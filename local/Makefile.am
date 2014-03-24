@@ -17,13 +17,21 @@ noinst_LTLIBRARIES = libopenwebrtc_local.la
 
 libopenwebrtc_local_la_SOURCES = \
     owr_local.c \
+if TARGET_APPLE
+    apple_sources = owr_device_list_avf.m
+    apple_noinst_headers = owr_device_list_avf_private.h
+endif
+
     owr_local_media_source.c \
     owr_media_renderer.c \
     owr_audio_renderer.c \
     owr_video_renderer.c \
     owr_image_renderer.c \
     owr_image_server.c \
-    owr_window_registry.c
+    owr_window_registry.c \
+    owr_image_server.c \
+    owr_device_list.c \
+    $(apple_sources)
 
 libopenwebrtc_local_la_LIBADD = \
     $(GSTREAMER_LIBS) \
@@ -38,11 +46,14 @@ include_HEADERS = \
     owr_video_renderer.h \
     owr_image_renderer.h \
     owr_image_server.h \
-    owr_window_registry.h
+    owr_window_registry.h \
+    owr_image_renderer_private.h \
+    owr_device_list_private.h
 
 noinst_HEADERS = \
     owr_local_media_source_private.h \
     owr_image_renderer_private.h \
-    owr_window_registry_private.h
+    owr_window_registry_private.h \
+    $(apple_noinst_headers)
 
 -include $(top_srcdir)/git.mk
