@@ -104,6 +104,7 @@ G_DEFINE_TYPE(OwrMediaSource, owr_media_source, G_TYPE_OBJECT)
 struct _OwrMediaSourcePrivate {
     gchar *name;
     OwrMediaType media_type;
+    guint device_index;
 
     OwrSourceType type;
     OwrCodecType codec_type;
@@ -186,6 +187,7 @@ static void owr_media_source_init(OwrMediaSource *source)
     priv->media_type = DEFAULT_MEDIA_TYPE;
     priv->type = DEFAULT_TYPE;
 
+    priv->device_index = (guint)-1;
     priv->source_bin = NULL;
     priv->source_tee = NULL;
 
@@ -581,6 +583,12 @@ void _owr_media_source_set_type(OwrMediaSource *media_source, OwrSourceType type
     g_return_if_fail(OWR_IS_MEDIA_SOURCE(media_source));
     /* an enum is an int type so we can use atomic assignment */
     g_atomic_int_set(&media_source->priv->type, type);
+}
+
+void _owr_media_source_set_device_index(OwrMediaSource *media_source, gint device_index)
+{
+    g_return_if_fail(OWR_IS_MEDIA_SOURCE(media_source));
+    g_atomic_int_set(&media_source->priv->device_index, device_index);
 }
 
 OwrCodecType _owr_media_source_get_codec(OwrMediaSource *media_source)

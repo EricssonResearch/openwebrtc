@@ -56,3 +56,68 @@ OwrCodecType _owr_caps_to_codec_type(GstCaps *caps)
     GST_ERROR("Unknown caps: %" GST_PTR_FORMAT, (gpointer)caps);
     return OWR_CODEC_TYPE_NONE;
 }
+
+typedef struct {
+    GClosure *callback;
+    GList *list;
+    GMutex mutex;
+} CallbackMergeContext;
+
+/*
+ * Call the closure with the list as single argument.
+ * @callback: (scope sync) (transfer full): the callback to be called with the list
+ * @list: (transfer full): any list
+ */
+void _owr_utils_call_closure_with_list(GClosure *callback, GList *list)
+{
+    GValue values[1] = { G_VALUE_INIT };
+
+    g_return_if_fail(callback);
+
+    g_value_init(&values[0], G_TYPE_POINTER);
+    g_value_set_pointer(&values[0], list);
+
+    g_closure_invoke(callback, NULL, 1, values, NULL);
+    g_closure_unref(callback);
+
+    g_value_unset(&values[0]);
+}
+
+static void callback_merger_on_destroy_data(CallbackMergeContext *context, GClosure *closure)
+{
+    OWR_UNUSED(closure);
+
+    _owr_utils_call_closure_with_list(context->callback, context->list);
+
+    g_mutex_clear(&context->mutex);
+    g_free(context);
+}
+
+static void callback_merger(GList *list, CallbackMergeContext *context)
+{
+    g_mutex_lock(&context->mutex);
+    context->list = g_list_concat(context->list, list);
+    g_mutex_unlock(&context->mutex);
+}
+
+/*
+ * Returns a closure which should be called with a single GList argument.
+ * When the refcount of the closure reaches 0, final_callback is called
+ *  with a concatenation of all the lists that were sent to the closure.
+ */
+GClosure *_owr_utils_list_closure_merger_new(GClosure *final_callback)
+{
+    CallbackMergeContext *context;
+    GClosure *merger;
+
+    context = g_new0(CallbackMergeContext, 1);
+
+    context->callback = final_callback;
+    context->list = NULL;
+    g_mutex_init(&context->mutex);
+
+    merger = g_cclosure_new(G_CALLBACK(callback_merger), context, (GClosureNotify) callback_merger_on_destroy_data);
+    g_closure_set_marshal(merger, g_cclosure_marshal_generic);
+
+    return merger;
+}

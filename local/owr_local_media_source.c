@@ -497,8 +497,8 @@ done:
     return source_element;
 }
 
-OwrLocalMediaSource *_owr_local_media_source_new(gchar *name, OwrMediaType media_type,
-    OwrSourceType source_type)
+OwrLocalMediaSource *_owr_local_media_source_new(gint device_index, const gchar *name,
+    OwrMediaType media_type, OwrSourceType source_type)
 {
     OwrLocalMediaSource *source;
 
@@ -507,6 +507,7 @@ OwrLocalMediaSource *_owr_local_media_source_new(gchar *name, OwrMediaType media
         "media-type", media_type,
         NULL);
 
+    _owr_media_source_set_device_index(OWR_MEDIA_SOURCE(source), device_index);
     _owr_media_source_set_type(OWR_MEDIA_SOURCE(source), source_type);
 
     return source;

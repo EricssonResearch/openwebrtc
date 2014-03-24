@@ -52,6 +52,8 @@ void _owr_media_source_release_source(OwrMediaSource *media_source, GstElement *
 
 void _owr_media_source_set_type(OwrMediaSource *source, OwrSourceType type);
 
+void _owr_media_source_set_device_index(OwrMediaSource *source, gint device_index);
+
 void _owr_media_source_set_codec(OwrMediaSource *source, OwrCodecType codec_type);
 OwrCodecType _owr_media_source_get_codec(OwrMediaSource *source);
 
