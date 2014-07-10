@@ -1,6 +1,6 @@
 ## Process this file with automake to produce Makefile.in
 
-SUBDIRS = transport local owr bridge docs
+SUBDIRS = transport local owr bridge tests docs
 
 if OWR_DEBUG
 DEBUG_CFLAGS = "-g"
