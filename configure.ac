@@ -86,6 +86,7 @@ owr/Makefile
 owr/openwebrtc-0.1.pc
 transport/Makefile
 local/Makefile
+tests/Makefile
 docs/Makefile
 docs/reference/Makefile
 docs/reference/owr/Makefile
