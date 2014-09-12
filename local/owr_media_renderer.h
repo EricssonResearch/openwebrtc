@@ -65,7 +65,7 @@ struct _OwrMediaRendererClass {
 
 GType owr_media_renderer_get_type(void) G_GNUC_CONST;
 
-gboolean owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *source);
+void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *source);
 
 G_END_DECLS
 

@@ -204,13 +204,14 @@ done:
     return gst_element_get_static_pad(sink, "sink");
 }
 
-static void unlink_source(OwrMediaRenderer *renderer)
-{
-    gst_pad_unlink(renderer->priv->srcpad, renderer->priv->sinkpad);
-    /* FIXME - need to release request pads after unlink */
-}
-
-gboolean owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *source)
+/**
+ * owr_media_renderer_set_source:
+ * @renderer:
+ * @source: (transfer none) (allow-none):
+ *
+ * Returns:
+ */
+void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *source)
 {
     OwrMediaRendererPrivate *priv;
     gboolean ret = TRUE;
@@ -218,21 +219,28 @@ gboolean owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSourc
     GstCaps *caps;
     GstPadLinkReturn pad_link_return;
 
-    g_assert(renderer);
-    g_assert(source);
+    g_return_if_fail(renderer);
+    g_return_if_fail(!source || OWR_IS_MEDIA_SOURCE(source));
 
     priv = renderer->priv;
 
     g_mutex_lock(&priv->media_renderer_lock);
 
+    if (source == priv->source)
+        return;
+
     if (priv->source) {
-        unlink_source(renderer);
+        _owr_media_source_unlink(priv->source, priv->sinkpad);
+        priv->srcpad = NULL;
         g_object_unref(priv->source);
         priv->source = NULL;
     }
 
     g_mutex_unlock(&priv->media_renderer_lock);
     /* FIXME - too much locking/unlocking of the same lock across private API? */
+
+    if (!source)
+        return;
 
     sinkpad = _owr_media_renderer_get_pad(renderer);
     g_assert(sinkpad);
@@ -258,5 +266,4 @@ done:
     priv->srcpad = srcpad;
     priv->sinkpad = sinkpad;
     g_mutex_unlock(&priv->media_renderer_lock);
-    return ret;
 }
