@@ -67,6 +67,7 @@ struct _OwrMediaSessionPrivate {
     GPtrArray *receive_payloads;
     GClosure *on_send_payload;
     GClosure *on_send_source;
+    OwrMediaSource *new_send_source;
 };
 
 enum {
@@ -196,7 +197,9 @@ static void owr_media_session_finalize(GObject *object)
         g_free(priv->cname);
 
     if (priv->send_source)
-        g_object_unref(priv->send_source);
+        owr_media_session_set_send_source(media_session, NULL);
+    if (priv->new_send_source)
+        g_object_unref(priv->new_send_source);
 
     if (priv->send_payload)
         g_object_unref(priv->send_payload);
@@ -284,6 +287,7 @@ static void owr_media_session_init(OwrMediaSession *media_session)
     priv->receive_payloads = g_ptr_array_new_with_free_func((GDestroyNotify)g_object_unref);
     priv->on_send_payload = NULL;
     priv->on_send_source = NULL;
+    priv->new_send_source = NULL;
     g_rw_lock_init(&priv->rw_lock);
 }
 
@@ -352,7 +356,7 @@ void owr_media_session_set_send_payload(OwrMediaSession *media_session, OwrPaylo
 /**
  * owr_media_session_set_send_source:
  * @media_session: The media session on which to set the send source.
- * @source: the send source to set
+ * @source: (transfer none) (allow-none): the send source to set
  *
  * Sets the source from which data will be sent.
  */
@@ -361,13 +365,14 @@ void owr_media_session_set_send_source(OwrMediaSession *media_session, OwrMediaS
     GHashTable *args;
 
     g_return_if_fail(OWR_IS_MEDIA_SESSION(media_session));
-    g_return_if_fail(OWR_IS_MEDIA_SOURCE(source));
+    g_return_if_fail(!source || OWR_IS_MEDIA_SOURCE(source));
 
     args = g_hash_table_new(g_str_hash, g_str_equal);
     g_hash_table_insert(args, "media_session", media_session);
     g_hash_table_insert(args, "source", source);
     g_object_ref(media_session);
-    g_object_ref(source);
+    if (source)
+        g_object_ref(source);
 
     _owr_schedule_with_hash_table((GSourceFunc)set_send_source, args);
 }
@@ -458,7 +463,7 @@ static gboolean set_send_source(GHashTable *args)
     OwrMediaSession *media_session;
     OwrMediaSessionPrivate *priv;
     OwrMediaSource *source;
-    GValue params[1] = { G_VALUE_INIT };
+    GValue params[2] = { G_VALUE_INIT, };
 
     g_return_val_if_fail(args, FALSE);
 
@@ -466,22 +471,22 @@ static gboolean set_send_source(GHashTable *args)
     source = g_hash_table_lookup(args, "source");
 
     g_return_val_if_fail(OWR_IS_MEDIA_SESSION(media_session), FALSE);
-    g_return_val_if_fail(OWR_IS_MEDIA_SOURCE(source), FALSE);
+    g_return_val_if_fail(!source || OWR_IS_MEDIA_SOURCE(source), FALSE);
 
     priv = media_session->priv;
-
-    if (priv->send_source)
-        g_object_unref(priv->send_source);
-
-    priv->send_source = source;
 
     if (priv->on_send_source) {
         g_value_init(&params[0], OWR_TYPE_MEDIA_SESSION);
         g_value_set_instance(&params[0], media_session);
-        g_closure_invoke(priv->on_send_source, NULL, 1, (const GValue *)&params, NULL);
+        g_value_init(&params[1], OWR_TYPE_MEDIA_SOURCE);
+        g_value_set_instance(&params[1], source);
+        g_closure_invoke(priv->on_send_source, NULL, 2, (const GValue *)&params, NULL);
+    } else {
+        if (priv->new_send_source)
+            g_object_unref(priv->new_send_source);
+        priv->new_send_source = source;
     }
 
-    g_object_unref(source);
     g_object_unref(media_session);
     g_hash_table_unref(args);
 
@@ -544,7 +549,11 @@ void _owr_media_session_set_on_send_source(OwrMediaSession *media_session, GClos
     g_return_if_fail(on_send_source);
 
     media_session->priv->on_send_source = on_send_source;
-    g_closure_set_marshal(media_session->priv->on_send_source, g_cclosure_marshal_VOID__VOID);
+    g_closure_set_marshal(media_session->priv->on_send_source, g_cclosure_marshal_generic);
+    if (media_session->priv->new_send_source) {
+        owr_media_session_set_send_source(media_session, media_session->priv->new_send_source);
+        media_session->priv->new_send_source = NULL;
+    }
 }
 
 void _owr_media_session_clear_closures(OwrMediaSession *media_session)
