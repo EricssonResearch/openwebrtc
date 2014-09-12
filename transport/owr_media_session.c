@@ -68,6 +68,8 @@ struct _OwrMediaSessionPrivate {
     GClosure *on_send_payload;
     GClosure *on_send_source;
     OwrMediaSource *new_send_source;
+    GSList *remote_sources;
+    GMutex remote_source_lock;
 };
 
 enum {
@@ -172,6 +174,10 @@ static void owr_media_session_on_incoming_source(OwrMediaSession *media_session,
     g_warn_if_fail(media_session);
     g_warn_if_fail(source);
 
+    g_mutex_lock(&media_session->priv->remote_source_lock);
+    media_session->priv->remote_sources = g_slist_append(media_session->priv->remote_sources, source);
+    g_mutex_unlock(&media_session->priv->remote_source_lock);
+
     g_object_unref(source);
 }
 
@@ -195,6 +201,14 @@ static void owr_media_session_finalize(GObject *object)
 
     if (priv->cname)
         g_free(priv->cname);
+
+    if (priv->remote_sources) {
+        g_mutex_lock(&priv->remote_source_lock);
+        g_slist_free_full(priv->remote_sources, g_object_unref);
+        priv->remote_sources = NULL;
+        g_mutex_unlock(&priv->remote_source_lock);
+    }
+    g_mutex_clear(&priv->remote_source_lock);
 
     if (priv->send_source)
         owr_media_session_set_send_source(media_session, NULL);
@@ -288,6 +302,8 @@ static void owr_media_session_init(OwrMediaSession *media_session)
     priv->on_send_payload = NULL;
     priv->on_send_source = NULL;
     priv->new_send_source = NULL;
+    priv->remote_sources = NULL;
+    g_mutex_init(&priv->remote_source_lock);
     g_rw_lock_init(&priv->rw_lock);
 }
 
