@@ -80,10 +80,16 @@ static void owr_media_renderer_finalize(GObject *object)
     OwrMediaRenderer *renderer = OWR_MEDIA_RENDERER(object);
     OwrMediaRendererPrivate *priv = renderer->priv;
 
-    if (priv->source)
+    if (priv->source) {
+        _owr_media_source_unlink(priv->source, priv->sinkpad);
         g_object_unref(priv->source);
-    if (priv->sink)
-        g_object_unref(priv->sink);
+        priv->source = NULL;
+    }
+    if (priv->sink) {
+        gst_element_set_state(priv->sink, GST_STATE_NULL);
+        gst_bin_remove(GST_BIN(_owr_get_pipeline()), priv->sink);
+        priv->sink = NULL;
+    }
 
     g_mutex_clear(&priv->media_renderer_lock);
 
