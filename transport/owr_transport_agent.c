@@ -606,6 +606,9 @@ static void maybe_handle_new_send_source_with_payload(OwrTransportAgent *transpo
     OwrPayload *payload = NULL;
     OwrMediaSource *media_source = NULL;
 
+    g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
+    g_return_if_fail(OWR_IS_MEDIA_SESSION(media_session));
+
     if ((payload = _owr_media_session_get_send_payload(media_session)) &&
         (media_source = _owr_media_session_get_send_source(media_session))) {
         handle_new_send_payload(transport_agent, media_session, payload);
