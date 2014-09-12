@@ -412,6 +412,11 @@ void owr_transport_agent_set_local_port_range(OwrTransportAgent *transport_agent
     transport_agent->priv->local_max_port = max_port;
 }
 
+/**
+ * owr_transport_agent_add_session:
+ * @agent:
+ * @session: (transfer full):
+ */
 void owr_transport_agent_add_session(OwrTransportAgent *agent, OwrSession *session)
 {
     GHashTable *args;
@@ -741,7 +746,6 @@ static gboolean add_media_session(GHashTable *args)
     }
 
     g_hash_table_insert(sessions, GUINT_TO_POINTER(stream_id), media_session);
-    g_object_ref(media_session);
 
     update_helper_servers(transport_agent, stream_id);
 
