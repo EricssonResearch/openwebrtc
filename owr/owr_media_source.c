@@ -201,7 +201,7 @@ GstElement *_owr_media_source_get_element(OwrMediaSource *media_source)
 void _owr_media_source_set_element(OwrMediaSource *media_source, GstElement *element)
 {
     g_return_if_fail(OWR_IS_MEDIA_SOURCE(media_source));
-    g_return_if_fail(GST_IS_ELEMENT(element));
+    g_return_if_fail(!element || GST_IS_ELEMENT(element));
 
     media_source->priv->source_bin = element;
 }
