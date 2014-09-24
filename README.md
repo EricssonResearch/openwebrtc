@@ -15,6 +15,14 @@ How to build OWR.
 ./build.sh -r osx ios
 ```
 
+## Community
+For support, questions and discussions you have the following options:
+* Public [mailing list](https://groups.google.com/forum/#!forum/ericsson-labs-web-rtc)
+* Twitter: [@OpenWebRTC](https://twitter.com/OpenWebRTC)
+* IRC?
+* OpenWebRTC [Blog](http://www.openwebrtc.io/blog/), maintained by Ericsson Research
+* Issue tracker
+
 ## Examples using OpenWebRTC
 Bowser is a mobile browser that uses OpenWebRTC as a WebRTC back-end. As you can see [here](/EricssonResearch/bowser), Bowser is in fact a very thin layer of UI code on top of OpenWebRTC.
 
