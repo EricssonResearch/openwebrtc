@@ -6,7 +6,19 @@ OpenWebRTC is built on the belief that the [WebRTC standard](http://www.w3.org/2
 
 Having independent, interoperable, implementations is important for the health of any standard, and WebRTC is no exception. The ambition of OpenWebRTC is to follow the WebRTC standard closely as it continues to evolve. The bulk of the API layer is therefore implemented in JavaScript, making it super fast to modify and extend with new functionality.
 
+## Architecture
+Write stuff here.
+
+## Building
+How to build OWR.
+```
+./build.sh -r osx ios
+```
+
 ## Examples using OpenWebRTC
 Bowser is a mobile browser that uses OpenWebRTC as a WebRTC back-end. As you can see [here](/EricssonResearch/bowser), Bowser is in fact a very thin layer of UI code on top of OpenWebRTC.
 
 Before being released publicly, OpenWebRTC has been used to build several research prototypes such as [this](http://www.ericsson.com/research-blog/context-aware-communication/field-service-support-google-glass-webrtc/) and [that](http://www.ericsson.com/research-blog/5g/remote-excavation-using-webrtc-real-time-video-eye-5g/). 
+
+## License
+Open WebRTC is released under BSD-2 clause. See LICENSE for details.
