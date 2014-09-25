@@ -7,6 +7,8 @@ OpenWebRTC is built on the belief that the [WebRTC standard](http://www.w3.org/2
 Having independent, interoperable, implementations is important for the health of any standard, and WebRTC is no exception. The ambition of OpenWebRTC is to follow the WebRTC standard closely as it continues to evolve. The bulk of the API layer is therefore implemented in JavaScript, making it super fast to modify and extend with new functionality.
 
 ## Architecture
+<img src="http://www.openwebrtc.io/s/ArchOwr.jpg" alt="Simplified architecture" width="499" height="375">
+
 Write stuff here.
 
 ## Building
