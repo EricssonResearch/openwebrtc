@@ -20,7 +20,7 @@ How to build OWR.
 For support, questions and discussions:
 * Public [mailing list](https://groups.google.com/forum/#!forum/ericsson-labs-web-rtc)
 * Twitter: [@OpenWebRTC](https://twitter.com/OpenWebRTC)
-* IRC?
+* [IRC](irc://chat.freenode.net/openwebrtc)
 * OpenWebRTC [blog](http://www.openwebrtc.io/blog/) (maintained by Ericsson Research)
 * [Issue tracker](https://github.com/EricssonResearch/openwebrtc/issues)
 
