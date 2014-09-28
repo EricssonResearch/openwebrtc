@@ -34,10 +34,11 @@ cd -
 ```
 The available target platform when building on Mac can be seen above, if you are building on Linux the available target platforms are "linux" and "android".
 ### Build OpenWebRTC
-How to build OWR.
+The OpenWebRTC framework is built using one command.
 ```
 ./build.sh -r osx ios android ios-simulator
 ```
+The available target platform when building on Mac can be seen above, if you are building on Linux the available target platforms are "linux" and "android".
 Now the OpenWebRTC framework is compiled and ready to be incorporated into you application.
 
 ## Community
