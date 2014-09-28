@@ -29,6 +29,7 @@ The external opensource that is used by OpenWebRTC framework is build separately
 ```
 cd scripts/dependencies
 ./build-all.sh -r osx ios android ios-simulator
+./deploy_deps.sh
 cd -
 ```
 The available target platform when building on Mac can be seen above, if you are building on Linux the available target platforms are "linux" and "android".
