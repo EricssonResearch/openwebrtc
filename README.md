@@ -11,6 +11,20 @@ OpenWebRTC was designed for flexibility and modularity. The bulk of the API laye
 <img src="http://static.squarespace.com/static/53f1eedee4b0439bf8d480c5/t/54241e32e4b04e698dffecec/1411653170102/Arch.png" alt="Simplified architecture" width="445" height="247">
 
 ## Building
+### Extracting the code
+```
+git clone https://github.com/EricssonResearch/openwebrtc.git --recursive
+cd openwebrtc
+```
+### Environment configuration
+Before we can start building OpenWebRTC we need to build some tools. This is done in the botstrap directory
+```
+cd scripts/bootstrap
+./bootstrap.sh -r osx
+cd -
+```
+If you are using a Linux computer instead of a Mac exchange the "osx" argument above to "linux"
+### Build OpenWebRTC
 How to build OWR.
 ```
 ./build.sh -r osx ios
