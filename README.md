@@ -11,7 +11,7 @@ OpenWebRTC was designed for flexibility and modularity. The bulk of the API laye
 <img src="http://static.squarespace.com/static/53f1eedee4b0439bf8d480c5/t/54241e32e4b04e698dffecec/1411653170102/Arch.png" alt="Simplified architecture" width="445" height="247">
 
 ## Building
-### Extracting the code
+#### Extracting the code
 ```
 git clone https://github.com/EricssonResearch/openwebrtc.git --recursive
 cd openwebrtc
