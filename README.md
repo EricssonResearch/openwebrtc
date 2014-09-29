@@ -17,15 +17,16 @@ git clone https://github.com/EricssonResearch/openwebrtc.git --recursive
 cd openwebrtc
 ```
 #### Environment configuration
-Before we can start building OpenWebRTC we need to build some tools. This is done in the bootstrap directory
+Before we can start building OpenWebRTC we need to build some tools. This is done in the bootstrap directory:
 ```
 cd scripts/bootstrap
 ./bootstrap.sh -r osx
 cd -
 ```
-If you are using a Linux computer instead of a Mac exchange the "osx" argument above to "linux"
-#### Build the external opensource
-The external opensource that is used by OpenWebRTC framework is build separately using the following commands
+If you are using a Linux computer instead of a Mac exchange the "osx" argument above to "linux".
+
+#### Build the external open source
+The external open source that is used by OpenWebRTC framework is build separately using the following commands:
 ```
 cd scripts/dependencies
 ./build-all.sh -r osx ios android ios-simulator
@@ -33,12 +34,14 @@ cd scripts/dependencies
 cd -
 ```
 The available target platform when building on Mac can be seen above, if you are building on Linux the available target platforms are "linux" and "android".
+
 #### Build OpenWebRTC
-The OpenWebRTC framework is built using one command.
+The OpenWebRTC framework is built using one command:
 ```
 ./build.sh -r osx ios android ios-simulator
 ```
 The available target platform when building on Mac can be seen above, if you are building on Linux the available target platforms are "linux" and "android".
+
 Now the OpenWebRTC framework is compiled and ready to be incorporated into you application.
 
 ## Community
