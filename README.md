@@ -13,6 +13,13 @@ OpenWebRTC was designed for flexibility and modularity. The bulk of the API laye
 Applications built on top of OpenWebRTC will be interoperable with popular WebRTC-enabled browsers such as Chrome and Firefox. 
 
 ## Building
+#### External programs to install
+##### iOS
+To build for the iOS platform Xcode and the command line tools needs to be installed on the computer.
+
+##### Android
+The NDK version r9d needs to be installed and the ndk-build program must be in the path. The latest SDK shall also be installed and the adb program be available in the path.
+
 #### Extracting the code
 ```
 git clone https://github.com/EricssonResearch/openwebrtc.git --recursive
