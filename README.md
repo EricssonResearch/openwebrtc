@@ -28,7 +28,7 @@ cd -
 If you are using a Linux computer instead of a Mac exchange the "osx" argument above to "linux".
 
 #### Build the external open source
-The external open source that is used by OpenWebRTC framework is build separately using the following commands:
+The external open source that is used by OpenWebRTC framework is built separately using the following commands:
 ```
 cd scripts/dependencies
 ./build-all.sh -r osx ios android ios-simulator
