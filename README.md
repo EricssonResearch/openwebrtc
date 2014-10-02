@@ -23,7 +23,7 @@ The NDK version r9d needs to be installed and the ndk-build program must be in t
 #### Extracting the code
 Fork the OpenWebRTC git and then extract your local copy.
 ```
-git clone https://github.com/<YourName>/openwebrtc.git --recursive
+git clone https://github.com/EricssonResearch/openwebrtc.git --recursive
 cd openwebrtc
 ```
 #### Environment configuration
@@ -43,7 +43,7 @@ cd scripts/dependencies
 ./deploy_deps.sh
 cd -
 ```
-The available target platform when building on Mac can be seen above, if you are building on Linux the available target platforms are "linux" and "android".
+The available target platforms when building on Mac can be seen above, if you are building on Linux the available target platforms are "linux" and "android".
 
 #### Build OpenWebRTC
 The OpenWebRTC framework is built using one command:
@@ -52,7 +52,7 @@ The OpenWebRTC framework is built using one command:
 ```
 The available target platform when building on Mac can be seen above, if you are building on Linux the available target platforms are "linux" and "android".
 
-Now the OpenWebRTC framework is compiled and ready to be incorporated into you application.
+Now the OpenWebRTC framework is compiled and ready to be incorporated into your application.
 
 ## Community
 For support, questions and discussions:
