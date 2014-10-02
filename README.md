@@ -23,7 +23,7 @@ The NDK version r9d needs to be installed and the ndk-build program must be in t
 #### Extracting the code
 Fork the OpenWebRTC git and then extract your local copy.
 ```
-git clone https://github.com/EricssonResearch/openwebrtc.git --recursive
+git clone https://github.com/<YourName>/openwebrtc.git --recursive
 cd openwebrtc
 ```
 #### Environment configuration
