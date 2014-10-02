@@ -19,7 +19,7 @@ LIBOPENWEBRTC_CFLAGS="-DGLIB_VERSION_MIN_REQUIRED=GLIB_VERSION_2_32 -DGLIB_VERSI
 AC_SUBST(LIBOPENWEBRTC_CFLAGS)
 
 PKG_CHECK_MODULES(GLIB, [glib-2.0, gobject-2.0, gmodule-2.0, gthread-2.0])
-PKG_CHECK_MODULES(GSTREAMER, [gstreamer-1.0 >= 1.0.10 gstreamer-rtp-1.0 >= 1.0.10])
+PKG_CHECK_MODULES(GSTREAMER, [gstreamer-1.0 >= 1.0.10 gstreamer-rtp-1.0 >= 1.0.10 gstreamer-video-1.0 >= 1.0.10 gstreamer-app-1.0 >= 1.0.10])
 PKG_CHECK_MODULES(NICE, [nice >= 0.1.7.1])
 PKG_CHECK_MODULES(ORC, [orc-0.4])
 PKG_CHECK_MODULES(SEED, [seed])
