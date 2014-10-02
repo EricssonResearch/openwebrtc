@@ -9,11 +9,9 @@ AM_CPPFLAGS = \
     -I$(top_srcdir)/owr
 
 AM_CFLAGS = \
-    -ansi \
     -Wall \
     -Wextra \
-    -Werror \
-    -pedantic
+    -Werror
 
 noinst_LTLIBRARIES = libopenwebrtc_local.la
 
