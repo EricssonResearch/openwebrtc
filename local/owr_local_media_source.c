@@ -292,7 +292,7 @@ static GstPad *owr_local_media_source_get_pad(OwrMediaSource *media_source, GstC
     OwrLocalMediaSource *local_source;
     OwrLocalMediaSourcePrivate *priv;
     GstElement *source_bin, *post_tee_bin;
-    GstElement *source, *capsfilter = NULL, *tee;
+    GstElement *source = NULL, *capsfilter = NULL, *tee;
     GstPad *ghostpad = NULL;
     gchar *pad_name;
     OwrMediaType media_type = OWR_MEDIA_TYPE_UNKNOWN;
