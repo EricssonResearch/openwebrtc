@@ -204,7 +204,6 @@ static GstElement *create_post_tee_bin(OwrMediaSource *media_source, GstElement 
         CREATE_ELEMENT_WITH_ID(videoscale, "videoscale", "source-video-scale", source_id);
         list = g_slist_prepend(list, videoscale);
         CREATE_ELEMENT_WITH_ID(videorate, "videorate", "source-video-rate", source_id);
-        g_object_set(videorate, "drop-only", TRUE, NULL);
         list = g_slist_prepend(list, videorate);
         list = g_slist_prepend(list, queue_pre);
 
