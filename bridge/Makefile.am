@@ -36,7 +36,8 @@ libopenwebrtc_bridge_la_LDFLAGS = -export-dynamic
 
 bin_PROGRAMS = daemon
 daemon_SOURCES = daemon.c
-daemon_LDFLAGS = -static -export-dynamic $(SEED_LIBS) libopenwebrtc_bridge.la
+daemon_LDFLAGS = -static -export-dynamic $(SEED_LIBS)
+daemon_LDADD = libopenwebrtc_bridge.la
 
 includedir = $(prefix)/include/owr
 include_HEADERS = \
