@@ -34,8 +34,12 @@
 
 #include <glib.h>
 
+G_BEGIN_DECLS
+
 typedef void (*OwrCaptureSourcesCallback) (GList *sources, gpointer user_data);
 
 void owr_get_capture_sources(OwrMediaType types, OwrCaptureSourcesCallback callback, gpointer user_data);
+
+G_END_DECLS
 
 #endif /* __OWR_LOCAL_H__ */
