@@ -252,16 +252,17 @@ GstElement * _owr_payload_create_encoder(OwrPayload *payload)
         break;
 
     case OWR_CODEC_TYPE_H264:
-        g_object_set(encoder, "gop-size", 0, "bitrate", evaluate_bitrate_from_payload(payload), NULL);
+        g_object_set(encoder, "gop-size", 0, NULL);
         gst_util_set_object_arg(G_OBJECT(encoder), "rate-control", "bitrate");
         g_object_bind_property(payload, "bitrate", encoder, "bitrate", G_BINDING_SYNC_CREATE);
+        g_object_set(payload, "bitrate", evaluate_bitrate_from_payload(payload), NULL);
         break;
 
     case OWR_CODEC_TYPE_VP8:
         g_object_set(encoder, "end-usage", 1, "deadline", G_GINT64_CONSTANT(1), "lag-in-frames", 0,
-            "error-resilient", 1, "keyframe-mode", 0,
-            "target-bitrate", evaluate_bitrate_from_payload(payload), NULL);
+            "error-resilient", 1, "keyframe-mode", 0, NULL);
         g_object_bind_property(payload, "bitrate", encoder, "target-bitrate", G_BINDING_SYNC_CREATE);
+        g_object_set(payload, "bitrate", evaluate_bitrate_from_payload(payload), NULL);
         break;
     default:
         break;
