@@ -11,11 +11,9 @@ AM_CPPFLAGS = \
     -I$(top_srcdir)/owr
 
 AM_CFLAGS = \
-    -ansi \
     -Wall \
     -Wextra \
     -Werror \
-    -pedantic \
     $(DEBUG_CFLAGS)
 
 noinst_LTLIBRARIES = libopenwebrtc_transport.la

@@ -8,11 +8,9 @@ AM_CPPFLAGS = \
     $(GSTREAMER_CFLAGS)
 
 AM_CFLAGS = \
-    -ansi \
     -Wall \
     -Wextra \
     -Werror \
-    -pedantic \
     $(DEBUG_CFLAGS)
 
 lib_LTLIBRARIES = libopenwebrtc.la

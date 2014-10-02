@@ -16,7 +16,6 @@ AM_CFLAGS = \
     -Wall \
     -Wextra \
     -Werror \
-    -pedantic \
     $(DEBUG_CFLAGS)
 
 lib_LTLIBRARIES = libopenwebrtc_bridge.la
