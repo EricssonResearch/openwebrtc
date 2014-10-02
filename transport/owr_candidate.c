@@ -230,12 +230,12 @@ static void owr_candidate_class_init(OwrCandidateClass *klass)
         OWR_CANDIDATE_TYPE_HOST, OWR_CANDIDATE_TYPE_RELAY, OWR_CANDIDATE_TYPE_HOST,
         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS);
 
-    obj_properties[PROP_COMPONENT_TYPE] = g_param_spec_uint("component_type", "Component type",
+    obj_properties[PROP_COMPONENT_TYPE] = g_param_spec_uint("component-type", "Component type",
         "The stream component type (RTP/RTCP)",
         OWR_COMPONENT_TYPE_RTP, OWR_COMPONENT_TYPE_RTCP, OWR_COMPONENT_TYPE_RTP,
         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS);
 
-    obj_properties[PROP_TRANSPORT_TYPE] = g_param_spec_uint("transport_type", "Transport type",
+    obj_properties[PROP_TRANSPORT_TYPE] = g_param_spec_uint("transport-type", "Transport type",
         "The transport type (UDP or TCP (active/passive/simultaneous open))",
         OWR_TRANSPORT_TYPE_UDP, OWR_TRANSPORT_TYPE_TCP_SO, OWR_TRANSPORT_TYPE_UDP,
         G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
