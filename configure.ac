@@ -22,7 +22,6 @@ PKG_CHECK_MODULES(GSTREAMER, [gstreamer-1.0 >= 1.0.10 gstreamer-rtp-1.0 >= 1.0.1
 PKG_CHECK_MODULES(NICE, [nice >= 0.1.4])
 PKG_CHECK_MODULES(ORC, [orc-0.4])
 PKG_CHECK_MODULES(SEED, [seed])
-PKG_CHECK_MODULES(OPENWEBRTC_GST_PLUGINS, [openwebrtc-gst-plugins])
 
 # check for gobject-introspection
 m4_ifdef([GOBJECT_INTROSPECTION_CHECK], [
