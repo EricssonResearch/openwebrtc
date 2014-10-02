@@ -1,0 +1,13 @@
+#!/bin/bash
+
+SCRIPT_PATH=`realpath $0`
+SCRIPT_DIR=`dirname $SCRIPT_PATH`
+HOOK="${0##*/}"
+
+if [ -x $0.local ]; then
+    $0.local "$@" || exit $?
+fi
+
+if [ -x $SCRIPT_DIR/$HOOK ]; then
+    $SCRIPT_DIR/$HOOK "$@" || exit $?
+fi

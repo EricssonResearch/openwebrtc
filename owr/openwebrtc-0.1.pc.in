@@ -1,0 +1,13 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+datarootdir=@datarootdir@
+datadir=@datadir@
+includedir=@includedir@/libopenwebrtc-0.1
+
+Name: libopenwebrtc
+Description: libopenwebrtc
+Version: @VERSION@
+Requires: glib-2.0 gobject-2.0 gmodule-2.0 gthread-2.0 gstreamer-1.0 nice
+Libs: -L${libdir} -lopenwebrtc
+Cflags: -I${includedir}

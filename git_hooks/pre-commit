@@ -1,0 +1,55 @@
+#!/bin/sh
+#
+# A pre-commit hook that runs WebKit style checking on the staged
+# changes and rejects if there are any style issues to be resolved.
+
+# If you want to allow non-ASCII filenames set this variable to true.
+# allownonascii=$(git config --bool hooks.allownonascii) can be used
+# instead of always setting allownoascii to false.
+allownoascii="false"
+
+# Redirect output to stderr.
+exec 1>&2
+
+# Cross platform projects tend to avoid non-ASCII filenames; prevent
+# them from being added to the repository. We exploit the fact that the
+# printable range starts at the space character and ends with tilde.
+if [ "$allownonascii" != "true" ] &&
+    # Note that the use of brackets around a tr range is ok here, (it's
+    # even required, for portability to Solaris 10's /usr/bin/tr), since
+    # the square bracket bytes happen to fall in the designated range.
+    test $(git diff --cached --name-only --diff-filter=A -z $against |
+        LC_ALL=C tr -d '[ -~]\0' | wc -c) != 0
+then
+    echo "Error: Attempt to add a non-ASCII file name. Only ASCII file names are allowed"
+    echo "in this project."
+    exit 1
+fi
+
+# If there are whitespace errors, print the offending file names and fail.
+echo "Checking for whitespace errors..."
+git diff-index --check --cached HEAD --
+if [ $? -ne 0 ]
+then
+    echo "Commit failed due to whitespace errors"
+    exit 1
+fi
+
+CHECK_PROGRAM="$HOME/.openwebrtc/bin/openwebrtc-style-check"
+if [ ! -x $CHECK_PROGRAM ]
+then
+    echo "'$CHECK_PROGRAM' not found or not executable."
+    echo "Note: ~/.openwebrtc is created by running the OpenWebRTC build environment bootstrap."
+    exit 1
+fi
+
+echo "Checking style.."
+$CHECK_PROGRAM --git-index
+if [ $? -eq 0 ]
+then
+    echo "Style OK"
+    exit 0
+else
+    echo "Commit failed due to style errors"
+    exit 1
+fi

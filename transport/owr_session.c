@@ -1,0 +1,434 @@
+/*
+ * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ * list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice, this
+ * list of conditions and the following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ */
+
+/*/
+\*\ OwrSession
+/*/
+
+
+/**
+ * SECTION:owr_session
+ * @short_description: OwrSession
+ * @title: OwrSession
+ *
+ * OwrSession - Represents a connection used for a session of either media or data.
+ */
+
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+#include "owr_session.h"
+
+#include "owr_candidate_private.h"
+#include "owr_private.h"
+#include "owr_session_private.h"
+
+#include <string.h>
+
+#define DEFAULT_DTLS_CLIENT_MODE FALSE
+#define DEFAULT_DTLS_CERTIFICATE "(auto)"
+#define DEFAULT_DTLS_KEY "(auto)"
+
+#define OWR_SESSION_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_SESSION, OwrSessionPrivate))
+
+G_DEFINE_TYPE(OwrSession, owr_session, G_TYPE_OBJECT)
+
+struct _OwrSessionPrivate {
+    gboolean rtcp_mux;
+    gboolean dtls_client_mode;
+    gchar *dtls_certificate;
+    gchar *dtls_key;
+    gchar *dtls_peer_certificate;
+    GSList *local_candidates;
+    GSList *remote_candidates;
+    GSList *forced_remote_candidates;
+    gboolean gathering_done;
+    GClosure *on_remote_candidate;
+};
+
+enum {
+    SIGNAL_ON_NEW_CANDIDATE,
+    SIGNAL_ON_CANDIDATE_GATHERING_DONE,
+
+    LAST_SIGNAL
+};
+
+#define DEFAULT_RTCP_MUX FALSE
+
+enum {
+    PROP_0,
+
+    PROP_DTLS_CLIENT_MODE,
+    PROP_DTLS_CERTIFICATE,
+    PROP_DTLS_KEY,
+    PROP_DTLS_PEER_CERTIFICATE,
+
+    N_PROPERTIES
+};
+
+static guint session_signals[LAST_SIGNAL] = { 0 };
+static GParamSpec *obj_properties[N_PROPERTIES] = {NULL, };
+
+static gboolean add_remote_candidate(GHashTable *args);
+
+
+static void owr_session_set_property(GObject *object, guint property_id, const GValue *value, GParamSpec *pspec)
+{
+    OwrSessionPrivate *priv = OWR_SESSION(object)->priv;
+
+    switch (property_id) {
+    case PROP_DTLS_CLIENT_MODE:
+        priv->dtls_client_mode = g_value_get_boolean(value);
+        break;
+
+    case PROP_DTLS_CERTIFICATE:
+        if (priv->dtls_certificate)
+            g_free(priv->dtls_certificate);
+        priv->dtls_certificate = g_value_dup_string(value);
+        if (priv->dtls_certificate && (!priv->dtls_certificate[0]
+            || g_strstr_len(priv->dtls_certificate, 5, "null"))) {
+            g_free(priv->dtls_certificate);
+            priv->dtls_certificate = NULL;
+        }
+        g_warn_if_fail(!priv->dtls_certificate
+            || g_str_has_prefix(priv->dtls_certificate, "-----BEGIN CERTIFICATE-----"));
+        break;
+
+    case PROP_DTLS_KEY:
+        if (priv->dtls_key)
+            g_free(priv->dtls_key);
+        priv->dtls_key = g_value_dup_string(value);
+        if (priv->dtls_key && (!priv->dtls_key[0] || g_strstr_len(priv->dtls_key, 5, "null"))) {
+            g_free(priv->dtls_key);
+            priv->dtls_key = NULL;
+        }
+        g_warn_if_fail(!priv->dtls_key
+            || g_str_has_prefix(priv->dtls_key, "-----BEGIN PRIVATE KEY-----")
+            || g_str_has_prefix(priv->dtls_key, "-----BEGIN RSA PRIVATE KEY-----"));
+        break;
+
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
+        break;
+    }
+}
+
+static void owr_session_get_property(GObject *object, guint property_id, GValue *value, GParamSpec *pspec)
+{
+    OwrSessionPrivate *priv = OWR_SESSION(object)->priv;
+
+    switch (property_id) {
+    case PROP_DTLS_CLIENT_MODE:
+        g_value_set_boolean(value, priv->dtls_client_mode);
+        break;
+
+    case PROP_DTLS_CERTIFICATE:
+        g_value_set_string(value, priv->dtls_certificate);
+        break;
+
+    case PROP_DTLS_KEY:
+        g_value_set_string(value, priv->dtls_key);
+        break;
+
+    case PROP_DTLS_PEER_CERTIFICATE:
+        g_value_set_string(value, priv->dtls_peer_certificate);
+        break;
+
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
+        break;
+    }
+}
+
+static void owr_session_on_new_candidate(OwrSession *session, OwrCandidate *candidate)
+{
+    OwrSessionPrivate *priv;
+
+    g_return_if_fail(session);
+    g_return_if_fail(candidate);
+
+    priv = session->priv;
+    g_warn_if_fail(!priv->gathering_done);
+    priv->local_candidates = g_slist_append(priv->local_candidates, candidate);
+}
+
+static void owr_session_on_candidate_gathering_done(OwrSession *session)
+{
+    g_return_if_fail(session);
+
+    session->priv->gathering_done = TRUE;
+}
+
+static void owr_session_finalize(GObject *object)
+{
+    OwrSession *session = OWR_SESSION(object);
+    OwrSessionPrivate *priv = session->priv;
+
+    if (priv->dtls_certificate)
+        g_free(priv->dtls_certificate);
+    if (priv->dtls_key)
+        g_free(priv->dtls_key);
+    if (priv->dtls_peer_certificate)
+        g_free(priv->dtls_peer_certificate);
+
+    g_slist_free_full(priv->local_candidates, (GDestroyNotify)g_object_unref);
+    g_slist_free_full(priv->remote_candidates, (GDestroyNotify)g_object_unref);
+    g_slist_free_full(priv->forced_remote_candidates, (GDestroyNotify)g_object_unref);
+
+    G_OBJECT_CLASS(owr_session_parent_class)->finalize(object);
+}
+
+static void owr_session_class_init(OwrSessionClass *klass)
+{
+    GObjectClass *gobject_class = G_OBJECT_CLASS(klass);
+
+    g_type_class_add_private(klass, sizeof(OwrSessionPrivate));
+
+    klass->on_new_candidate = owr_session_on_new_candidate;
+    klass->on_candidate_gathering_done = owr_session_on_candidate_gathering_done;
+
+    /**
+    * OwrSession::on-new-candidate:
+    * @session: the object which received the signal
+    * @candidate: the candidate gathered
+    *
+    * Notify of a new gathered candidate for a #OwrSession.
+    */
+    session_signals[SIGNAL_ON_NEW_CANDIDATE] = g_signal_new("on-new-candidate",
+        G_OBJECT_CLASS_TYPE(klass), G_SIGNAL_RUN_FIRST,
+        G_STRUCT_OFFSET(OwrSessionClass, on_new_candidate), NULL, NULL,
+        g_cclosure_marshal_VOID__OBJECT, G_TYPE_NONE, 1, OWR_TYPE_CANDIDATE);
+
+    /**
+    * OwrSession::on-candidate-gathering-done:
+    * @session: the object which received the signal
+    *
+    * Notify that all candidates have been gathered for a #OwrSession
+    */
+    session_signals[SIGNAL_ON_CANDIDATE_GATHERING_DONE] =
+        g_signal_new("on-candidate-gathering-done",
+        G_OBJECT_CLASS_TYPE(klass), G_SIGNAL_RUN_FIRST,
+        G_STRUCT_OFFSET(OwrSessionClass, on_candidate_gathering_done), NULL, NULL,
+        g_cclosure_marshal_VOID__VOID, G_TYPE_NONE, 0);
+
+    gobject_class->set_property = owr_session_set_property;
+    gobject_class->get_property = owr_session_get_property;
+    gobject_class->finalize = owr_session_finalize;
+
+    obj_properties[PROP_DTLS_CLIENT_MODE] = g_param_spec_boolean("dtls-client-mode",
+        "DTLS client mode", "TRUE if the DTLS connection should be setup using client role.",
+        DEFAULT_DTLS_CLIENT_MODE, G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+        G_PARAM_STATIC_STRINGS);
+
+    obj_properties[PROP_DTLS_CERTIFICATE] = g_param_spec_string("dtls-certificate",
+        "DTLS certificate", "The X509 certificate to be used by DTLS (in PEM format)."
+        " Set to NULL or empty string to disable DTLS",
+        DEFAULT_DTLS_CERTIFICATE, G_PARAM_STATIC_STRINGS | G_PARAM_READWRITE |
+        G_PARAM_STATIC_STRINGS);
+
+    obj_properties[PROP_DTLS_KEY] = g_param_spec_string("dtls-key",
+        "DTLS key", "The RSA private key to be used by DTLS (in PEM format)",
+        DEFAULT_DTLS_KEY, G_PARAM_STATIC_STRINGS | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+
+    obj_properties[PROP_DTLS_PEER_CERTIFICATE] = g_param_spec_string("dtls-peer-certificate",
+        "DTLS peer certificate",
+        "The X509 certificate of the remote peer, used by DTLS (in PEM format)",
+        NULL, G_PARAM_STATIC_STRINGS | G_PARAM_READABLE | G_PARAM_STATIC_STRINGS);
+
+    g_object_class_install_properties(gobject_class, N_PROPERTIES, obj_properties);
+
+}
+
+static void owr_session_init(OwrSession *session)
+{
+    OwrSessionPrivate *priv;
+
+    session->priv = priv = OWR_SESSION_GET_PRIVATE(session);
+    priv->dtls_client_mode = DEFAULT_DTLS_CLIENT_MODE;
+    priv->dtls_certificate = g_strdup(DEFAULT_DTLS_CERTIFICATE);
+    priv->dtls_key = g_strdup(DEFAULT_DTLS_KEY);
+    priv->dtls_peer_certificate = NULL;
+    priv->local_candidates = NULL;
+    priv->remote_candidates = NULL;
+    priv->forced_remote_candidates = NULL;
+    priv->gathering_done = FALSE;
+    priv->on_remote_candidate = NULL;
+}
+
+/**
+ * owr_session_add_remote_candidate:
+ * @session: the session on which the candidate will be added.
+ * @candidate: the candidate to add
+ *
+ * Adds a remote candidate for this session.
+ *
+ */
+void owr_session_add_remote_candidate(OwrSession *session, OwrCandidate *candidate)
+{
+    GHashTable *args;
+
+    g_return_if_fail(session);
+    g_return_if_fail(candidate);
+
+    if (session->priv->rtcp_mux && _owr_candidate_get_component_type(candidate) == OWR_COMPONENT_TYPE_RTCP) {
+        g_warning("Trying to adding RTCP component on an rtcp_muxing session. Aborting");
+        return;
+    }
+
+    args = g_hash_table_new(g_str_hash, g_str_equal);
+    g_hash_table_insert(args, "session", session);
+    g_hash_table_insert(args, "candidate", candidate);
+    g_object_ref(session);
+    g_object_ref(candidate);
+
+    _owr_schedule_with_hash_table((GSourceFunc)add_remote_candidate, args);
+}
+
+
+/**
+ * owr_session_force_remote_candidate:
+ * @session: The session on which the candidate will be forced.
+ * @candidate: the candidate to forcibly set
+ *
+ * Forces the transport agent to use the given candidate. Calling this function will disable all
+ * further ICE processing. Keep-alives will continue to be sent.
+ */
+void owr_session_force_remote_candidate(OwrSession *session, OwrCandidate *candidate)
+{
+    GHashTable *args;
+
+    g_return_if_fail(OWR_IS_SESSION(session));
+    g_return_if_fail(OWR_IS_CANDIDATE(candidate));
+
+    args = g_hash_table_new(g_str_hash, g_str_equal);
+    g_hash_table_insert(args, "session", session);
+    g_hash_table_insert(args, "candidate", candidate);
+    g_hash_table_insert(args, "forced", GINT_TO_POINTER(TRUE));
+    g_object_ref(session);
+    g_object_ref(candidate);
+
+    _owr_schedule_with_hash_table((GSourceFunc)add_remote_candidate, args);
+}
+
+
+/* Internal functions */
+
+static gboolean add_remote_candidate(GHashTable *args)
+{
+    OwrSession *session;
+    OwrSessionPrivate *priv;
+    OwrCandidate *candidate;
+    gboolean forced;
+    GSList **candidates;
+    GValue params[2] = { G_VALUE_INIT, G_VALUE_INIT };
+
+    g_return_val_if_fail(args, FALSE);
+
+    session = g_hash_table_lookup(args, "session");
+    candidate = g_hash_table_lookup(args, "candidate");
+    forced = GPOINTER_TO_INT(g_hash_table_lookup(args, "forced"));
+    g_return_val_if_fail(session && candidate, FALSE);
+
+    priv = session->priv;
+    candidates = forced ? &priv->forced_remote_candidates : &priv->remote_candidates;
+
+    if (g_slist_find(*candidates, candidate)) {
+        g_warning("Fail: remote candidate already added.");
+        goto end;
+    }
+
+    if (g_slist_find(priv->local_candidates, candidate)) {
+        g_warning("Fail: candidate is local.");
+        goto end;
+    }
+
+    *candidates = g_slist_append(*candidates, candidate);
+    g_object_ref(candidate);
+
+    if (priv->on_remote_candidate) {
+        g_value_init(&params[0], OWR_TYPE_SESSION);
+        g_value_set_instance(&params[0], session);
+        g_value_init(&params[1], G_TYPE_BOOLEAN);
+        g_value_set_boolean(&params[1], forced);
+        g_closure_invoke(priv->on_remote_candidate, NULL, 2, (const GValue *)&params, NULL);
+    }
+
+end:
+    g_object_unref(candidate);
+    g_object_unref(session);
+    g_hash_table_unref(args);
+    return FALSE;
+}
+
+
+void _owr_session_clear_closures(OwrSession *session)
+{
+    if (session->priv->on_remote_candidate) {
+        g_closure_invalidate(session->priv->on_remote_candidate);
+        g_closure_unref(session->priv->on_remote_candidate);
+        session->priv->on_remote_candidate = NULL;
+    }
+}
+
+/* Private methods */
+GSList * _owr_session_get_remote_candidates(OwrSession *session)
+{
+    g_return_val_if_fail(session, NULL);
+
+    return session->priv->remote_candidates;
+}
+
+GSList * _owr_session_get_forced_remote_candidates(OwrSession *session)
+{
+    g_return_val_if_fail(OWR_IS_SESSION(session), NULL);
+
+    return session->priv->forced_remote_candidates;
+}
+
+void _owr_session_set_on_remote_candidate(OwrSession *session, GClosure *on_remote_candidate)
+{
+    g_return_if_fail(session);
+    g_return_if_fail(on_remote_candidate);
+
+    session->priv->on_remote_candidate = on_remote_candidate;
+    g_closure_set_marshal(session->priv->on_remote_candidate, g_cclosure_marshal_VOID__BOOLEAN);
+}
+
+
+void _owr_session_set_dtls_peer_certificate(OwrSession *session,
+    const gchar *certificate)
+{
+    OwrSessionPrivate *priv;
+    g_return_if_fail(OWR_IS_SESSION(session));
+
+    priv = session->priv;
+    if (priv->dtls_peer_certificate)
+        g_free(priv->dtls_peer_certificate);
+    priv->dtls_peer_certificate = g_strdup(certificate);
+    g_warn_if_fail(!priv->dtls_peer_certificate
+        || g_str_has_prefix(priv->dtls_peer_certificate, "-----BEGIN CERTIFICATE-----"));
+    g_object_notify(G_OBJECT(session), "dtls-peer-certificate");
+}
