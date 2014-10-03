@@ -40,8 +40,6 @@
 #include <TargetConditionals.h>
 #endif
 
-#define VIDEO_SINK "glimagesink"
-
 #if defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR)
 #define VIDEO_CONVERT "ercolorspace"
 #else
@@ -52,6 +50,7 @@
 #define DEFAULT_HEIGHT 0
 #define DEFAULT_MAX_FRAMERATE 0.0
 #define DEFAULT_WINDOW_HANDLE 0
+#define DEFAULT_VIDEO_SINK "glimagesink"
 
 #define OWR_VIDEO_RENDERER_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_VIDEO_RENDERER, OwrVideoRendererPrivate))
 
@@ -65,6 +64,7 @@ enum {
     PROP_HEIGHT,
     PROP_MAX_FRAMERATE,
     PROP_WINDOW_HANDLE,
+    PROP_SINK,
     N_PROPERTIES
 };
 
@@ -85,7 +85,21 @@ struct _OwrVideoRendererPrivate {
     gdouble max_framerate;
     GstElement *renderer_bin;
     guintptr window_handle;
+    GstElement *sink;
 };
+
+static void owr_video_renderer_dispose(GObject *object)
+{
+    OwrVideoRenderer *renderer = OWR_VIDEO_RENDERER(object);
+    OwrVideoRendererPrivate *priv = renderer->priv;
+
+    if (priv->sink) {
+        gst_object_unref(priv->sink);
+        priv->sink = NULL;
+    }
+
+    G_OBJECT_CLASS(owr_video_renderer_parent_class)->dispose(object);
+}
 
 static void owr_video_renderer_finalize(GObject *object)
 {
@@ -120,9 +134,14 @@ static void owr_video_renderer_class_init(OwrVideoRendererClass *klass)
         "Window widget handle into which to draw video (default: 0, create a new window)",
         G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
+    obj_properties[PROP_SINK] = g_param_spec_object("sink", "sink",
+        "Video sink to use for rendering (default: glimagesink)", G_TYPE_OBJECT,
+        G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+
     gobject_class->set_property = owr_video_renderer_set_property;
     gobject_class->get_property = owr_video_renderer_get_property;
 
+    gobject_class->dispose = owr_video_renderer_dispose;
     gobject_class->finalize = owr_video_renderer_finalize;
 
     media_renderer_class->get_element = (void *(*)(OwrMediaRenderer *))owr_video_renderer_get_element;
@@ -141,6 +160,7 @@ static void owr_video_renderer_init(OwrVideoRenderer *renderer)
     priv->max_framerate = DEFAULT_MAX_FRAMERATE;
     priv->window_handle = DEFAULT_WINDOW_HANDLE;
     priv->renderer_bin = NULL;
+    priv->sink = NULL;
 
     g_mutex_init(&priv->video_renderer_lock);
 }
@@ -149,6 +169,7 @@ static void owr_video_renderer_set_property(GObject *object, guint property_id,
     const GValue *value, GParamSpec *pspec)
 {
     OwrVideoRendererPrivate *priv;
+    GstElement *sink;
 
     g_return_if_fail(object);
     priv = OWR_VIDEO_RENDERER_GET_PRIVATE(object);
@@ -165,6 +186,15 @@ static void owr_video_renderer_set_property(GObject *object, guint property_id,
         break;
     case PROP_WINDOW_HANDLE:
         priv->window_handle = (guintptr)g_value_get_pointer(value);
+        break;
+    case PROP_SINK:
+        sink = g_value_get_object(value);
+        if (!GST_IS_ELEMENT(sink))
+            break;
+        if (priv->sink)
+            gst_object_unref(priv->sink);
+        priv->sink = sink;
+        gst_object_ref_sink(sink);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
@@ -193,6 +223,9 @@ static void owr_video_renderer_get_property(GObject *object, guint property_id,
         break;
     case PROP_WINDOW_HANDLE:
         g_value_set_pointer(value, (gpointer)priv->window_handle);
+        break;
+    case PROP_SINK:
+        g_value_set_object(value, priv->sink);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
@@ -285,7 +318,7 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer)
     g_assert(queue);
     g_object_set(queue, "max-size-buffers", 3, "max-size-bytes", 0, "max-size-time", 0, NULL);
 
-    sink = gst_element_factory_make(VIDEO_SINK, "video-renderer-sink");
+    sink = priv->sink ? priv->sink : gst_element_factory_make(DEFAULT_VIDEO_SINK, "video-renderer-sink");
     g_assert(sink);
     if (GST_IS_VIDEO_OVERLAY(sink))
         gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(sink), priv->window_handle);
