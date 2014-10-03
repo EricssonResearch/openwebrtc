@@ -13,46 +13,7 @@ OpenWebRTC was designed for flexibility and modularity. The bulk of the API laye
 Applications built on top of OpenWebRTC will be interoperable with popular WebRTC-enabled browsers such as Chrome and Firefox. 
 
 ## Building
-#### External programs to install
-##### iOS
-To build for the iOS platform Xcode and the command line tools needs to be installed on the computer.
-
-##### Android
-The NDK version r9d needs to be installed and the ndk-build program must be in the path. The latest SDK shall also be installed and the adb program be available in the path.
-
-#### Extracting the code
-**Fork the OpenWebRTC git** and then extract your local copy.
-```
-git clone https://github.com/<YourName>/openwebrtc.git --recursive
-cd openwebrtc
-```
-#### Environment configuration
-Before we can start building OpenWebRTC we need to build some tools. This is done in the bootstrap directory:
-```
-cd scripts/bootstrap
-./bootstrap.sh -r osx
-cd -
-```
-If you are using a Linux computer instead of a Mac exchange the "osx" argument above to "linux".
-
-#### Build the external open source
-The external open source that is used by OpenWebRTC framework is built separately using the following commands:
-```
-cd scripts/dependencies
-./build-all.sh -r osx ios android ios-simulator
-./deploy_deps.sh
-cd -
-```
-The available target platforms when building on Mac can be seen above, if you are building on Linux the available target platforms are "linux" and "android".
-
-#### Build OpenWebRTC
-The OpenWebRTC framework is built using one command:
-```
-./build.sh -r osx ios android ios-simulator
-```
-The available target platform when building on Mac can be seen above, if you are building on Linux the available target platforms are "linux" and "android".
-
-Now the OpenWebRTC framework is compiled and ready to be incorporated into your application.
+Take a look at the [Building OpenWebRTC](https://github.com/EricssonResearch/openwebrtc/wiki/Building-OpenWebRTC) wiki page for information about how to build the framework.
 
 ## Community
 For support, questions and discussions:
