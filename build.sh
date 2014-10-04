@@ -6,6 +6,11 @@ SCRIPT_DIR="$REPO_ROOT/scripts/engine"
 
 export XML_CATALOG_FILES=~/.openwebrtc/etc/xml/catalog
 
+if [[ ! -d $SCRIPT_DIR ]]; then
+    git submodule init
+    git submodule update
+fi
+
 #
 # Check preconditions:
 # 1. Check if file releases are missing and download in that case.
