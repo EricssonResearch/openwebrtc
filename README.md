@@ -13,6 +13,7 @@ OpenWebRTC was designed for flexibility and modularity. The bulk of the API laye
 Applications built on top of OpenWebRTC will be interoperable with popular WebRTC-enabled browsers such as Chrome and Firefox. 
 
 ## Building
+* NOTE: Only 64-bit operating systems are supported.
 #### External programs to install
 ##### iOS
 To build for the iOS platform Xcode and the command line tools needs to be installed on the computer.
