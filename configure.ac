@@ -6,7 +6,7 @@ AC_CONFIG_HEADERS([config.h])
 
 AC_CONFIG_MACRO_DIR(m4)
 
-AM_INIT_AUTOMAKE([1.11 -Wno-portability])
+AM_INIT_AUTOMAKE([1.11 -Wno-portability foreign])
 
 AM_SILENT_RULES([yes])
 
