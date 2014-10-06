@@ -121,11 +121,15 @@ crypto.subtle = {
                 return;
             }
 
-            var d = Array.apply([], new Uint8Array(data));
+            var i;
+            var d = [];
+            var bufferView = new Uint8Array(data);
+            for (i = 0; i < bufferView.length; i++)
+                d[i] = bufferView[i];
             var hash = glib.compute_checksum_for_data(glib.ChecksumType[csumtype], d, d.length);
             var digest = new ArrayBuffer(hash.length / 2);
             var bufView = new Uint8Array(digest);
-            for (var i = 0; i < hash.length; i += 2)
+            for (i = 0; i < hash.length; i += 2)
                 bufView[i / 2] = parseInt(hash.slice(i, i + 2), 16);
             if (typeof(resolve) == "function")
                 resolve(digest);
