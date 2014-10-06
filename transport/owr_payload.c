@@ -36,6 +36,7 @@
 #include "owr_payload_private.h"
 #include "owr_types.h"
 #include "owr_video_payload.h"
+#include "owr_utils.h"
 
 #define DEFAULT_MTU 1200
 #define DEFAULT_BITRATE 0
@@ -146,6 +147,47 @@ static void owr_payload_get_property(GObject *object, guint property_id, GValue 
     }
 }
 
+/* To be extended once more codecs are supported */
+static GList *h264_decoders = NULL;
+static GList *h264_encoders = NULL;
+static GList *vp8_decoders = NULL;
+static GList *vp8_encoders = NULL;
+
+static gpointer owr_payload_detect_codecs(gpointer data)
+{
+    GList *decoder_factories;
+    GList *encoder_factories;
+    GstCaps *caps;
+
+    OWR_UNUSED(data);
+
+    decoder_factories = gst_element_factory_list_get_elements(GST_ELEMENT_FACTORY_TYPE_DECODER |
+                                                              GST_ELEMENT_FACTORY_TYPE_MEDIA_VIDEO,
+                                                              GST_RANK_MARGINAL);
+    encoder_factories = gst_element_factory_list_get_elements (GST_ELEMENT_FACTORY_TYPE_ENCODER |
+                                                               GST_ELEMENT_FACTORY_TYPE_MEDIA_VIDEO,
+                                                               GST_RANK_MARGINAL);
+
+    caps = gst_caps_new_empty_simple("video/x-h264");
+    h264_decoders = gst_element_factory_list_filter(decoder_factories, caps, GST_PAD_SINK, FALSE);
+    h264_encoders = gst_element_factory_list_filter(encoder_factories, caps, GST_PAD_SRC, FALSE);
+    gst_caps_unref (caps);
+
+    caps = gst_caps_new_empty_simple("video/x-vp8");
+    vp8_decoders = gst_element_factory_list_filter(decoder_factories, caps, GST_PAD_SINK, FALSE);
+    vp8_encoders = gst_element_factory_list_filter(encoder_factories, caps, GST_PAD_SRC, FALSE);
+    gst_caps_unref (caps);
+
+    gst_plugin_feature_list_free(decoder_factories);
+    gst_plugin_feature_list_free(encoder_factories);
+
+    h264_decoders = g_list_sort(h264_decoders, gst_plugin_feature_rank_compare_func);
+    h264_encoders = g_list_sort(h264_encoders, gst_plugin_feature_rank_compare_func);
+    vp8_decoders = g_list_sort(vp8_decoders, gst_plugin_feature_rank_compare_func);
+    vp8_encoders = g_list_sort(vp8_encoders, gst_plugin_feature_rank_compare_func);
+
+    return NULL;
+}
 
 
 static void owr_payload_class_init(OwrPayloadClass *klass)
@@ -191,6 +233,10 @@ static void owr_payload_class_init(OwrPayloadClass *klass)
 
 static void owr_payload_init(OwrPayload *payload)
 {
+    static GOnce g_once = G_ONCE_INIT;
+
+    g_once (&g_once, owr_payload_detect_codecs, NULL);
+
     payload->priv = OWR_PAYLOAD_GET_PRIVATE(payload);
     payload->priv->mtu = DEFAULT_MTU;
     payload->priv->bitrate = DEFAULT_BITRATE;
@@ -236,6 +282,40 @@ static guint evaluate_bitrate_from_payload(OwrPayload *payload)
     return bitrate;
 }
 
+static GstElement * try_codecs(GList *codecs, const gchar *name_prefix)
+{
+    GList *l;
+    gchar *element_name;
+
+    for (l = codecs; l; l = l->next) {
+        GstElementFactory *f = l->data;
+        GstElement *e;
+
+        element_name = g_strdup_printf("%s_%s_%u", name_prefix,
+                                       gst_plugin_feature_get_name(GST_PLUGIN_FEATURE(f)),
+                                       get_unique_id());
+
+        e = gst_element_factory_create(f, element_name);
+        g_free(element_name);
+
+        if (!e)
+            continue;
+
+        /* Try setting to READY. If this fails the codec does not work, for
+         * example because the hardware codec is currently busy
+         */
+        if (gst_element_set_state (e, GST_STATE_READY) != GST_STATE_CHANGE_SUCCESS) {
+            gst_element_set_state (e, GST_STATE_NULL);
+            gst_object_unref(e);
+            continue;
+        }
+
+        return e;
+    }
+
+    return NULL;
+}
+
 GstElement * _owr_payload_create_encoder(OwrPayload *payload)
 {
     GstElement *encoder = NULL;
@@ -243,16 +323,10 @@ GstElement * _owr_payload_create_encoder(OwrPayload *payload)
 
     g_return_val_if_fail(payload, NULL);
 
-    element_name = g_strdup_printf("encoder_%s_%u", OwrCodecTypeEncoderElementName[payload->priv->codec_type], get_unique_id());
-    encoder = gst_element_factory_make(OwrCodecTypeEncoderElementName[payload->priv->codec_type], element_name);
-    g_free(element_name);
-    g_return_val_if_fail(encoder, NULL);
-
     switch (payload->priv->codec_type) {
-    case OWR_CODEC_TYPE_OPUS:
-        break;
-
     case OWR_CODEC_TYPE_H264:
+        encoder = try_codecs(h264_encoders, "encoder");
+        g_return_val_if_fail(encoder, NULL);
         g_object_set(encoder, "gop-size", 0, NULL);
         gst_util_set_object_arg(G_OBJECT(encoder), "rate-control", "bitrate");
         g_object_bind_property(payload, "bitrate", encoder, "bitrate", G_BINDING_SYNC_CREATE);
@@ -260,18 +334,23 @@ GstElement * _owr_payload_create_encoder(OwrPayload *payload)
         break;
 
     case OWR_CODEC_TYPE_VP8:
+        encoder = try_codecs(vp8_encoders, "encoder");
+        g_return_val_if_fail(encoder, NULL);
         g_object_set(encoder, "end-usage", 1, "deadline", G_GINT64_CONSTANT(1), "lag-in-frames", 0,
             "error-resilient", 1, "keyframe-mode", 0, NULL);
         g_object_bind_property(payload, "bitrate", encoder, "target-bitrate", G_BINDING_SYNC_CREATE);
         g_object_set(payload, "bitrate", evaluate_bitrate_from_payload(payload), NULL);
         break;
     default:
+        element_name = g_strdup_printf("encoder_%s_%u", OwrCodecTypeEncoderElementName[payload->priv->codec_type], get_unique_id());
+        encoder = gst_element_factory_make(OwrCodecTypeEncoderElementName[payload->priv->codec_type], element_name);
+        g_free(element_name);
+        g_return_val_if_fail(encoder, NULL);
         break;
     }
 
     return encoder;
 }
-
 
 GstElement * _owr_payload_create_decoder(OwrPayload *payload)
 {
@@ -280,24 +359,24 @@ GstElement * _owr_payload_create_decoder(OwrPayload *payload)
 
     g_return_val_if_fail(payload, NULL);
 
-    element_name = g_strdup_printf("decoder_%s_%u", OwrCodecTypeDecoderElementName[payload->priv->codec_type], get_unique_id());
-    decoder = gst_element_factory_make(OwrCodecTypeDecoderElementName[payload->priv->codec_type], element_name);
-
     switch (payload->priv->codec_type) {
-    case OWR_CODEC_TYPE_OPUS:
-        break;
     case OWR_CODEC_TYPE_H264:
-        g_object_set(decoder, "drop-on-errors", TRUE, NULL);
+        decoder = try_codecs(h264_decoders, "decoder");
+        g_return_val_if_fail(decoder, NULL);
         break;
     case OWR_CODEC_TYPE_VP8:
+        decoder = try_codecs(vp8_decoders, "decoder");
+        g_return_val_if_fail(decoder, NULL);
         break;
     default:
+        element_name = g_strdup_printf("decoder_%s_%u", OwrCodecTypeDecoderElementName[payload->priv->codec_type], get_unique_id());
+        decoder = gst_element_factory_make(OwrCodecTypeDecoderElementName[payload->priv->codec_type], element_name);
+        g_free(element_name);
+        g_return_val_if_fail(decoder, NULL);
         break;
     }
 
-    g_free(element_name);
     return decoder;
-
 }
 
 GstElement * _owr_payload_create_parser(OwrPayload *payload)
