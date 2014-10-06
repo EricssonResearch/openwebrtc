@@ -1148,8 +1148,8 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
     guint stream_id;
     OwrPayload *payload = NULL;
     GstElement *send_input_bin = NULL;
-    GstElement *capsfilter = NULL, *encoder = NULL, *payloader = NULL, *rtp_capsfilter = NULL,
-        *rtpbin = NULL;
+    GstElement *capsfilter = NULL, *encoder = NULL, *parser = NULL, *payloader = NULL,
+        *rtp_capsfilter = NULL, *rtpbin = NULL;
     GstCaps *caps = NULL, *rtp_caps = NULL;
     gchar *name = NULL;
     gboolean link_ok = TRUE, sync_ok = TRUE;
@@ -1209,16 +1209,25 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
         gboolean link_ok = TRUE, sync_ok = TRUE;
 
         encoder = _owr_payload_create_encoder(payload);
+        parser = _owr_payload_create_parser(payload);
         payloader = _owr_payload_create_payload_packetizer(payload);
         g_warn_if_fail(payloader && encoder);
 
         gst_bin_add_many(GST_BIN(send_input_bin), encoder, payloader, NULL);
-        link_ok &= gst_element_link_many(encoder, payloader, rtp_capsfilter, NULL);
+        if (parser) {
+            gst_bin_add(GST_BIN(send_input_bin), parser);
+            link_ok &= gst_element_link_many(encoder, parser, payloader, NULL);
+        } else {
+            link_ok &= gst_element_link_many(encoder, payloader, NULL);
+        }
+        link_ok &= gst_element_link_many(payloader, rtp_capsfilter, NULL);
 
         g_warn_if_fail(link_ok);
 
         sync_ok &= gst_element_sync_state_with_parent(rtp_capsfilter);
         sync_ok &= gst_element_sync_state_with_parent(payloader);
+        if (parser)
+            sync_ok &= gst_element_sync_state_with_parent(parser);
         sync_ok &= gst_element_sync_state_with_parent(encoder);
 
         name = g_strdup_printf("video_sink_%u_%u", OWR_CODEC_TYPE_NONE, stream_id);
@@ -1237,14 +1246,24 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
         gst_caps_unref(caps);
 
         encoder = _owr_payload_create_encoder(payload);
+        parser = _owr_payload_create_parser(payload);
         payloader = _owr_payload_create_payload_packetizer(payload);
 
         gst_bin_add_many(GST_BIN(send_input_bin), capsfilter, encoder, payloader, NULL);
-        link_ok = gst_element_link_many(capsfilter, encoder, payloader, rtp_capsfilter, NULL);
+        link_ok = gst_element_link_many(capsfilter, encoder, NULL);
+        if (parser) {
+            gst_bin_add(GST_BIN(send_input_bin), parser);
+            link_ok &= gst_element_link_many(encoder, parser, payloader, NULL);
+        } else {
+            link_ok &= gst_element_link_many(encoder, payloader, NULL);
+        }
+        link_ok &= gst_element_link_many (payloader, rtp_capsfilter, NULL);
         g_warn_if_fail(link_ok);
 
         sync_ok &= gst_element_sync_state_with_parent(rtp_capsfilter);
         sync_ok &= gst_element_sync_state_with_parent(payloader);
+        if (parser)
+            sync_ok &= gst_element_sync_state_with_parent(parser);
         sync_ok &= gst_element_sync_state_with_parent(encoder);
         sync_ok &= gst_element_sync_state_with_parent(capsfilter);
         g_warn_if_fail(sync_ok);
@@ -1438,7 +1457,7 @@ static void setup_video_receive_elements(GstPad *new_pad, guint32 session_id, Ow
     gboolean sync_ok = TRUE;
     GstElement *receive_output_bin;
     GstElement *payload_caps_element, *rtpdepay, *videorepair1, *depayed_caps_filter,
-        *depayed_valve, *decoder;
+        *depayed_valve, *parser, *decoder;
     GstPadLinkReturn link_res;
     gboolean link_ok = TRUE;
     OwrCodecType codec_type;
@@ -1472,13 +1491,19 @@ static void setup_video_receive_elements(GstPad *new_pad, guint32 session_id, Ow
     payload_caps_element = gst_element_factory_make("capsfilter", "out_capsfilter_video");
     g_object_set(payload_caps_element, "caps", caps, NULL);
     gst_caps_unref(caps);
+    parser = _owr_payload_create_parser(payload);
     decoder = _owr_payload_create_decoder(payload);
 
     gst_bin_add_many(GST_BIN(receive_output_bin), rtpdepay, depayed_caps_filter,
         depayed_valve, videorepair1, decoder, /*decoded_tee,*/ NULL);
     depay_sink_pad = gst_element_get_static_pad(rtpdepay, "sink");
-    link_ok = gst_element_link_many(rtpdepay, depayed_caps_filter, depayed_valve, videorepair1,
-        decoder, NULL);
+    link_ok = gst_element_link_many(rtpdepay, depayed_caps_filter, depayed_valve, videorepair1, NULL);
+    if (parser) {
+        gst_bin_add(GST_BIN(receive_output_bin), parser);
+        link_ok &= gst_element_link_many(videorepair1, parser, decoder, NULL);
+    } else {
+        link_ok &= gst_element_link_many(videorepair1, decoder, NULL);
+    }
 
     ghost_pad = ghost_pad_and_add_to_bin(depay_sink_pad, receive_output_bin, "sink");
     link_res = gst_pad_link(new_pad, ghost_pad);
@@ -1487,6 +1512,8 @@ static void setup_video_receive_elements(GstPad *new_pad, guint32 session_id, Ow
     g_warn_if_fail(link_ok && (link_res == GST_PAD_LINK_OK));
 
     sync_ok &= gst_element_sync_state_with_parent(decoder);
+    if (parser)
+        sync_ok &= gst_element_sync_state_with_parent(parser);
     sync_ok &= gst_element_sync_state_with_parent(videorepair1);
     sync_ok &= gst_element_sync_state_with_parent(depayed_valve);
     sync_ok &= gst_element_sync_state_with_parent(depayed_caps_filter);
@@ -1504,7 +1531,7 @@ static void setup_audio_receive_elements(GstPad *new_pad, guint32 session_id, Ow
 {
     GstElement *receive_output_bin;
     gchar *pad_name = NULL;
-    GstElement *rtp_capsfilter, *rtpdepay, *depayed_valve, *decoder, *capsfilter;
+    GstElement *rtp_capsfilter, *rtpdepay, *depayed_valve, *parser, *decoder, *capsfilter;
     GstPad *rtp_caps_sink_pad = NULL, *pad = NULL, *ghost_pad = NULL;
     gchar *element_name = NULL;
     GstCaps *rtp_caps = NULL, *caps = NULL;
@@ -1536,6 +1563,7 @@ static void setup_audio_receive_elements(GstPad *new_pad, guint32 session_id, Ow
     g_object_set(depayed_valve, "drop", TRUE, NULL);
     g_free(pad_name);
 
+    parser = _owr_payload_create_parser(payload);
     decoder = _owr_payload_create_decoder(payload);
 
     element_name = g_strdup_printf("recv_capsfilter_%u", session_id);
@@ -1547,8 +1575,13 @@ static void setup_audio_receive_elements(GstPad *new_pad, guint32 session_id, Ow
 
     gst_bin_add_many(GST_BIN(receive_output_bin), rtp_capsfilter, rtpdepay,
         depayed_valve, decoder, capsfilter, NULL);
-    link_ok = gst_element_link_many(rtp_capsfilter, rtpdepay, depayed_valve,
-        decoder, capsfilter, NULL);
+    link_ok = gst_element_link_many(rtp_capsfilter, rtpdepay, depayed_valve, NULL);
+    if (parser) {
+        gst_bin_add(GST_BIN(receive_output_bin), parser);
+        link_ok &= gst_element_link_many(depayed_valve, parser, decoder, capsfilter, NULL);
+    } else {
+        link_ok &= gst_element_link_many(depayed_valve, decoder, capsfilter, NULL);
+    }
     g_warn_if_fail(link_ok);
 
     rtp_caps_sink_pad = gst_element_get_static_pad(rtp_capsfilter, "sink");
@@ -1561,6 +1594,8 @@ static void setup_audio_receive_elements(GstPad *new_pad, guint32 session_id, Ow
 
     sync_ok &= gst_element_sync_state_with_parent(capsfilter);
     sync_ok &= gst_element_sync_state_with_parent(decoder);
+    if (parser)
+        sync_ok &= gst_element_sync_state_with_parent(parser);
     sync_ok &= gst_element_sync_state_with_parent(depayed_valve);
     sync_ok &= gst_element_sync_state_with_parent(rtpdepay);
     sync_ok &= gst_element_sync_state_with_parent(rtp_capsfilter);

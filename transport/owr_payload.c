@@ -211,6 +211,7 @@ OwrPayload * owr_payload_new(OwrMediaType media_type, OwrCodecType codec_type, g
 
 static gchar *OwrCodecTypeEncoderElementName[] = {"none", "mulawenc", "alawenc", "opusenc", "openh264enc", "vp8enc"};
 static gchar *OwrCodecTypeDecoderElementName[] = {"none", "mulawdec", "alawdec", "opusdec", "openh264dec", "vp8dec"};
+static gchar *OwrCodecTypeParserElementName[] = {"none", "none", "none", "none", "h264parse", "none"};
 static gchar *OwrCodecTypePayElementName[] = {"none", "rtppcmupay", "rtppcmapay", "rtpopuspay", "rtph264pay", "rtpvp8pay"};
 static gchar *OwrCodecTypeDepayElementName[] = {"none", "rtppcmudepay", "rtppcmadepay", "rtpopusdepay", "rtph264depay", "rtpvp8depay"};
 
@@ -299,7 +300,22 @@ GstElement * _owr_payload_create_decoder(OwrPayload *payload)
 
 }
 
+GstElement * _owr_payload_create_parser(OwrPayload *payload)
+{
+    GstElement * parser = NULL;
+    gchar *element_name = NULL;
 
+    g_return_val_if_fail(payload, NULL);
+
+    if (!g_strcmp0(OwrCodecTypeParserElementName[payload->priv->codec_type], "none"))
+        return NULL;
+
+    element_name = g_strdup_printf("parser_%s_%u", OwrCodecTypeParserElementName[payload->priv->codec_type], get_unique_id());
+    parser = gst_element_factory_make(OwrCodecTypeParserElementName[payload->priv->codec_type], element_name);
+
+    g_free(element_name);
+    return parser;
+}
 
 GstElement * _owr_payload_create_payload_packetizer(OwrPayload *payload)
 {
