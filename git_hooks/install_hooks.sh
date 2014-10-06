@@ -4,7 +4,7 @@ echo "and create symbolic links to the hooks in git_hooks/ directory."
 
 HOOK_DIR="$(git rev-parse --show-toplevel)/.git/hooks"
 HOOK_NAMES="pre-commit pre-push"
-SCRIPT_DIR="`pwd`/`dirname "$0"`"
+SCRIPT_DIR="$( cd "$(dirname "$0")"; pwd )"
 
 pushd $HOOK_DIR > /dev/null
 for hook in $HOOK_NAMES; do
