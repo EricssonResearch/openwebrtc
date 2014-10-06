@@ -211,8 +211,7 @@ static void load_typelibs()
     GITypelib **typelibs;
     const char *namespace;
     guint i;
-
-    gchar *namespaces[] = {
+    const gchar *namespaces[] = {
         "GLib",
         "GObject",
         "Gio",
@@ -220,8 +219,7 @@ static void load_typelibs()
         "Owr",
         NULL
     };
-
-    guchar *gir_checksums[] = {
+    const guchar *gir_checksums[] = {
         GLib_2_0_gir_sha1,
         GObject_2_0_gir_sha1,
         Gio_2_0_gir_sha1,
@@ -229,9 +227,9 @@ static void load_typelibs()
         Owr_0_1_gir_sha1,
         NULL
     };
-    guint gir_checksum_lengths[G_N_ELEMENTS(gir_checksums)];
+    const guint gir_checksum_lengths[G_N_ELEMENTS(gir_checksums)];
 
-    guchar *girs[] = {
+    const guchar *girs[] = {
         GLib_2_0_gir,
         GObject_2_0_gir,
         Gio_2_0_gir,
@@ -239,7 +237,7 @@ static void load_typelibs()
         Owr_0_1_gir,
         NULL
     };
-    guint gir_lengths[G_N_ELEMENTS(girs)];
+    const guint gir_lengths[G_N_ELEMENTS(girs)];
 
     gir_checksum_lengths[0] = GLib_2_0_gir_sha1_len;
     gir_checksum_lengths[1] = GObject_2_0_gir_sha1_len,
@@ -322,7 +320,7 @@ static gpointer run(GAsyncQueue *msg_queue)
         "workerinit.js",
         NULL
     };
-    guchar *scripts[] = {
+    const guchar *scripts[] = {
         workerutils_js_,
         websocket_js_,
         workerinit_js_,
@@ -336,7 +334,7 @@ static gpointer run(GAsyncQueue *msg_queue)
         "bridgeserver.js",
         NULL
     };
-    guchar *worker_scripts[] = {
+    const guchar *worker_scripts[] = {
         wbjsonrpc_js_,
         peerhandler_js_,
         bridgeserver_js_,
@@ -351,7 +349,7 @@ static gpointer run(GAsyncQueue *msg_queue)
         "webrtc_js",
         NULL
     };
-    guchar *client_scripts[] = {
+    const guchar *client_scripts[] = {
         wbjsonrpc_js_,
         domutils_js_,
         sdp_js_,
