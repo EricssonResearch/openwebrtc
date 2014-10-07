@@ -286,8 +286,7 @@ static void owr_transport_agent_get_property(GObject *object, guint property_id,
 
 OwrTransportAgent * owr_transport_agent_new(gboolean ice_controlling_mode)
 {
-    return g_object_new(OWR_TYPE_TRANSPORT_AGENT, "ice-controlling_mode", ice_controlling_mode,
-        "dtls-client-mode", NULL);
+    return g_object_new(OWR_TYPE_TRANSPORT_AGENT, "ice-controlling_mode", ice_controlling_mode, NULL);
 }
 
 /**
