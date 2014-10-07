@@ -1205,9 +1205,6 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
     g_warn_if_fail(sync_ok);
 
     if (media_type == OWR_MEDIA_TYPE_VIDEO) {
-        GstElement *encoder = NULL, *payloader = NULL;
-        gboolean link_ok = TRUE, sync_ok = TRUE;
-
         encoder = _owr_payload_create_encoder(payload);
         parser = _owr_payload_create_parser(payload);
         payloader = _owr_payload_create_payload_packetizer(payload);
