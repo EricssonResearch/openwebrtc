@@ -42,7 +42,9 @@ AM_CONDITIONAL([ENABLE_GTK_DOC], false)
 dnl build debug or not
 AC_MSG_CHECKING([whether to build debug or not])
 AC_ARG_ENABLE(debug,
-[  --enable-debug    Enable debug],
+AC_HELP_STRING(
+  [--enable-debug],
+  [Enable debug @<:@default=yes@:>@]),
 [case "${enableval}" in
   yes) enable_debug=yes ;;
   no)  enable_debug=no ;;
