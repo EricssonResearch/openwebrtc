@@ -43,7 +43,10 @@
 #include "owr_utils.h"
 
 #include <gst/gst.h>
+
+#ifdef OWR_STATIC
 #include <gstnice.h>
+#endif
 
 #ifdef __APPLE__
 #include <TargetConditionals.h>
@@ -64,6 +67,7 @@ static guint bus_watch_id = -1;
 static gpointer owr_run(gpointer data);
 static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer user_data);
 
+#ifdef OWR_STATIC
 GST_PLUGIN_STATIC_DECLARE(alaw);
 GST_PLUGIN_STATIC_DECLARE(app);
 GST_PLUGIN_STATIC_DECLARE(audioconvert);
@@ -104,6 +108,7 @@ GST_PLUGIN_STATIC_DECLARE(video4linux2);
 
 #if defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR)
 GST_PLUGIN_STATIC_DECLARE(ercolorspace);
+#endif
 #endif
 
 #ifdef __ANDROID__
@@ -176,12 +181,15 @@ void owr_init()
     gst_debug_add_log_function((GstLogFunction)gst_log_android_handler, NULL, NULL);
 #endif
 
+#ifdef OWR_STATIC
     /* Hack to make sure that all symbols that we need are included in the resulting library/binary */
     _owr_require_symbols();
+#endif
 
     gst_init(NULL, NULL);
     owr_initialized = TRUE;
 
+#ifdef OWR_STATIC
     GST_PLUGIN_STATIC_REGISTER(alaw);
     GST_PLUGIN_STATIC_REGISTER(app);
     GST_PLUGIN_STATIC_REGISTER(audioconvert);
@@ -225,6 +233,7 @@ void owr_init()
 
     gst_element_register(NULL, "nicesrc", GST_RANK_NONE, GST_TYPE_NICE_SRC);
     gst_element_register(NULL, "nicesink", GST_RANK_NONE, GST_TYPE_NICE_SINK);
+#endif
 
     owr_main_context_is_external = !!owr_main_context;
 

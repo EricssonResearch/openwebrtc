@@ -74,7 +74,7 @@ build(){
 
         export CFLAGS="$PLATFORM_CFLAGS -I${src_dir}/openwebrtc-deps-${target}/include -I${src_dir}/framework"
         if [[ $target_triple == "arm-apple-darwin10" ]]; then
-            local configure_flags="--enable-static --disable-shared --disable-introspection"
+            local configure_flags="--enable-static --enable-owr-static --disable-shared --disable-introspection"
             local platform_ldflags="${home}/openwebrtc-deps-armv7-ios/lib/my_environ.o ${home}/openwebrtc-deps-${target}/lib/my_stat.o "
             local seed_platform_libs="-framework JavaScriptCore"
             export PLATFORM_GLIB_LIBS="-lffi -lresolv -liconv -lintl "
@@ -82,28 +82,28 @@ build(){
             export PLATFORM_OWR_GST_PLUGINS_LIBS="-lgstercolorspace"
             export PLATFORM_CXX_LIBS="-lc++"
         elif [[ $target_triple == "i386-apple-darwin10" ]]; then
-            local configure_flags="--enable-static --disable-shared --disable-introspection"
+            local configure_flags="--enable-static --enable-owr-static --disable-shared --disable-introspection"
             local seed_platform_libs="-framework JavaScriptCore"
             export PLATFORM_GLIB_LIBS="-lffi -lresolv -liconv -lintl "
             export PLATFORM_GSTREAMER_LIBS="-framework CoreMedia -framework CoreVideo -framework AVFoundation -framework Foundation -framework OpenGLES -lgstosxaudio -lgstapplemedia -framework AssetsLibrary -framework CoreAudio -framework AudioToolbox"
             export PLATFORM_CXX_LIBS="-lc++"
         elif [[ $target_triple == "arm-linux-androideabi" ]]; then
             local platform_ldflags="-llog -Wl,--allow-multiple-definition "
-            local configure_flags="--disable-static --enable-shared --disable-introspection"
+            local configure_flags="--disable-static --enable-owr-static --enable-shared --disable-introspection"
             local seed_platform_libs="-ljavascriptcoregtk-3.0 -licui18n -licuuc -licudata"
             export PLATFORM_GLIB_LIBS="-lffi -liconv -lintl "
             export PLATFORM_GSTREAMER_LIBS="-lgstopensles -lOpenSLES -lGLESv2 -lEGL"
             export PLATFORM_OWR_GST_PLUGINS_LIBS="-lgstandroidvideosrc -lgstercolorspace"
             export PLATFORM_CXX_LIBS="-L$ANDROID_NDK/sources/cxx-stl/gnu-libstdc++/4.8/libs/armeabi-v7a -lgnustl_static -lstdc++"
         elif [[ $target_triple == "x86_64-apple-darwin" ]]; then
-            local configure_flags="--enable-static --enable-shared --enable-gtk-doc"
+            local configure_flags="--enable-static --enable-owr-static --enable-shared --enable-gtk-doc"
             local seed_platform_libs="-framework JavaScriptCore"
             export PLATFORM_GLIB_LIBS="-lffi -lresolv -liconv -lintl -framework Carbon"
             export PLATFORM_GSTREAMER_LIBS="-lgstvideoconvert -lgstapplemedia -lgstosxaudio"
             export PLATFORM_GSTREAMER_LIBS="$PLATFORM_GSTREAMER_LIBS -framework AudioUnit -framework AudioToolbox -framework CoreAudio -framework CoreMedia -framework CoreVideo -framework QTKit -framework AVFoundation -framework Foundation -framework VideoToolbox -framework AppKit -framework OpenGL"
             export PLATFORM_CXX_LIBS="-lc++"
         elif [[ $target_triple == "x86_64-unknown-linux" ]] ; then
-            local configure_flags="--enable-static --enable-shared --enable-gtk-doc"
+            local configure_flags="--enable-static --enable-owr-static --enable-shared --enable-gtk-doc"
             local seed_platform_libs="-ljavascriptcoregtk-3.0 -licui18n -licuuc -licudata"
             export PLATFORM_GLIB_LIBS="-lpthread -lffi -lrt -ldl -lresolv"
             export PLATFORM_GSTREAMER_LIBS="-lgstvideoconvert -lgstpulse -lpulse-mainloop-glib -lpulse -lgstvideo4linux2 -lv4l2 -lX11 -lXv -lgstallocators-1.0 -lGLU -lGL"

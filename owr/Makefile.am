@@ -17,7 +17,6 @@ lib_LTLIBRARIES = libopenwebrtc.la
 
 libopenwebrtc_la_SOURCES = \
     owr.c \
-    owr_require_symbols.c \
     owr_types.c \
     owr_media_source.c \
     owr_utils.c
@@ -35,10 +34,15 @@ libopenwebrtc_la_DEPENDENCIES = \
     $(top_builddir)/local/libopenwebrtc_local.la \
     $(top_builddir)/transport/libopenwebrtc_transport.la
 
-libopenwebrtc_la_LDFLAGS = -export-dynamic -export-symbols $(top_srcdir)/libopenwebrtc.exp -version-info 3601
+libopenwebrtc_la_LDFLAGS = -export-dynamic -version-info 3601
 
+if OWR_STATIC
+libopenwebrtc_la_LDFLAGS += -export-symbols $(top_srcdir)/libopenwebrtc.exp
+libopenwebrtc_la_SOURCES += \
+    owr_require_symbols.c
 owr_require_symbols.c:
 	python ${srcdir}/symbols_to_source.py $(top_srcdir)/libopenwebrtc.exp $@
+endif
 
 includedir = $(prefix)/include/owr
 include_HEADERS = \
@@ -61,7 +65,11 @@ EXTRA_DIST = \
 -include $(INTROSPECTION_MAKEFILE)
 INTROSPECTION_GIRS =
 INTROSPECTION_SCANNER_ARGS = --add-include-path=$(srcdir) --warn-all
-INTROSPECTION_COMPILER_ARGS = --includedir=$(srcdir) --shared-library=""
+
+INTROSPECTION_COMPILER_ARGS = --includedir=$(srcdir)
+if OWR_STATIC
+INTROSPECTION_COMPILER_ARGS += --shared-library=""
+endif
 
 if HAVE_INTROSPECTION
 introspection_sources = $(libopenwebrtc_la_SOURCES)
@@ -74,6 +82,9 @@ Owr_0_1_gir_CFLAGS = \
     -I$(top_srcdir)/transport \
     -I$(top_srcdir)/local
 Owr_0_1_gir_LIBS = libopenwebrtc.la
+if !OWR_STATIC
+Owr_0_1_gir_LIBS += gstreamer-1.0 gstvideo-1.0 gstapp-1.0
+endif
 Owr_0_1_gir_FILES = \
     owr.h \
     owr.c \
