@@ -57,6 +57,24 @@ if test "x$enable_debug" = xyes; then
 fi
 AM_CONDITIONAL(OWR_DEBUG, test x$enable_debug = xyes)
 
+dnl build static or not
+AC_MSG_CHECKING([whether to build static owr or not])
+AC_ARG_ENABLE(owr-static,
+AC_HELP_STRING(
+  [--enable-owr-static],
+  [Enable static owr @<:@default=no@:>@]),
+[case "${enableval}" in
+  yes) enable_owr_static=yes ;;
+  no)  enable_owr_static=no ;;
+  *) AC_MSG_ERROR(bad value ${enableval} for --enable-owr-static) ;;
+esac],[enable_owr_static=no])
+AC_MSG_RESULT([$enable_owr_static])
+if test "x$enable_owr_static" = xyes; then
+  AC_DEFINE(OWR_STATIC, 1,
+  [Define if building static])
+fi
+AM_CONDITIONAL(OWR_STATIC, test x$enable_owr_static = xyes)
+
 AC_OUTPUT([
 Makefile
 bridge/Makefile

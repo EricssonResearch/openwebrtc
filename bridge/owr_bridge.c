@@ -30,7 +30,6 @@
 #endif
 #include "owr_bridge.h"
 
-#include "Owr-0.1.gir.h"
 #include "client/domutils.js.h"
 #include "client/sdp.js.h"
 #include "client/webrtc.js.h"
@@ -42,6 +41,8 @@
 #include "worker/bridgeserver.js.h"
 #include "worker/peerhandler.js.h"
 
+#ifdef OWR_STATIC
+#include "Owr-0.1.gir.h"
 #include <gir/GIRepository-2.0.gir.h>
 #include <gir/GLib-2.0.gir.h>
 #include <gir/GObject-2.0.gir.h>
@@ -49,6 +50,8 @@
 
 #include <girepository.h>
 #include <girparser.h>
+#endif
+
 #include <glib/gstdio.h>
 #include <seed.h>
 
@@ -58,6 +61,7 @@
 #include <TargetConditionals.h>
 #endif
 
+#ifdef OWR_STATIC
 GLogLevelFlags logged_levels;
 static void no_log_handler() { }
 
@@ -274,6 +278,7 @@ static void load_typelibs()
     for (i = 0; gir_checksums[i]; i++)
         g_free(gir_checksums[i]);
 }
+#endif
 
 static SeedException evaluate_script(SeedContext context, gchar *script, guint script_len,
     gchar *script_name)
@@ -376,7 +381,10 @@ static gpointer run(GAsyncQueue *msg_queue)
     client_script_lengths[3] = webrtc_js__len;
     client_script_lengths[4] = 0;
 
+#ifdef OWR_STATIC
     load_typelibs();
+#endif
+
     owr_init_with_main_context(g_main_context_default());
     engine = seed_init(&argc, &argv);
     seed_engine_set_search_path(engine, "");
