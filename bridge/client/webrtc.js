@@ -636,7 +636,13 @@
                 return;
             }
 
-            var candidateInfo = SDP.parse("m=application 0 NONE\r\na=" + candidate.candidate + "\r\n");
+            /* handle candidate values in the form <candidate> and a=<candidate>
+             * to workaround https://code.google.com/p/webrtc/issues/detail?id=1142
+             */
+            var candidateAttribute = candidate.candidate;
+            if (candidateAttribute.substr(0, 2) != "a=")
+                candidateAttribute = "a=" + candidateAttribute;
+            var candidateInfo = SDP.parse("m=application 0 NONE\r\n" + candidateAttribute + "\r\n");
 
             if (!candidateInfo.mediaDescriptions[0]
                 || !candidateInfo.mediaDescriptions[0].ice
