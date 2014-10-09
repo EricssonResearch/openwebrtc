@@ -641,8 +641,12 @@
             if (!candidateInfo.mediaDescriptions[0]
                 || !candidateInfo.mediaDescriptions[0].ice
                 || !candidateInfo.mediaDescriptions[0].ice.candidates
-                || !candidateInfo.mediaDescriptions[0].ice.candidates[0])
-                throw new Error("SyntaxError");
+                || !candidateInfo.mediaDescriptions[0].ice.candidates[0]) {
+                completeQueuedOperation(function () {
+                    failureCallback(new Error("SyntaxError"));
+                });
+                return;
+            }
 
             var mdesc = remoteSessionInfo.mediaDescriptions[candidate.sdpMLineIndex];
             if (!mdesc) {
