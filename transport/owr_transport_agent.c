@@ -1275,17 +1275,25 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
     g_warn_if_fail(sync_ok);
 
     if (media_type == OWR_MEDIA_TYPE_VIDEO) {
+        GstElement *queue = NULL;
+
+        name = g_strdup_printf("send-input-video-queue-%u", stream_id);
+        queue = gst_element_factory_make("queue", name);
+        g_free(name);
+        g_object_set(queue, "max-size-buffers", 1, "max-size-bytes", 0, "max-size-time", 0,
+            "leaky", 2 /* leak downstream*/, NULL);
+
         encoder = _owr_payload_create_encoder(payload);
         parser = _owr_payload_create_parser(payload);
         payloader = _owr_payload_create_payload_packetizer(payload);
         g_warn_if_fail(payloader && encoder);
 
-        gst_bin_add_many(GST_BIN(send_input_bin), encoder, payloader, NULL);
+        gst_bin_add_many(GST_BIN(send_input_bin), queue, encoder, payloader, NULL);
         if (parser) {
             gst_bin_add(GST_BIN(send_input_bin), parser);
-            link_ok &= gst_element_link_many(encoder, parser, payloader, NULL);
+            link_ok &= gst_element_link_many(queue, encoder, parser, payloader, NULL);
         } else {
-            link_ok &= gst_element_link_many(encoder, payloader, NULL);
+            link_ok &= gst_element_link_many(queue, encoder, payloader, NULL);
         }
         link_ok &= gst_element_link_many(payloader, rtp_capsfilter, NULL);
 
@@ -1296,9 +1304,10 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
         if (parser)
             sync_ok &= gst_element_sync_state_with_parent(parser);
         sync_ok &= gst_element_sync_state_with_parent(encoder);
+        sync_ok &= gst_element_sync_state_with_parent(queue);
 
         name = g_strdup_printf("video_sink_%u_%u", OWR_CODEC_TYPE_NONE, stream_id);
-        sink_pad = gst_element_get_static_pad(encoder, "sink");
+        sink_pad = gst_element_get_static_pad(queue, "sink");
         add_pads_to_bin_and_transport_bin(sink_pad, send_input_bin,
             transport_agent->priv->transport_bin, name);
         gst_object_unref(sink_pad);
