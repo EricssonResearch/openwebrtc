@@ -283,7 +283,7 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer)
 
     queue = gst_element_factory_make("queue", "video-renderer-queue");
     g_assert(queue);
-    g_object_set(queue, "max-size-buffers", 3, "max-size-bytes", 0, "max-size-time", 0, NULL);
+    g_object_set(queue, "max-size-buffers", 3, "max-size-bytes", 0, "max-size-time", G_GUINT64_CONSTANT(0), NULL);
 
     sink = gst_element_factory_make(VIDEO_SINK, "video-renderer-sink");
     g_assert(sink);
