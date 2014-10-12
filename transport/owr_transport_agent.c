@@ -114,8 +114,8 @@ static void update_helper_servers(OwrTransportAgent *transport_agent, guint stre
 static gboolean add_media_session(GHashTable *args);
 static guint get_stream_id(OwrTransportAgent *transport_agent, OwrSession *session);
 static OwrMediaSession * get_media_session(OwrTransportAgent *transport_agent, guint stream_id);
-static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_agent, guint stream_id);
-static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_agent, guint stream_id);
+static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_agent, guint stream_id, gboolean rtcp_mux);
+static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_agent, guint stream_id, gboolean rtcp_mux);
 static void set_send_ssrc_and_cname(OwrTransportAgent *agent, OwrMediaSession *media_session);
 static void on_new_candidate(NiceAgent *nice_agent, guint stream_id, guint component_id, gchar *foundation, OwrTransportAgent *transport_agent);
 static void on_candidate_gathering_done(NiceAgent *nice_agent, guint stream_id, OwrTransportAgent *transport_agent);
@@ -529,6 +529,7 @@ static gboolean add_media_session(GHashTable *args)
     GHashTable *sessions;
     GHashTableIter iter;
     gboolean media_session_found = FALSE;
+    gboolean rtcp_mux = FALSE;
     guint stream_id;
     gchar *send_rtp_sink_pad_name;
     GstPad *rtp_sink_pad;
@@ -557,7 +558,8 @@ static gboolean add_media_session(GHashTable *args)
         goto end;
     }
 
-    stream_id = nice_agent_add_stream(transport_agent->priv->nice_agent, 2);
+    g_object_get(media_session, "rtcp-mux", &rtcp_mux, NULL);
+    stream_id = nice_agent_add_stream(transport_agent->priv->nice_agent, rtcp_mux ? 1 : 2);
     if (!stream_id) {
         g_warning("Failed to add media session.");
         goto end;
@@ -583,16 +585,18 @@ static gboolean add_media_session(GHashTable *args)
     g_free(send_rtp_sink_pad_name);
     gst_object_unref(rtp_sink_pad);
 
-    prepare_transport_bin_receive_elements(transport_agent, stream_id);
-    prepare_transport_bin_send_elements(transport_agent, stream_id);
+    prepare_transport_bin_receive_elements(transport_agent, stream_id, rtcp_mux);
+    prepare_transport_bin_send_elements(transport_agent, stream_id, rtcp_mux);
 
     set_send_ssrc_and_cname(transport_agent, media_session);
 
     if (transport_agent->priv->local_max_port > 0) {
         nice_agent_set_port_range(transport_agent->priv->nice_agent, stream_id, NICE_COMPONENT_TYPE_RTP,
             transport_agent->priv->local_min_port, transport_agent->priv->local_max_port);
-        nice_agent_set_port_range(transport_agent->priv->nice_agent, stream_id, NICE_COMPONENT_TYPE_RTCP,
-            transport_agent->priv->local_min_port, transport_agent->priv->local_max_port);
+        if (!rtcp_mux) {
+            nice_agent_set_port_range(transport_agent->priv->nice_agent, stream_id, NICE_COMPONENT_TYPE_RTCP,
+                transport_agent->priv->local_min_port, transport_agent->priv->local_max_port);
+        }
     }
 
     nice_agent_gather_candidates(transport_agent->priv->nice_agent, stream_id);
@@ -843,11 +847,10 @@ static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, g
     GstPad *sink_pad, *src_pad;
     GstElement *output_selector;
     OwrMediaSession *media_session;
-    gboolean rtcp_mux = FALSE;
 
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
     g_return_if_fail(GST_IS_ELEMENT(dtls_srtp_bin_rtp));
-    g_return_if_fail(GST_IS_ELEMENT(dtls_srtp_bin_rtcp));
+    g_return_if_fail(!dtls_srtp_bin_rtcp || GST_IS_ELEMENT(dtls_srtp_bin_rtcp));
 
     /* RTP */
 
@@ -874,11 +877,6 @@ static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, g
     gst_bin_add(GST_BIN(send_output_bin), output_selector);
     gst_element_sync_state_with_parent(output_selector);
 
-    media_session = get_media_session(transport_agent, stream_id);
-    g_signal_connect_object(media_session, "notify::rtcp-mux", G_CALLBACK(on_rtcp_mux_changed),
-        output_selector, 0);
-    g_object_get(media_session, "rtcp-mux", &rtcp_mux, NULL);
-
     rtpbin_pad_name = g_strdup_printf("send_rtcp_src_%u", stream_id);
     dtls_srtp_pad_name = g_strdup_printf("rtcp_sink_%u",  stream_id);
 
@@ -889,22 +887,26 @@ static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, g
     g_assert(GST_IS_PAD(src_pad));
     linked_ok = gst_pad_link(src_pad, sink_pad) == GST_PAD_LINK_OK;
     g_warn_if_fail(linked_ok);
-    if (rtcp_mux)
-        g_object_set(output_selector, "active-pad", src_pad, NULL);
+    g_object_set(output_selector, "active-pad", src_pad, NULL);
     gst_object_unref(src_pad);
     gst_object_unref(sink_pad);
 
-    /* RTCP standalone */
-    sink_pad = gst_element_get_request_pad(dtls_srtp_bin_rtcp, dtls_srtp_pad_name);
-    g_assert(GST_IS_PAD(sink_pad));
-    src_pad = gst_element_get_request_pad(output_selector, "src_%u");
-    g_assert(GST_IS_PAD(src_pad));
-    linked_ok = gst_pad_link(src_pad, sink_pad) == GST_PAD_LINK_OK;
-    g_warn_if_fail(linked_ok);
-    if (!rtcp_mux)
+    if (dtls_srtp_bin_rtcp) {
+        /* RTCP standalone */
+        sink_pad = gst_element_get_request_pad(dtls_srtp_bin_rtcp, dtls_srtp_pad_name);
+        g_assert(GST_IS_PAD(sink_pad));
+        src_pad = gst_element_get_request_pad(output_selector, "src_%u");
+        g_assert(GST_IS_PAD(src_pad));
+        linked_ok = gst_pad_link(src_pad, sink_pad) == GST_PAD_LINK_OK;
+        g_warn_if_fail(linked_ok);
         g_object_set(output_selector, "active-pad", src_pad, NULL);
-    gst_object_unref(src_pad);
-    gst_object_unref(sink_pad);
+        gst_object_unref(src_pad);
+        gst_object_unref(sink_pad);
+
+        media_session = get_media_session(transport_agent, stream_id);
+        g_signal_connect_object(media_session, "notify::rtcp-mux", G_CALLBACK(on_rtcp_mux_changed),
+            output_selector, 0);
+    }
 
     sink_pad = gst_element_get_static_pad(output_selector, "sink");
     ghost_pad_and_add_to_bin(sink_pad, send_output_bin, dtls_srtp_pad_name);
@@ -918,9 +920,10 @@ static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, g
     g_free(dtls_srtp_pad_name);
 }
 
-static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_agent, guint stream_id)
+static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_agent, guint stream_id,
+    gboolean rtcp_mux)
 {
-    GstElement *nice_element, *dtls_srtp_bin_rtp, *dtls_srtp_bin_rtcp;
+    GstElement *nice_element, *dtls_srtp_bin_rtp, *dtls_srtp_bin_rtcp = NULL;
     gboolean linked_ok, synced_ok;
     GstElement *send_output_bin;
     gchar *bin_name;
@@ -942,22 +945,16 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
 
     nice_element = add_nice_element(transport_agent, stream_id, TRUE, FALSE, send_output_bin);
     dtls_srtp_bin_rtp = add_dtls_srtp_bin(transport_agent, stream_id, TRUE, FALSE, send_output_bin);
+    linked_ok = gst_element_link(dtls_srtp_bin_rtp, nice_element);
+    g_warn_if_fail(linked_ok);
+    synced_ok = gst_element_sync_state_with_parent(nice_element);
+    g_warn_if_fail(synced_ok);
+    synced_ok = gst_element_sync_state_with_parent(dtls_srtp_bin_rtp);
+    g_warn_if_fail(synced_ok);
 
-    if (nice_element) {
-        g_warn_if_fail(dtls_srtp_bin_rtp);
-        linked_ok = gst_element_link(dtls_srtp_bin_rtp, nice_element);
-        g_warn_if_fail(linked_ok);
-        synced_ok = gst_element_sync_state_with_parent(nice_element);
-        g_warn_if_fail(synced_ok);
-        synced_ok = gst_element_sync_state_with_parent(dtls_srtp_bin_rtp);
-        g_warn_if_fail(synced_ok);
-    }
-
-    nice_element = add_nice_element(transport_agent, stream_id, TRUE, TRUE, send_output_bin);
-    dtls_srtp_bin_rtcp = add_dtls_srtp_bin(transport_agent, stream_id, TRUE, TRUE, send_output_bin);
-
-    if (nice_element) {
-        g_warn_if_fail(dtls_srtp_bin_rtcp);
+    if (!rtcp_mux) {
+        nice_element = add_nice_element(transport_agent, stream_id, TRUE, TRUE, send_output_bin);
+        dtls_srtp_bin_rtcp = add_dtls_srtp_bin(transport_agent, stream_id, TRUE, TRUE, send_output_bin);
         linked_ok = gst_element_link(dtls_srtp_bin_rtcp, nice_element);
         g_warn_if_fail(linked_ok);
         synced_ok = gst_element_sync_state_with_parent(nice_element);
@@ -970,7 +967,7 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
 }
 
 static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_agent,
-    guint stream_id)
+    guint stream_id, gboolean rtcp_mux)
 {
     GstElement *nice_element, *dtls_srtp_bin;
     GstPad *rtp_src_pad, *rtcp_src_pad;
@@ -1013,24 +1010,26 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
     synced_ok = gst_element_sync_state_with_parent(nice_element);
     g_warn_if_fail(synced_ok);
 
-    nice_element = add_nice_element(transport_agent, stream_id, FALSE, TRUE, receive_input_bin);
-    dtls_srtp_bin = add_dtls_srtp_bin(transport_agent, stream_id, FALSE, TRUE, receive_input_bin);
+    if (!rtcp_mux) {
+        nice_element = add_nice_element(transport_agent, stream_id, FALSE, TRUE, receive_input_bin);
+        dtls_srtp_bin = add_dtls_srtp_bin(transport_agent, stream_id, FALSE, TRUE, receive_input_bin);
 
-    rtcp_src_pad = gst_element_get_static_pad(dtls_srtp_bin, "rtp_src");
-    ghost_pad_and_add_to_bin(rtcp_src_pad, receive_input_bin, "rtcp_src");
-    gst_object_unref(rtcp_src_pad);
+        rtcp_src_pad = gst_element_get_static_pad(dtls_srtp_bin, "rtp_src");
+        ghost_pad_and_add_to_bin(rtcp_src_pad, receive_input_bin, "rtcp_src");
+        gst_object_unref(rtcp_src_pad);
 
-    rtpbin_pad_name = g_strdup_printf("recv_rtcp_sink_%u", stream_id);
-    linked_ok = gst_element_link_pads(receive_input_bin, "rtcp_src",
-        transport_agent->priv->rtpbin, rtpbin_pad_name);
-    g_warn_if_fail(linked_ok);
-    g_free(rtpbin_pad_name);
-    synced_ok = gst_element_sync_state_with_parent(dtls_srtp_bin);
-    g_warn_if_fail(synced_ok);
-    linked_ok = gst_element_link(nice_element, dtls_srtp_bin);
-    g_warn_if_fail(linked_ok);
-    synced_ok = gst_element_sync_state_with_parent(nice_element);
-    g_warn_if_fail(synced_ok);
+        rtpbin_pad_name = g_strdup_printf("recv_rtcp_sink_%u", stream_id);
+        linked_ok = gst_element_link_pads(receive_input_bin, "rtcp_src",
+            transport_agent->priv->rtpbin, rtpbin_pad_name);
+        g_warn_if_fail(linked_ok);
+        g_free(rtpbin_pad_name);
+        synced_ok = gst_element_sync_state_with_parent(dtls_srtp_bin);
+        g_warn_if_fail(synced_ok);
+        linked_ok = gst_element_link(nice_element, dtls_srtp_bin);
+        g_warn_if_fail(linked_ok);
+        synced_ok = gst_element_sync_state_with_parent(nice_element);
+        g_warn_if_fail(synced_ok);
+    }
 }
 
 static void set_send_ssrc_and_cname(OwrTransportAgent *transport_agent, OwrMediaSession *media_session)

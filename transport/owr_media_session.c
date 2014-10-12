@@ -103,10 +103,13 @@ static void owr_media_session_set_property(GObject *object, guint property_id, c
 {
     OwrMediaSessionPrivate *priv = OWR_MEDIA_SESSION(object)->priv;
     GObjectClass *parent_class;
+    gboolean rtcp_mux;
 
     switch (property_id) {
     case PROP_RTCP_MUX:
-        priv->rtcp_mux = g_value_get_boolean(value);
+        rtcp_mux = g_value_get_boolean(value);
+        g_return_if_fail(!priv->rtcp_mux || rtcp_mux);
+        priv->rtcp_mux = rtcp_mux;
         break;
 
     case PROP_INCOMING_SRTP_KEY:
@@ -241,7 +244,8 @@ static void owr_media_session_class_init(OwrMediaSessionClass *klass)
     gobject_class->finalize = owr_media_session_finalize;
 
     obj_properties[PROP_RTCP_MUX] = g_param_spec_boolean("rtcp-mux", "RTP/RTCP multiplexing",
-        "Whether to use RTP/RTCP multiplexing or not",
+        "Whether to use RTP/RTCP multiplexing or not. " \
+        "Once RTP/RTCP multiplexing has been enabled, it cannot be disabled again.",
         DEFAULT_RTCP_MUX,
         G_PARAM_STATIC_STRINGS | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
