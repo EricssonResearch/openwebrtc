@@ -851,16 +851,16 @@
         }
 
         function dispatchIceCandidate(c, mdescIndex) {
-            var candidateLine = "candidate:" + c.foundation + " " + c.componentId + " "
+            var candidateAttribute = "candidate:" + c.foundation + " " + c.componentId + " "
                 + c.transport + " " + c.priority + " " + c.address + " " + c.port
                 + " typ " + c.type;
             if (c.relatedAddress)
-                candidateLine += " raddr " + c.relatedAddress + " rport " + c.relatedPort;
+                candidateAttribute += " raddr " + c.relatedAddress + " rport " + c.relatedPort;
             if (c.tcpType)
-                candidateLine += " tcpType " + c.tcpType;
+                candidateAttribute += " tcptype " + c.tcpType;
 
             var candidate = new RTCIceCandidate({
-                "candidate": candidateLine,
+                "candidate": candidateAttribute,
                 "sdpMid": null,
                 "sdpMLineIndex": mdescIndex
             });
