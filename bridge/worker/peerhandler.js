@@ -93,7 +93,7 @@ function PeerHandler(configuration, client, jsonRpc) {
 
                 if (cand.type != "host") {
                     cand.relatedAddress = candidate.base_address;
-                    cand.relatedPort = candidate.base_port;
+                    cand.relatedPort = candidate.base_port || 9;
                 }
 
                 var mdescIndex = localSessionInfo.mediaDescriptions.indexOf(mdesc);
