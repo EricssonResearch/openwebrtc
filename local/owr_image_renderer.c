@@ -218,7 +218,7 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
     OwrImageRenderer *image_renderer;
     OwrImageRendererPrivate *priv;
     GstElement *sink;
-    GstElement *videorate, *videoscale, *videoconvert, *capsfilter;
+    GstElement *queue, *videorate, *videoscale, *videoconvert, *capsfilter;
     GstCaps *filter_caps;
     GstPad *ghostpad, *sinkpad;
     gint fps_n = 0, fps_d = 1;
@@ -239,6 +239,10 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
 
     gst_bin_add(GST_BIN(_owr_get_pipeline()), priv->renderer_bin);
     gst_element_sync_state_with_parent(GST_ELEMENT(priv->renderer_bin));
+
+    queue = gst_element_factory_make("queue", "video-renderer-queue");
+    g_object_set(queue, "max-size-buffers", 3, "max-size-bytes", 0,
+        "max-size-time", G_GUINT64_CONSTANT(0), "leaky", 2 /* leak downstream */, NULL);
 
     videorate = gst_element_factory_make("videorate", "video-renderer-rate");
     g_object_set(videorate, "drop-only", TRUE, NULL);
@@ -275,15 +279,16 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
      * as prerolling is not possible from live sources in GStreamer */
     g_object_set(sink, "async", FALSE, "max-buffers", 1, "drop", TRUE, "qos", TRUE, NULL);
 
-    gst_bin_add_many(GST_BIN(priv->renderer_bin), videorate, videoscale,
+    gst_bin_add_many(GST_BIN(priv->renderer_bin), queue, videorate, videoscale,
         videoconvert, capsfilter, sink, NULL);
 
     LINK_ELEMENTS(capsfilter, sink);
     LINK_ELEMENTS(videoconvert, capsfilter);
     LINK_ELEMENTS(videoscale, videoconvert);
     LINK_ELEMENTS(videorate, videoscale);
+    LINK_ELEMENTS(queue, videorate);
 
-    sinkpad = gst_element_get_static_pad(videorate, "sink");
+    sinkpad = gst_element_get_static_pad(queue, "sink");
     g_assert(sinkpad);
     ghostpad = gst_ghost_pad_new("sink", sinkpad);
     gst_pad_set_active(ghostpad, TRUE);
@@ -295,6 +300,7 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
     gst_element_sync_state_with_parent(videoconvert);
     gst_element_sync_state_with_parent(videoscale);
     gst_element_sync_state_with_parent(videorate);
+    gst_element_sync_state_with_parent(queue);
 done:
     g_mutex_unlock(&priv->image_renderer_lock);
     return priv->renderer_bin;
