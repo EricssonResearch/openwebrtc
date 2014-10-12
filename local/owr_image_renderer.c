@@ -325,7 +325,7 @@ static GstCaps *owr_image_renderer_get_caps(OwrMediaRenderer *renderer)
     gst_caps_set_simple(caps, "width", G_TYPE_INT, width > 0 ? width : LIMITED_WIDTH, NULL);
     gst_caps_set_simple(caps, "height", G_TYPE_INT, height > 0 ? height : LIMITED_HEIGHT, NULL);
 
-    max_framerate = max_framerate > 0 ? max_framerate : LIMITED_FRAMERATE;
+    max_framerate = max_framerate > 0.0 ? max_framerate : LIMITED_FRAMERATE;
     gst_util_double_to_fraction(max_framerate, &fps_n, &fps_d);
     GST_DEBUG_OBJECT(renderer, "Setting the framerate to %d/%d", fps_n, fps_d);
     gst_caps_set_simple(caps, "framerate", GST_TYPE_FRACTION, fps_n, fps_d, NULL);
