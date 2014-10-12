@@ -1279,8 +1279,8 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
         name = g_strdup_printf("send-input-video-queue-%u", stream_id);
         queue = gst_element_factory_make("queue", name);
         g_free(name);
-        g_object_set(queue, "max-size-buffers", 1, "max-size-bytes", 0, "max-size-time", 0,
-            "leaky", 2 /* leak downstream*/, NULL);
+        g_object_set(queue, "max-size-buffers", 3, "max-size-bytes", 0,
+            "max-size-time", G_GUINT64_CONSTANT(0), "leaky", 2 /* leak downstream */, NULL);
 
         encoder = _owr_payload_create_encoder(payload);
         parser = _owr_payload_create_parser(payload);
