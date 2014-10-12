@@ -1476,11 +1476,6 @@ static void on_transport_bin_pad_added(GstElement *transport_bin, GstPad *new_pa
         signal_incoming_source(media_type, transport_agent, stream_id, codec_type);
 
     g_free(new_pad_name);
-
-#ifdef OWR_DEBUG
-    g_print("on_transport_bin_pad_added done. New pipeline:\n");
-    _owr_utils_print_bin(_owr_get_pipeline(), TRUE);
-#endif
 }
 
 static void on_rtpbin_pad_added(GstElement *rtpbin, GstPad *new_pad, OwrTransportAgent *transport_agent)
@@ -1516,11 +1511,6 @@ static void on_rtpbin_pad_added(GstElement *rtpbin, GstPad *new_pad, OwrTranspor
         guint32 session_id = 0;
         sscanf(new_pad_name, "send_rtp_src_%u", &session_id);
     }
-
-#ifdef OWR_DEBUG
-    g_print("on_rtpbin_pad_added done. New transport_bin:\n");
-    _owr_utils_print_bin(transport_agent->priv->transport_bin, TRUE);
-#endif
 
     g_free(new_pad_name);
 }

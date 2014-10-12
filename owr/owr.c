@@ -370,7 +370,6 @@ static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer user_data)
         g_printerr("%s: %s\n", message_type, error->message);
         g_printerr("Debugging info: %s\n", (debug) ? debug : "none");
 
-        _owr_utils_print_bin(owr_pipeline, TRUE);
         g_printerr("==== %s message stop ====\n", message_type);
         /*GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(owr_pipeline), GST_DEBUG_GRAPH_SHOW_ALL, "pipeline.dot");*/
 
