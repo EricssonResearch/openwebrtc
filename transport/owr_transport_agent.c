@@ -109,7 +109,7 @@ static void owr_transport_agent_get_property(GObject *object, guint property_id,
     GValue *value, GParamSpec *pspec);
 
 
-static gboolean add_helper_server_info(GHashTable *info);
+static void add_helper_server_info(GResolver *resolver, GAsyncResult *result, GHashTable *info);
 static void update_helper_servers(OwrTransportAgent *transport_agent, guint stream_id);
 static gboolean add_media_session(GHashTable *args);
 static guint get_stream_id(OwrTransportAgent *transport_agent, OwrSession *session);
@@ -294,7 +294,7 @@ OwrTransportAgent * owr_transport_agent_new(gboolean ice_controlling_mode)
  * owr_transport_agent_add_helper_server:
  * @transport_agent: The #OwrTransportAgent that should use a helper server
  * @type: The type of helper server to add
- * @address: The IP address of the helper server
+ * @address: The IP address or hostname of the helper server
  * @port: The port on the helper server
  * @username: (allow-none): The helper server username (when applicable)
  * @password: (allow-none): The helper server password (when applicable)
@@ -305,12 +305,12 @@ void owr_transport_agent_add_helper_server(OwrTransportAgent *transport_agent,
     const gchar *username, const gchar *password)
 {
     GHashTable *helper_server_info;
+    GResolver *resolver;
 
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
     helper_server_info = g_hash_table_new(g_str_hash, g_str_equal);
     g_hash_table_insert(helper_server_info, "transport_agent", transport_agent);
     g_hash_table_insert(helper_server_info, "type", GUINT_TO_POINTER(type));
-    g_hash_table_insert(helper_server_info, "address", g_strdup(address));
     g_hash_table_insert(helper_server_info, "port", GUINT_TO_POINTER(port));
     if (username)
         g_hash_table_insert(helper_server_info, "username", g_strdup(username));
@@ -318,7 +318,9 @@ void owr_transport_agent_add_helper_server(OwrTransportAgent *transport_agent,
         g_hash_table_insert(helper_server_info, "password", g_strdup(password));
 
     g_object_ref(transport_agent);
-    _owr_schedule_with_hash_table((GSourceFunc)add_helper_server_info, helper_server_info);
+    resolver = g_resolver_get_default();
+    g_resolver_lookup_by_name_async(resolver, address, NULL,
+        (GAsyncReadyCallback)add_helper_server_info, helper_server_info);
 }
 
 void owr_transport_agent_add_local_address(OwrTransportAgent *transport_agent, const gchar *local_address)
@@ -364,16 +366,32 @@ void owr_transport_agent_add_session(OwrTransportAgent *agent, OwrSession *sessi
 
 /* Internal functions */
 
-static gboolean add_helper_server_info(GHashTable *info)
+static void add_helper_server_info(GResolver *resolver, GAsyncResult *result, GHashTable *info)
 {
     OwrTransportAgent *transport_agent;
     OwrTransportAgentPrivate *priv;
-    GList *stream_ids, *item;
+    GList *stream_ids, *item, *address_list;
     guint stream_id;
+    GError *error = NULL;
 
     transport_agent = OWR_TRANSPORT_AGENT(g_hash_table_lookup(info, "transport_agent"));
-    g_return_val_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent), FALSE);
+    g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
     g_hash_table_remove(info, "transport_agent");
+
+    address_list = g_resolver_lookup_by_name_finish(resolver, result, &error);
+    g_object_unref(resolver);
+
+    if (!address_list) {
+        g_printerr("Failed to resolve helper server address: %s\n", error->message);
+        g_error_free(error);
+        g_free(g_hash_table_lookup(info, "username"));
+        g_free(g_hash_table_lookup(info, "password"));
+        g_hash_table_unref(info);
+        goto out;
+    }
+
+    g_hash_table_insert(info, "address", g_inet_address_to_string(address_list->data));
+    g_resolver_free_addresses(address_list);
 
     priv = transport_agent->priv;
     priv->helper_server_infos = g_list_append(priv->helper_server_infos, info);
@@ -385,9 +403,8 @@ static gboolean add_helper_server_info(GHashTable *info)
     }
     g_list_free(stream_ids);
 
+out:
     g_object_unref(transport_agent);
-
-    return FALSE;
 }
 
 static void update_helper_servers(OwrTransportAgent *transport_agent, guint stream_id)
