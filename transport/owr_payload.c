@@ -424,8 +424,15 @@ GstElement * _owr_payload_create_parser(OwrPayload *payload)
 
     element_name = g_strdup_printf("parser_%s_%u", OwrCodecTypeParserElementName[payload->priv->codec_type], get_unique_id());
     parser = gst_element_factory_make(OwrCodecTypeParserElementName[payload->priv->codec_type], element_name);
-
     g_free(element_name);
+
+    switch (payload->priv->codec_type) {
+    case OWR_CODEC_TYPE_H264:
+        g_object_set(parser, "disable-passthrough", TRUE, NULL);
+        break;
+    default:
+        break;
+    }
     return parser;
 }
 
