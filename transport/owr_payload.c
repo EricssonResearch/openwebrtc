@@ -614,15 +614,16 @@ GstCaps * _owr_payload_create_encoded_caps(OwrPayload *payload)
     switch (payload->priv->codec_type) {
     case OWR_CODEC_TYPE_H264:
         caps = gst_caps_new_simple("video/x-h264",
-            "stream-format", G_TYPE_STRING, "byte-stream",
-            "alignment", G_TYPE_STRING, "nal",
+            "profile", G_TYPE_STRING, "baseline",
             NULL);
+        caps = gst_caps_merge_structure(caps, gst_structure_new("video/x-h264",
+            "profile", G_TYPE_STRING, "constrained-baseline", NULL));
         break;
     case OWR_CODEC_TYPE_VP8:
-        caps = gst_caps_new_simple("video/x-vp8", NULL, NULL);
+        caps = gst_caps_new_empty_simple("video/x-vp8");
         break;
     default:
-        caps = gst_caps_new_simple("ANY", NULL, NULL);
+        caps = gst_caps_new_any();
     }
 
     return caps;

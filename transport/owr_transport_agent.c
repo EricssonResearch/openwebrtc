@@ -1274,7 +1274,7 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
     g_warn_if_fail(sync_ok);
 
     if (media_type == OWR_MEDIA_TYPE_VIDEO) {
-        GstElement *queue = NULL;
+        GstElement *queue = NULL, *encoder_capsfilter;
 
         name = g_strdup_printf("send-input-video-queue-%u", stream_id);
         queue = gst_element_factory_make("queue", name);
@@ -1287,12 +1287,19 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
         payloader = _owr_payload_create_payload_packetizer(payload);
         g_warn_if_fail(payloader && encoder);
 
-        gst_bin_add_many(GST_BIN(send_input_bin), queue, encoder, payloader, NULL);
+        name = g_strdup_printf("send-input-video-encoder-capsfilter-%u", stream_id);
+        encoder_capsfilter = gst_element_factory_make("capsfilter", name);
+        g_free(name);
+        caps = _owr_payload_create_encoded_caps(payload);
+        g_object_set(encoder_capsfilter, "caps", caps, NULL);
+        gst_caps_unref(caps);
+
+        gst_bin_add_many(GST_BIN(send_input_bin), queue, encoder, encoder_capsfilter, payloader, NULL);
         if (parser) {
             gst_bin_add(GST_BIN(send_input_bin), parser);
-            link_ok &= gst_element_link_many(queue, encoder, parser, payloader, NULL);
+            link_ok &= gst_element_link_many(queue, encoder, parser, encoder_capsfilter, payloader, NULL);
         } else {
-            link_ok &= gst_element_link_many(queue, encoder, payloader, NULL);
+            link_ok &= gst_element_link_many(queue, encoder, encoder_capsfilter, payloader, NULL);
         }
         link_ok &= gst_element_link_many(payloader, rtp_capsfilter, NULL);
 
@@ -1302,6 +1309,7 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
         sync_ok &= gst_element_sync_state_with_parent(payloader);
         if (parser)
             sync_ok &= gst_element_sync_state_with_parent(parser);
+        sync_ok &= gst_element_sync_state_with_parent(encoder_capsfilter);
         sync_ok &= gst_element_sync_state_with_parent(encoder);
         sync_ok &= gst_element_sync_state_with_parent(queue);
 
