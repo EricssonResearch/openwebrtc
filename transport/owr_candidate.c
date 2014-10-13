@@ -361,7 +361,7 @@ OwrCandidate * _owr_candidate_new_from_nice_candidate(NiceCandidate *nice_candid
 
     owr_candidate = owr_candidate_new(candidate_type, component_type);
 
-    g_object_set(G_OBJECT(owr_candidate), "transport_type", transport_type, NULL);
+    g_object_set(G_OBJECT(owr_candidate), "transport-type", transport_type, NULL);
 
     address = g_new0(gchar, NICE_ADDRESS_STRING_LEN);
     nice_address_to_string(&nice_candidate->addr, address);
