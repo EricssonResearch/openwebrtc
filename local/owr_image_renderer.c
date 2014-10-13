@@ -221,7 +221,7 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
     GstElement *queue, *videorate, *videoscale, *videoconvert, *capsfilter;
     GstCaps *filter_caps;
     GstPad *ghostpad, *sinkpad;
-    gint fps_n = 0, fps_d = 1;
+    gdouble max_framerate;
     gchar *bin_name;
 
     g_assert(renderer);
@@ -245,7 +245,8 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
         "max-size-time", G_GUINT64_CONSTANT(0), "leaky", 2 /* leak downstream */, NULL);
 
     videorate = gst_element_factory_make("videorate", "video-renderer-rate");
-    g_object_set(videorate, "drop-only", TRUE, NULL);
+    max_framerate = priv->max_framerate > 0.0 ? priv->max_framerate : LIMITED_FRAMERATE;
+    g_object_set(videorate, "drop-only", TRUE, "max-rate", (gint)max_framerate, NULL);
 
     videoscale = gst_element_factory_make("videoscale", "video-renderer-scale");
     videoconvert = gst_element_factory_make(VIDEO_CONVERT, "video-renderer-convert");
@@ -262,14 +263,6 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
             "width", G_TYPE_INT, LIMITED_WIDTH,
             "height", G_TYPE_INT, LIMITED_HEIGHT, NULL);
     }
-    gst_util_double_to_fraction(priv->max_framerate, &fps_n, &fps_d);
-#if defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR)
-    if (!fps_n)
-        gst_util_double_to_fraction(LIMITED_FRAMERATE, &fps_n, &fps_d);
-#endif
-    if (fps_n > 0 && fps_d > 0)
-        gst_caps_set_simple(filter_caps, "framerate", GST_TYPE_FRACTION, fps_n, fps_d, NULL);
-    g_object_set(capsfilter, "caps", filter_caps, NULL);
 
     sink = gst_element_factory_make("appsink", "video-renderer-appsink");
     g_assert(sink);
