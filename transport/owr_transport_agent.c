@@ -1521,7 +1521,7 @@ static void setup_video_receive_elements(GstPad *new_pad, guint32 session_id, Ow
     GstCaps *caps = NULL;
     gboolean sync_ok = TRUE;
     GstElement *receive_output_bin;
-    GstElement *payload_caps_element, *rtpdepay, *videorepair1, *depayed_caps_filter,
+    GstElement *rtpdepay, *videorepair1, *depayed_caps_filter,
         *decoded_valve, *parser, *decoder;
     GstPadLinkReturn link_res;
     gboolean link_ok = TRUE;
@@ -1552,10 +1552,6 @@ static void setup_video_receive_elements(GstPad *new_pad, guint32 session_id, Ow
     decoded_valve = gst_element_factory_make("valve", name);
     g_object_set(decoded_valve, "drop", TRUE, NULL);
     g_object_get(payload, "codec-type", &codec_type, NULL);
-    caps = _owr_payload_create_encoded_caps(payload);
-    payload_caps_element = gst_element_factory_make("capsfilter", "out_capsfilter_video");
-    g_object_set(payload_caps_element, "caps", caps, NULL);
-    gst_caps_unref(caps);
     parser = _owr_payload_create_parser(payload);
     decoder = _owr_payload_create_decoder(payload);
 
