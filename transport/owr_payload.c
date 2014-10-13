@@ -38,6 +38,8 @@
 #include "owr_video_payload.h"
 #include "owr_utils.h"
 
+#include <string.h>
+
 #define DEFAULT_MTU 1200
 #define DEFAULT_BITRATE 0
 
@@ -316,10 +318,25 @@ static GstElement * try_codecs(GList *codecs, const gchar *name_prefix)
     return NULL;
 }
 
+static gboolean binding_transform_to_kbps(GBinding *binding, const GValue *from_value, GValue *to_value, gpointer user_data)
+{
+    guint bitrate;
+
+    OWR_UNUSED(binding);
+    OWR_UNUSED(user_data);
+
+    bitrate = g_value_get_uint(from_value);
+    g_value_set_uint(to_value, bitrate / 1000);
+
+    return TRUE;
+}
+
 GstElement * _owr_payload_create_encoder(OwrPayload *payload)
 {
     GstElement *encoder = NULL;
     gchar *element_name = NULL;
+    GstElementFactory *factory;
+    const gchar *factory_name;
 
     g_return_val_if_fail(payload, NULL);
 
@@ -327,9 +344,25 @@ GstElement * _owr_payload_create_encoder(OwrPayload *payload)
     case OWR_CODEC_TYPE_H264:
         encoder = try_codecs(h264_encoders, "encoder");
         g_return_val_if_fail(encoder, NULL);
-        g_object_set(encoder, "gop-size", 0, NULL);
-        gst_util_set_object_arg(G_OBJECT(encoder), "rate-control", "bitrate");
-        g_object_bind_property(payload, "bitrate", encoder, "bitrate", G_BINDING_SYNC_CREATE);
+
+        factory = gst_element_get_factory(encoder);
+        factory_name = gst_plugin_feature_get_name(factory);
+
+        if (!strcmp(factory_name, "openh264enc")) {
+            g_object_set(encoder, "gop-size", 0, NULL);
+            gst_util_set_object_arg(G_OBJECT(encoder), "rate-control", "bitrate");
+            g_object_bind_property(payload, "bitrate", encoder, "bitrate", G_BINDING_SYNC_CREATE);
+        } else if (!strcmp(factory_name, "x264enc")) {
+            g_object_bind_property_full(payload, "bitrate", encoder, "bitrate", G_BINDING_SYNC_CREATE,
+                binding_transform_to_kbps, NULL, NULL, NULL);
+            g_object_set(encoder, "tune", 0x04 /* zero-latency */, NULL);
+        } else if (!strcmp(factory_name, "vtenc_h264")) {
+            g_object_bind_property_full(payload, "bitrate", encoder, "bitrate", G_BINDING_SYNC_CREATE,
+                binding_transform_to_kbps, NULL, NULL, NULL);
+        } else {
+            /* Assume bits/s instead of kbit/s */
+            g_object_bind_property(payload, "bitrate", encoder, "bitrate", G_BINDING_SYNC_CREATE);
+        }
         g_object_set(payload, "bitrate", evaluate_bitrate_from_payload(payload), NULL);
         break;
 
