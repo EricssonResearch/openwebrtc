@@ -188,3 +188,16 @@ function randomString() {
     crypto.getRandomValues(randomValues);
     return btoa(String.fromCharCode.apply(null, randomValues));
 }
+
+function createError(name, message) {
+    var constructor = self[name] || self.Error;
+    var error = new constructor(entityReplace(message));
+    error.name = name;
+    return error;
+}
+
+function entityReplace(str) {
+    return escape(str).replace(/%([0-9A-F]{2})/g, function (match) {
+        return "&#" + parseInt(match.substr(1), 16) + ";"
+    });
+}

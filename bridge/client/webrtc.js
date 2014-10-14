@@ -158,7 +158,7 @@
         var constructorTracks = arguments[0] instanceof MediaStream ? arguments[0].getTracks() : arguments[0];
         constructorTracks.forEach(function (track) {
             if (!(track instanceof MediaStreamTrack))
-                throw TypeError("MediaStream: list item is not a MediaStreamTrack");
+                throw createError("TypeError", "MediaStream: list item is not a MediaStreamTrack");
 
             if (!a.active && track.readyState != "ended")
                 a.active = true;
@@ -397,7 +397,7 @@
                     "offerToReceiveAudio": "number | boolean"
                 });
             }
-            checkClosedState();
+            checkClosedState("createOffer");
 
             enqueueOperation(function () {
                 queuedCreateOffer(successCallback, failureCallback, options);
@@ -456,7 +456,7 @@
                     "offerToReceiveAudio": "number | boolean"
                 });
             }
-            checkClosedState();
+            checkClosedState("createAnswer");
 
             enqueueOperation(function () {
                 queuedCreateAnswer(successCallback, failureCallback, options);
@@ -467,7 +467,8 @@
 
             if (!remoteSessionInfo) {
                 completeQueuedOperation(function () {
-                    failureCallback(new Error("InvalidStateError"));
+                    failureCallback(createError("InvalidStateError",
+                        "createAnswer: no remote description set"));
                 });
                 return;
             }
@@ -510,7 +511,7 @@
 
         this.setLocalDescription = function (description, successCallback, failureCallback) {
             checkArguments("setLocalDescription", "RTCSessionDescription, function, function", 3, arguments);
-            checkClosedState();
+            checkClosedState("setLocalDescription");
 
             enqueueOperation(function () {
                 queuedSetLocalDescription(description, successCallback, failureCallback);
@@ -521,7 +522,10 @@
             var targetState = signalingStateMap[a.signalingState]["setLocal:" + description.type];
             if (!targetState) {
                 completeQueuedOperation(function () {
-                    failureCallback(new Error("InvalidSessionDescriptionError"));
+                    failureCallback(createError("InvalidSessionDescriptionError",
+                        "setLocalDescription: description type \"" +
+                        description.type + "\" invalid for the current state \""
+                        + a.signalingState + "\""));
                 });
                 return;
             }
@@ -555,7 +559,7 @@
 
         this.setRemoteDescription = function (description, successCallback, failureCallback) {
             checkArguments("setRemoteDescription", "RTCSessionDescription, function, function", 3, arguments);
-            checkClosedState();
+            checkClosedState("setRemoteDescription");
 
             enqueueOperation(function () {
                 queuedSetRemoteDescription(description, successCallback, failureCallback);
@@ -566,7 +570,10 @@
             var targetState = signalingStateMap[a.signalingState]["setRemote:" + description.type];
             if (!targetState) {
                 completeQueuedOperation(function () {
-                    failureCallback(new Error("InvalidSessionDescriptionError"));
+                    failureCallback(createError("InvalidSessionDescriptionError",
+                        "setRemoteDescription: description type \"" +
+                        description.type + "\" invalid for the current state \""
+                        + a.signalingState + "\""));
                 });
                 return;
             }
@@ -616,12 +623,12 @@
         this.updateIce = function (configuration) {
             checkArguments("updateIce", "object", 1, arguments);
             checkConfigurationDictionary(configuration);
-            checkClosedState();
+            checkClosedState("updateIce");
         };
 
         this.addIceCandidate = function (candidate, successCallback, failureCallback) {
             checkArguments("addIceCandidate", "RTCIceCandidate, function, function", 3, arguments);
-            checkClosedState();
+            checkClosedState("addIceCandidate");
 
             enqueueOperation(function () {
                 queuedAddIceCandidate(candidate, successCallback, failureCallback);
@@ -631,7 +638,8 @@
         function queuedAddIceCandidate(candidate, successCallback, failureCallback) {
             if (!remoteSessionInfo) {
                 completeQueuedOperation(function () {
-                    failureCallback(new Error("InvalidStateError"));
+                    failureCallback(createError("InvalidStateError",
+                        "addIceCandidate: no remote description set"));
                 });
                 return;
             }
@@ -649,7 +657,8 @@
                 || !candidateInfo.mediaDescriptions[0].ice.candidates
                 || !candidateInfo.mediaDescriptions[0].ice.candidates[0]) {
                 completeQueuedOperation(function () {
-                    failureCallback(new Error("SyntaxError"));
+                    failureCallback(createError("SyntaxError",
+                        "addIceCandidate: failed to parse candidate attribute"));
                 });
                 return;
             }
@@ -657,7 +666,9 @@
             var mdesc = remoteSessionInfo.mediaDescriptions[candidate.sdpMLineIndex];
             if (!mdesc) {
                 completeQueuedOperation(function () {
-                    failureCallback(new Error("SyntaxError"));
+                    failureCallback(createError("SyntaxError",
+                        "addIceCandidate: no matching media description for sdpMLineIndex: " +
+                        candidate.sdpMLineIndex));
                 });
                 return;
             }
@@ -690,7 +701,7 @@
 
         this.addStream = function (stream) {
             checkArguments("addStream", "webkitMediaStream", 1, arguments);
-            checkClosedState();
+            checkClosedState("addStream");
 
             if (findInArrayById(localStreams, stream.id) || findInArrayById(remoteStreams, stream.id))
                 return;
@@ -701,7 +712,7 @@
 
         this.removeStream = function (stream) {
             checkArguments("removeStream", "webkitMediaStream", 1, arguments);
-            checkClosedState();
+            checkClosedState("removeStream");
 
             var index = localStreams.indexOf(stream);
             if (index == -1)
@@ -757,9 +768,10 @@
             }
         }
 
-        function checkClosedState() {
+        function checkClosedState(name) {
             if (a.signalingState == "closed")
-                throw new Error("signalingState is 'closed'.");
+                throw createError("InvalidStateError", name +
+                    ": signalingState is \"closed\".");
         }
 
         function maybeDispatchNegotiationNeeded() {
