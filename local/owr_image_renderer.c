@@ -240,18 +240,18 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
     gst_bin_add(GST_BIN(_owr_get_pipeline()), priv->renderer_bin);
     gst_element_sync_state_with_parent(GST_ELEMENT(priv->renderer_bin));
 
-    queue = gst_element_factory_make("queue", "video-renderer-queue");
+    queue = gst_element_factory_make("queue", "image-renderer-queue");
     g_object_set(queue, "max-size-buffers", 3, "max-size-bytes", 0,
         "max-size-time", G_GUINT64_CONSTANT(0), "leaky", 2 /* leak downstream */, NULL);
 
-    videorate = gst_element_factory_make("videorate", "video-renderer-rate");
+    videorate = gst_element_factory_make("videorate", "image-renderer-rate");
     max_framerate = priv->max_framerate > 0.0 ? priv->max_framerate : LIMITED_FRAMERATE;
     g_object_set(videorate, "drop-only", TRUE, "max-rate", (gint)max_framerate, NULL);
 
-    videoscale = gst_element_factory_make("videoscale", "video-renderer-scale");
-    videoconvert = gst_element_factory_make(VIDEO_CONVERT, "video-renderer-convert");
+    videoscale = gst_element_factory_make("videoscale", "image-renderer-scale");
+    videoconvert = gst_element_factory_make(VIDEO_CONVERT, "image-renderer-convert");
 
-    capsfilter = gst_element_factory_make("capsfilter", "video-renderer-capsfilter");
+    capsfilter = gst_element_factory_make("capsfilter", "image-renderer-capsfilter");
     filter_caps = gst_caps_new_empty_simple("video/x-raw");
     gst_caps_set_simple(filter_caps, "format", G_TYPE_STRING, "BGRA", NULL);
     if (priv->width > 0)
@@ -264,7 +264,7 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
             "height", G_TYPE_INT, LIMITED_HEIGHT, NULL);
     }
 
-    sink = gst_element_factory_make("appsink", "video-renderer-appsink");
+    sink = gst_element_factory_make("appsink", "image-renderer-appsink");
     g_assert(sink);
     priv->appsink = sink;
 
