@@ -34,10 +34,10 @@ libopenwebrtc_bridge_la_DEPENDENCIES = \
 libopenwebrtc_bridge_la_CFLAGS = $(AM_CFLAGS) -ansi
 libopenwebrtc_bridge_la_LDFLAGS = -export-dynamic
 
-bin_PROGRAMS = daemon
-daemon_SOURCES = daemon.c
-daemon_LDFLAGS = -static -export-dynamic $(SEED_LIBS)
-daemon_LDADD = libopenwebrtc_bridge.la
+bin_PROGRAMS = openwebrtc-daemon
+openwebrtc_daemon_SOURCES = daemon.c
+openwebrtc_daemon_LDFLAGS = -static -export-dynamic $(SEED_LIBS)
+openwebrtc_daemon_LDADD = libopenwebrtc_bridge.la
 
 includedir = $(prefix)/include/owr
 include_HEADERS = \
