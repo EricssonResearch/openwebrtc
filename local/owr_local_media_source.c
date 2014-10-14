@@ -172,13 +172,13 @@ static GstElement *create_post_tee_bin(OwrMediaSource *media_source, GstElement 
     CREATE_ELEMENT_WITH_ID(queue_post, "queue", "source-output-queue", source_id);
     list = g_slist_append(list, queue_post);
 
-    g_object_set(capsfilter, "caps", caps, NULL);
-
     g_object_get(media_source, "media-type", &media_type, NULL);
     switch (media_type) {
     case OWR_MEDIA_TYPE_AUDIO:
         {
         GstElement *audioresample, *audioconvert;
+
+        g_object_set(capsfilter, "caps", caps, NULL);
 
         CREATE_ELEMENT_WITH_ID(audioresample, "audioresample", "source-audio-resample", source_id);
         list = g_slist_prepend(list, audioresample);
@@ -198,12 +198,23 @@ static GstElement *create_post_tee_bin(OwrMediaSource *media_source, GstElement 
     case OWR_MEDIA_TYPE_VIDEO:
         {
         GstElement *videorate, *videoscale, *videoconvert;
+        GstCaps *source_caps;
+        GstStructure *source_structure;
+        gint fps_n = 0, fps_d = 1;
+
+        source_caps = gst_caps_copy(caps);
+        source_structure = gst_caps_get_structure(source_caps, 0);
+        if (gst_structure_get_fraction(source_structure, "framerate", &fps_n, &fps_d))
+            gst_structure_remove_field(source_structure, "framerate");
+        g_object_set(capsfilter, "caps", source_caps, NULL);
+        gst_caps_unref(source_caps);
 
         CREATE_ELEMENT_WITH_ID(videoconvert, VIDEO_CONVERT, "source-video-convert", source_id);
         list = g_slist_prepend(list, videoconvert);
         CREATE_ELEMENT_WITH_ID(videoscale, "videoscale", "source-video-scale", source_id);
         list = g_slist_prepend(list, videoscale);
         CREATE_ELEMENT_WITH_ID(videorate, "videorate", "source-video-rate", source_id);
+        g_object_set(videorate, "drop-only", TRUE, "max-rate", fps_n / fps_d, NULL);
         list = g_slist_prepend(list, videorate);
         list = g_slist_prepend(list, queue_pre);
 
