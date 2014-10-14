@@ -103,7 +103,7 @@ build(){
             export PLATFORM_GSTREAMER_LIBS="$PLATFORM_GSTREAMER_LIBS -framework AudioUnit -framework AudioToolbox -framework CoreAudio -framework CoreMedia -framework CoreVideo -framework QTKit -framework AVFoundation -framework Foundation -framework VideoToolbox -framework AppKit -framework OpenGL"
             export PLATFORM_CXX_LIBS="-lc++"
         elif [[ $target_triple == "x86_64-unknown-linux" ]] ; then
-            local configure_flags="--enable-static --enable-owr-static --enable-shared --enable-gtk-doc"
+            local configure_flags="--enable-static --enable-owr-static --enable-shared"
             local seed_platform_libs="-ljavascriptcoregtk-3.0 -licui18n -licuuc -licudata"
             export PLATFORM_GLIB_LIBS="-lpthread -lffi -lrt -ldl -lresolv"
             export PLATFORM_GSTREAMER_LIBS="-lgstvideoconvert -lgstpulse -lpulse-mainloop-glib -lpulse -lgstvideo4linux2 -lv4l2 -lX11 -lXv -lgstallocators-1.0 -lGLU -lGL"
