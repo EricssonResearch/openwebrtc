@@ -263,6 +263,8 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
             "width", G_TYPE_INT, LIMITED_WIDTH,
             "height", G_TYPE_INT, LIMITED_HEIGHT, NULL);
     }
+    g_object_set(capsfilter, "caps", filter_caps, NULL);
+    gst_caps_unref(filter_caps);
 
     sink = gst_element_factory_make("appsink", "image-renderer-appsink");
     g_assert(sink);
