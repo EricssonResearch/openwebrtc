@@ -138,7 +138,7 @@
     MediaStream.prototype.constructor = MediaStream;
 
     function MediaStream() { // (MediaStream or sequence<MediaStreamTrack>)
-        checkArguments("MediaStream", "MediaStream | Array", 1, arguments);
+        checkArguments("MediaStream", "webkitMediaStream | Array", 1, arguments);
 
         EventTarget.call(this, {
             "onactive": null,
@@ -689,7 +689,7 @@
         };
 
         this.addStream = function (stream) {
-            checkArguments("addStream", "MediaStream", 1, arguments);
+            checkArguments("addStream", "webkitMediaStream", 1, arguments);
             checkClosedState();
 
             if (findInArrayById(localStreams, stream.id) || findInArrayById(remoteStreams, stream.id))
@@ -700,7 +700,7 @@
         };
 
         this.removeStream = function (stream) {
-            checkArguments("removeStream", "MediaStream", 1, arguments);
+            checkArguments("removeStream", "webkitMediaStream", 1, arguments);
             checkClosedState();
 
             var index = localStreams.indexOf(stream);
@@ -1217,11 +1217,11 @@
         };
     }
 
-    global.MediaStream = MediaStream;
-    global.RTCPeerConnection = RTCPeerConnection;
+    global.webkitMediaStream = MediaStream;
+    global.webkitRTCPeerConnection = RTCPeerConnection;
     global.RTCSessionDescription = RTCSessionDescription;
     global.RTCIceCandidate = RTCIceCandidate;
-    global.navigator.getUserMedia = getUserMedia;
+    global.navigator.webkitGetUserMedia = getUserMedia;
 
     var url = global.webkitURL || global.URL;
     if (!url)
@@ -1236,9 +1236,5 @@
        // this will always fail
        checkArguments("createObjectURL", "Blob", 1, arguments);
     };
-
-    // FIXME: what about prefixes?
-    global.navigator.webkitGetUserMedia = getUserMedia;
-    global.webkitRTCPeerConnection = RTCPeerConnection;
 
 })(self);
