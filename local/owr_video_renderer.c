@@ -236,10 +236,8 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer)
 {
     OwrVideoRenderer *video_renderer;
     OwrVideoRendererPrivate *priv;
-    GstElement *videorate, *videoscale, *videoconvert, *capsfilter, *balance, *queue, *sink;
-    GstCaps *filter_caps;
+    GstElement *balance, *queue, *sink;
     GstPad *ghostpad, *sinkpad;
-    gint fps_n = 0, fps_d = 1;
     gchar *bin_name;
 
     g_assert(renderer);
@@ -258,24 +256,6 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer)
     gst_bin_add(GST_BIN(_owr_get_pipeline()), priv->renderer_bin);
     gst_element_sync_state_with_parent(GST_ELEMENT(priv->renderer_bin));
 
-    videorate = gst_element_factory_make("videorate", "video-renderer-rate");
-    g_object_set(videorate, "drop-only", TRUE, NULL);
-
-    videoscale = gst_element_factory_make("videoscale", "video-renderer-scale");
-    videoconvert = gst_element_factory_make(VIDEO_CONVERT, "video-renderer-convert");
-
-    gst_util_double_to_fraction(priv->max_framerate, &fps_n, &fps_d);
-
-    capsfilter = gst_element_factory_make("capsfilter", "video-renderer-capsfilter");
-    filter_caps = gst_caps_new_empty_simple("video/x-raw");
-    if (priv->width > 0)
-        gst_caps_set_simple(filter_caps, "width", G_TYPE_INT, priv->width, NULL);
-    if (priv->height > 0)
-        gst_caps_set_simple(filter_caps, "height", G_TYPE_INT, priv->height, NULL);
-    if (fps_n > 0 && fps_d > 0)
-        gst_caps_set_simple(filter_caps, "framerate", GST_TYPE_FRACTION, fps_n, fps_d, NULL);
-    g_object_set(capsfilter, "caps", filter_caps, NULL);
-
     balance = gst_element_factory_make("videobalance", "video-renderer-balance");
     g_signal_connect_object(renderer, "notify::disabled", G_CALLBACK(renderer_disabled),
         balance, 0);
@@ -283,7 +263,8 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer)
 
     queue = gst_element_factory_make("queue", "video-renderer-queue");
     g_assert(queue);
-    g_object_set(queue, "max-size-buffers", 3, "max-size-bytes", 0, "max-size-time", G_GUINT64_CONSTANT(0), NULL);
+    g_object_set(queue, "max-size-buffers", 3, "max-size-bytes", 0, "max-size-time", G_GUINT64_CONSTANT(0),
+        "leaky", 2 /* downstream leaky */, NULL);
 
     sink = gst_element_factory_make(VIDEO_SINK, "video-renderer-sink");
     g_assert(sink);
@@ -294,17 +275,12 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer)
      * as prerolling is not possible from live sources in GStreamer */
     g_object_set(sink, "async", FALSE, NULL);
 
-    gst_bin_add_many(GST_BIN(priv->renderer_bin), videorate, videoscale,
-        videoconvert, capsfilter, balance, queue, sink, NULL);
+    gst_bin_add_many(GST_BIN(priv->renderer_bin), balance, queue, sink, NULL);
 
     LINK_ELEMENTS(queue, sink);
     LINK_ELEMENTS(balance, queue);
-    LINK_ELEMENTS(capsfilter, balance);
-    LINK_ELEMENTS(videoconvert, capsfilter);
-    LINK_ELEMENTS(videoscale, videoconvert);
-    LINK_ELEMENTS(videorate, videoscale);
 
-    sinkpad = gst_element_get_static_pad(videorate, "sink");
+    sinkpad = gst_element_get_static_pad(balance, "sink");
     g_assert(sinkpad);
     ghostpad = gst_ghost_pad_new("sink", sinkpad);
     gst_pad_set_active(ghostpad, TRUE);
@@ -314,10 +290,6 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer)
     gst_element_sync_state_with_parent(sink);
     gst_element_sync_state_with_parent(queue);
     gst_element_sync_state_with_parent(balance);
-    gst_element_sync_state_with_parent(capsfilter);
-    gst_element_sync_state_with_parent(videoconvert);
-    gst_element_sync_state_with_parent(videoscale);
-    gst_element_sync_state_with_parent(videorate);
 done:
     g_mutex_unlock(&priv->video_renderer_lock);
     return priv->renderer_bin;
