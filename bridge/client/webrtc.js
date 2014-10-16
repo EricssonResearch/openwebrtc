@@ -524,8 +524,8 @@
                 completeQueuedOperation(function () {
                     failureCallback(createError("InvalidSessionDescriptionError",
                         "setLocalDescription: description type \"" +
-                        description.type + "\" invalid for the current state \""
-                        + a.signalingState + "\""));
+                        entityReplace(description.type) + "\" invalid for the current state \"" +
+                        a.signalingState + "\""));
                 });
                 return;
             }
@@ -572,8 +572,8 @@
                 completeQueuedOperation(function () {
                     failureCallback(createError("InvalidSessionDescriptionError",
                         "setRemoteDescription: description type \"" +
-                        description.type + "\" invalid for the current state \""
-                        + a.signalingState + "\""));
+                        entityReplace(description.type) + "\" invalid for the current state \"" +
+                        a.signalingState + "\""));
                 });
                 return;
             }
@@ -668,7 +668,7 @@
                 completeQueuedOperation(function () {
                     failureCallback(createError("SyntaxError",
                         "addIceCandidate: no matching media description for sdpMLineIndex: " +
-                        candidate.sdpMLineIndex));
+                        entityReplace(candidate.sdpMLineIndex)));
                 });
                 return;
             }
@@ -770,8 +770,7 @@
 
         function checkClosedState(name) {
             if (a.signalingState == "closed")
-                throw createError("InvalidStateError", name +
-                    ": signalingState is \"closed\".");
+                throw createError("InvalidStateError", name + ": signalingState is \"closed\"");
         }
 
         function maybeDispatchNegotiationNeeded() {

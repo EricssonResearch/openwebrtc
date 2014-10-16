@@ -191,7 +191,7 @@ function randomString() {
 
 function createError(name, message) {
     var constructor = self[name] || self.Error;
-    var error = new constructor(entityReplace(message));
+    var error = new constructor(message);
     error.name = name;
     return error;
 }
