@@ -22,7 +22,8 @@ libopenwebrtc_local_la_SOURCES = \
     owr_audio_renderer.c \
     owr_video_renderer.c \
     owr_image_renderer.c \
-    owr_image_server.c
+    owr_image_server.c \
+    owr_window_registry.c
 
 libopenwebrtc_local_la_LIBADD = \
     $(GSTREAMER_LIBS) \
@@ -36,11 +37,13 @@ include_HEADERS = \
     owr_audio_renderer.h \
     owr_video_renderer.h \
     owr_image_renderer.h \
-    owr_image_server.h
+    owr_image_server.h \
+    owr_window_registry.h
 
 noinst_HEADERS = \
     owr_local_media_source_private.h \
     owr_media_renderer_private.h \
-    owr_image_renderer_private.h
+    owr_image_renderer_private.h \
+    owr_window_registry_private.h
 
 -include $(top_srcdir)/git.mk

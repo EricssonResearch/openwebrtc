@@ -42,6 +42,10 @@ owr_video_payload_get_type
 owr_video_payload_new
 owr_video_renderer_get_type
 owr_video_renderer_new
+owr_window_registry_get
+owr_window_registry_get_type
+owr_window_registry_register
+owr_window_registry_unregister
 g_access
 g_action_activate
 g_action_change_state

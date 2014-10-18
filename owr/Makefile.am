@@ -121,7 +121,9 @@ Owr_0_1_gir_FILES = \
     ../local/owr_image_renderer.h \
     ../local/owr_image_renderer.c \
     ../local/owr_image_server.h \
-    ../local/owr_image_server.c
+    ../local/owr_image_server.c \
+    ../local/owr_window_registry.h \
+    ../local/owr_window_registry.c
 
 INTROSPECTION_GIRS += Owr-0.1.gir
 
