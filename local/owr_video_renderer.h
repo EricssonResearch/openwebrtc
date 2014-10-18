@@ -58,7 +58,7 @@ struct _OwrVideoRendererClass {
 
 GType owr_video_renderer_get_type(void) G_GNUC_CONST;
 
-OwrVideoRenderer *owr_video_renderer_new(guintptr window_handle);
+OwrVideoRenderer *owr_video_renderer_new(const gchar *tag);
 
 G_END_DECLS
 

@@ -33,6 +33,8 @@
 #include "owr_video_renderer.h"
 
 #include "owr_private.h"
+#include "owr_window_registry.h"
+#include "owr_window_registry_private.h"
 
 #include <gst/video/videooverlay.h>
 
@@ -51,7 +53,7 @@
 #define DEFAULT_WIDTH 0
 #define DEFAULT_HEIGHT 0
 #define DEFAULT_MAX_FRAMERATE 0.0
-#define DEFAULT_WINDOW_HANDLE 0
+#define DEFAULT_TAG NULL
 
 #define OWR_VIDEO_RENDERER_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_VIDEO_RENDERER, OwrVideoRendererPrivate))
 
@@ -64,7 +66,7 @@ enum {
     PROP_WIDTH,
     PROP_HEIGHT,
     PROP_MAX_FRAMERATE,
-    PROP_WINDOW_HANDLE,
+    PROP_TAG,
     N_PROPERTIES
 };
 
@@ -84,7 +86,7 @@ struct _OwrVideoRendererPrivate {
     guint height;
     gdouble max_framerate;
     GstElement *renderer_bin;
-    guintptr window_handle;
+    gchar *tag;
 };
 
 static void owr_video_renderer_finalize(GObject *object)
@@ -93,6 +95,8 @@ static void owr_video_renderer_finalize(GObject *object)
     OwrVideoRendererPrivate *priv = renderer->priv;
 
     g_mutex_clear(&priv->video_renderer_lock);
+
+    g_free(priv->tag);
 
     G_OBJECT_CLASS(owr_video_renderer_parent_class)->finalize(object);
 }
@@ -116,9 +120,9 @@ static void owr_video_renderer_class_init(OwrVideoRendererClass *klass)
         "Maximum video frames per second", 0.0, G_MAXDOUBLE,
         DEFAULT_MAX_FRAMERATE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
-    obj_properties[PROP_WINDOW_HANDLE] = g_param_spec_pointer("window-handle", "window-handle",
-        "Window widget handle into which to draw video (default: 0, create a new window)",
-        G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+    obj_properties[PROP_TAG] = g_param_spec_string("tag", "tag",
+        "Tag referencing the window widget into which to draw video (default: NULL, create a new window)",
+        DEFAULT_TAG, G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
     gobject_class->set_property = owr_video_renderer_set_property;
     gobject_class->get_property = owr_video_renderer_get_property;
@@ -139,7 +143,8 @@ static void owr_video_renderer_init(OwrVideoRenderer *renderer)
     priv->width = DEFAULT_WIDTH;
     priv->height = DEFAULT_HEIGHT;
     priv->max_framerate = DEFAULT_MAX_FRAMERATE;
-    priv->window_handle = DEFAULT_WINDOW_HANDLE;
+    priv->tag = DEFAULT_TAG;
+
     priv->renderer_bin = NULL;
 
     g_mutex_init(&priv->video_renderer_lock);
@@ -163,8 +168,9 @@ static void owr_video_renderer_set_property(GObject *object, guint property_id,
     case PROP_MAX_FRAMERATE:
         priv->max_framerate = g_value_get_double(value);
         break;
-    case PROP_WINDOW_HANDLE:
-        priv->window_handle = (guintptr)g_value_get_pointer(value);
+    case PROP_TAG:
+        g_free(priv->tag);
+        priv->tag = g_value_dup_string(value);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
@@ -191,8 +197,8 @@ static void owr_video_renderer_get_property(GObject *object, guint property_id,
     case PROP_MAX_FRAMERATE:
         g_value_set_double(value, priv->max_framerate);
         break;
-    case PROP_WINDOW_HANDLE:
-        g_value_set_pointer(value, (gpointer)priv->window_handle);
+    case PROP_TAG:
+        g_value_set_string(value, priv->tag);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
@@ -203,15 +209,15 @@ static void owr_video_renderer_get_property(GObject *object, guint property_id,
 
 /**
  * owr_video_renderer_new: (constructor)
- * @window_handle:
+ * @tag:
  *
  * Returns: The new #OwrVideoRenderer
  */
-OwrVideoRenderer *owr_video_renderer_new(guintptr window_handle)
+OwrVideoRenderer *owr_video_renderer_new(const gchar *tag)
 {
     return g_object_new(OWR_TYPE_VIDEO_RENDERER,
         "media-type", OWR_MEDIA_TYPE_VIDEO,
-        "window-handle", window_handle,
+        "tag", tag,
         NULL);
 }
 
@@ -268,8 +274,16 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer)
 
     sink = gst_element_factory_make(VIDEO_SINK, "video-renderer-sink");
     g_assert(sink);
-    if (GST_IS_VIDEO_OVERLAY(sink))
-        gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(sink), priv->window_handle);
+    if (priv->tag) {
+        GstElement *sink_element = GST_IS_BIN(sink) ?
+            gst_bin_get_by_interface(GST_BIN(sink), GST_TYPE_VIDEO_OVERLAY) : sink;
+        if (GST_IS_ELEMENT(sink_element) && GST_IS_VIDEO_OVERLAY(sink)) {
+            guintptr handle = _owr_window_registry_lookup(owr_window_registry_get(), priv->tag);
+            gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(sink), handle);
+        }
+        if (GST_IS_BIN(sink))
+            g_object_unref(sink_element);
+    }
 
     /* async false is needed when using live sources to not require prerolling
      * as prerolling is not possible from live sources in GStreamer */
