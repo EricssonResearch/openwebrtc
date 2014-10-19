@@ -133,8 +133,9 @@ function PeerHandler(configuration, client, jsonRpc) {
     };
 
     this.prepareToSend = function (remoteSessionInfo, isInitiator) {
+        var i;
         var dtlsRoles = [];
-        for (var i = mediaSessions.length; i < remoteSessionInfo.mediaDescriptions.length; i++) {
+        for (i = mediaSessions.length; i < remoteSessionInfo.mediaDescriptions.length; i++) {
             var ourRole = remoteSessionInfo.mediaDescriptions[i].dtls.mode == "active" ?
                 "passive" : "active";
             dtlsRoles.push(ourRole);
@@ -142,11 +143,11 @@ function PeerHandler(configuration, client, jsonRpc) {
 
         ensureTransportAgentAndMediaSessions(isInitiator, dtlsRoles);
 
-        var i = 0;
-        mediaSessions.forEach(function (mediaSession) {
+        for (i = 0; i < mediaSessions.length; i++) {
+            var mediaSession = mediaSessions[i];
             var mdesc = remoteSessionInfo.mediaDescriptions[i];
             if (!mdesc)
-                return;
+                continue;
 
             mediaSession.rtcp_mux = mdesc.rtcp ? !!mdesc.rtcp.mux : false;
 
@@ -158,7 +159,7 @@ function PeerHandler(configuration, client, jsonRpc) {
             }
 
             if (!mdesc.source || i < numberOfSendPreparedMediaSessions)
-                return;
+                continue;
 
             var sendPayload = (mdesc.type == "audio") ?
                 new owr.AudioPayload({
@@ -176,10 +177,8 @@ function PeerHandler(configuration, client, jsonRpc) {
                 });
             mediaSession.set_send_payload(sendPayload);
             mediaSession.set_send_source(mdesc.source);
-            i++;
-        });
-
-        numberOfSendPreparedMediaSessions = i;
+            numberOfSendPreparedMediaSessions = i + 1;
+        }
     }
 
     this.addRemoteCandidate = function (candidate, mediaSessionIndex, ufrag, password) {
