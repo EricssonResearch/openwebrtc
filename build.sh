@@ -78,7 +78,7 @@ build(){
             local platform_ldflags="${home}/openwebrtc-deps-armv7-ios/lib/my_environ.o ${home}/openwebrtc-deps-${target}/lib/my_stat.o "
             local seed_platform_libs="-framework JavaScriptCore"
             export PLATFORM_GLIB_LIBS="-lffi -lresolv -liconv -lintl "
-            export PLATFORM_GSTREAMER_LIBS="-lgstosxaudio -lgstapplemedia -framework AssetsLibrary -framework CoreMedia -framework CoreVideo -framework AVFoundation -framework Foundation -framework OpenGLES -framework CoreAudio -framework AudioToolbox"
+            export PLATFORM_GSTREAMER_LIBS="-lgstosxaudio -lgstapplemedia -framework AssetsLibrary -framework CoreMedia -framework CoreVideo -framework AVFoundation -framework Foundation -framework OpenGLES -framework CoreAudio -framework AudioToolbox -framework VideoToolbox"
             export PLATFORM_OWR_GST_PLUGINS_LIBS="-lgstercolorspace"
             export PLATFORM_CXX_LIBS="-lc++"
         elif [[ $target_triple == "i386-apple-darwin10" ]]; then
