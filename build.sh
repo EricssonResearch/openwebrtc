@@ -139,6 +139,7 @@ build(){
             --prefix=${installdir} \
             --host=${target_triple} \
             --enable-debug=$debug ${configure_flags} &&
+        patch -p0 < $REPO_ROOT/libtool.diff &&
         make && make install
     )
 }

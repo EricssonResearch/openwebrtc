@@ -1,0 +1,106 @@
+--- libtool.old	2014-10-22 12:25:12.000000000 +0200
++++ libtool	2014-10-22 12:29:48.000000000 +0200
+@@ -5715,6 +5715,19 @@
+ 	  prev=
+ 	  continue
+ 	  ;;
++	weak_framework)
++	  case $host in
++	    *-*-darwin*)
++	      case "$deplibs " in
++		*" $qarg.ltweak_framework "*) ;;
++		*) deplibs+=" $qarg.ltweak_framework" # this is fixed later
++		   ;;
++	      esac
++	      ;;
++	  esac
++	  prev=
++	  continue
++	  ;;
+ 	inst_prefix)
+ 	  inst_prefix_dir="$arg"
+ 	  prev=
+@@ -5948,6 +5961,11 @@
+ 	continue
+ 	;;
+ 
++      -weak_framework)
++	prev=weak_framework
++	continue
++	;;
++
+       -inst-prefix-dir)
+ 	prev=inst_prefix
+ 	continue
+@@ -6680,6 +6698,22 @@
+ 	  fi
+ 	  continue
+ 	  ;;
++	*.ltweak_framework)
++	  if test "$linkmode,$pass" = "prog,link"; then
++	    compile_deplibs="$deplib $compile_deplibs"
++	    finalize_deplibs="$deplib $finalize_deplibs"
++	  else
++	    deplibs="$deplib $deplibs"
++	    if test "$linkmode" = lib ; then
++		case "$new_inherited_linker_flags " in
++		    *" $deplib "*) ;;
++		    * ) new_inherited_linker_flags+=" $deplib" ;;
++		esac
++	    fi
++	  fi
++	  continue
++	  ;;
++
+ 	-L*)
+ 	  case $linkmode in
+ 	  lib)
+@@ -6837,7 +6871,7 @@
+ 
+ 	# Convert "-framework foo" to "foo.ltframework"
+ 	if test -n "$inherited_linker_flags"; then
+-	  tmp_inherited_linker_flags=`$ECHO "$inherited_linker_flags" | $SED 's/-framework \([^ $]*\)/\1.ltframework/g'`
++	  tmp_inherited_linker_flags=`$ECHO "$inherited_linker_flags" | $SED 's/-framework \([^ $]*\)/\1.ltframework/g' | $SED 's/-weak_framework \([^ $]*\)/\1.ltweak_framework/g'`
+ 	  for tmp_inherited_linker_flag in $tmp_inherited_linker_flags; do
+ 	    case " $new_inherited_linker_flags " in
+ 	      *" $tmp_inherited_linker_flag "*) ;;
+@@ -6845,7 +6879,7 @@
+ 	    esac
+ 	  done
+ 	fi
+-	dependency_libs=`$ECHO " $dependency_libs" | $SED 's% \([^ $]*\).ltframework% -framework \1%g'`
++	dependency_libs=`$ECHO " $dependency_libs" | $SED 's% \([^ $]*\).ltframework% -framework \1%g' | $SED 's% \([^ $]*\).ltweak_framework% -weak_framework \1%g'`
+ 	if test "$linkmode,$pass" = "lib,link" ||
+ 	   test "$linkmode,$pass" = "prog,scan" ||
+ 	   { test "$linkmode" != prog && test "$linkmode" != lib; }; then
+@@ -7519,7 +7553,7 @@
+ 	  compile_deplibs="$new_inherited_linker_flags $compile_deplibs"
+ 	  finalize_deplibs="$new_inherited_linker_flags $finalize_deplibs"
+ 	else
+-	  compiler_flags="$compiler_flags "`$ECHO " $new_inherited_linker_flags" | $SED 's% \([^ $]*\).ltframework% -framework \1%g'`
++	  compiler_flags="$compiler_flags "`$ECHO " $new_inherited_linker_flags" | $SED 's% \([^ $]*\).ltframework% -framework \1%g' | $SED 's% \([^ $]*\).ltweak_framework% -weak_framework \1%g'`
+ 	fi
+       fi
+       dependency_libs="$newdependency_libs"
+@@ -8415,8 +8449,8 @@
+       case $host in
+ 	*-*-darwin*)
+ 	  newdeplibs=`$ECHO " $newdeplibs" | $SED 's% \([^ $]*\).ltframework% -framework \1%g'`
+-	  new_inherited_linker_flags=`$ECHO " $new_inherited_linker_flags" | $SED 's% \([^ $]*\).ltframework% -framework \1%g'`
+-	  deplibs=`$ECHO " $deplibs" | $SED 's% \([^ $]*\).ltframework% -framework \1%g'`
++	  new_inherited_linker_flags=`$ECHO " $new_inherited_linker_flags" | $SED 's% \([^ $]*\).ltframework% -framework \1%g' | $SED 's% \([^ $]*\).ltweak_framework% -weak_framework \1%g'`
++	  deplibs=`$ECHO " $deplibs" | $SED 's% \([^ $]*\).ltframework% -framework \1%g' | $SED 's% \([^ $]*\).ltweak_framework% -weak_framework \1%g'`
+ 	  ;;
+       esac
+ 
+@@ -9145,8 +9179,8 @@
+ 	  esac
+ 	fi
+ 	# Time to change all our "foo.ltframework" stuff back to "-framework foo"
+-	compile_deplibs=`$ECHO " $compile_deplibs" | $SED 's% \([^ $]*\).ltframework% -framework \1%g'`
+-	finalize_deplibs=`$ECHO " $finalize_deplibs" | $SED 's% \([^ $]*\).ltframework% -framework \1%g'`
++	compile_deplibs=`$ECHO " $compile_deplibs" | $SED 's% \([^ $]*\).ltframework% -framework \1%g' | $SED 's% \([^ $]*\).ltweak_framework% -weak_framework \1%g'`
++	finalize_deplibs=`$ECHO " $finalize_deplibs" | $SED 's% \([^ $]*\).ltframework% -framework \1%g' | $SED 's% \([^ $]*\).ltweak_framework% -weak_framework \1%g'`
+ 	;;
+       esac
+ 
