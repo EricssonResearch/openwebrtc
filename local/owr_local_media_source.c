@@ -197,7 +197,7 @@ static GstElement *create_post_tee_bin(OwrMediaSource *media_source, GstElement 
         }
     case OWR_MEDIA_TYPE_VIDEO:
         {
-        GstElement *videorate, *videoscale, *videoconvert;
+        GstElement *videorate = NULL, *videoscale, *videoconvert;
         GstCaps *source_caps;
         GstStructure *source_structure;
         gint fps_n = 0, fps_d = 1;
@@ -213,18 +213,25 @@ static GstElement *create_post_tee_bin(OwrMediaSource *media_source, GstElement 
         list = g_slist_prepend(list, videoconvert);
         CREATE_ELEMENT_WITH_ID(videoscale, "videoscale", "source-video-scale", source_id);
         list = g_slist_prepend(list, videoscale);
-        CREATE_ELEMENT_WITH_ID(videorate, "videorate", "source-video-rate", source_id);
-        g_object_set(videorate, "drop-only", TRUE, "max-rate", fps_n / fps_d, NULL);
-        list = g_slist_prepend(list, videorate);
+        if (fps_n > 0) {
+            CREATE_ELEMENT_WITH_ID(videorate, "videorate", "source-video-rate", source_id);
+            g_object_set(videorate, "drop-only", TRUE, "max-rate", fps_n / fps_d, NULL);
+            list = g_slist_prepend(list, videorate);
+            gst_bin_add(GST_BIN(post_tee_bin), videorate);
+        }
         list = g_slist_prepend(list, queue_pre);
 
         gst_bin_add_many(GST_BIN(post_tee_bin),
-            queue_pre, videorate, videoscale, videoconvert, capsfilter, queue_post, NULL);
+            queue_pre, videoscale, videoconvert, capsfilter, queue_post, NULL);
         LINK_ELEMENTS(capsfilter, queue_post);
         LINK_ELEMENTS(videoconvert, capsfilter);
         LINK_ELEMENTS(videoscale, videoconvert);
-        LINK_ELEMENTS(videorate, videoscale);
-        LINK_ELEMENTS(queue_pre, videorate);
+        if (videorate) {
+            LINK_ELEMENTS(videorate, videoscale);
+            LINK_ELEMENTS(queue_pre, videorate);
+        } else {
+            LINK_ELEMENTS(queue_pre, videoscale);
+        }
 
         break;
         }
