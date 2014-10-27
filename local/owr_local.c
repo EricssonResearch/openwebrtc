@@ -61,6 +61,12 @@ static GList *get_capture_sources(OwrMediaType types)
 
     if (g_once_init_enter(&cached_sources)) {
         GList *sources = NULL;
+
+        /* FIXME: This code makes no sense at all, we shouldn't hardcode
+         * capture sources but check what is available. Not everybody has
+         * /dev/video0 and /dev/video1, and not always are they camera
+         * sources...
+         * Use GstDeviceMonitor here! */
         source = _owr_local_media_source_new("Audio capture source", OWR_MEDIA_TYPE_AUDIO,
             OWR_SOURCE_TYPE_CAPTURE);
         sources = g_list_append(sources, OWR_MEDIA_SOURCE(source));
