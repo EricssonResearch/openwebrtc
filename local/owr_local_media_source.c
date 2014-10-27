@@ -612,19 +612,51 @@ done:
     return pad;
 }
 
+static gboolean shutdown_media_source(GHashTable *args)
+{
+    OwrMediaSource *media_source;
+    OwrLocalMediaSource *local_media_source;
+    GstElement *source_pipeline;
+
+    media_source = g_hash_table_lookup(args, "media_source");
+    g_assert(media_source);
+    local_media_source = OWR_LOCAL_MEDIA_SOURCE(media_source);
+
+    source_pipeline = _owr_media_source_get_element(media_source);
+    if (!source_pipeline) {
+        g_object_unref(media_source);
+        return FALSE;
+    }
+
+    if (local_media_source->priv->source_tee->numsrcpads != 1) {
+        g_object_unref(media_source);
+        return FALSE;
+    }
+
+    _owr_media_source_set_element(media_source, NULL);
+    local_media_source->priv->source_tee = NULL;
+
+    gst_element_set_state(source_pipeline, GST_STATE_NULL);
+    gst_object_unref(source_pipeline);
+
+    g_object_unref(media_source);
+
+    return FALSE;
+}
+
 static GstPadProbeReturn tee_idle_probe_cb(GstPad *teepad, GstPadProbeInfo *info, gpointer user_data)
 {
-    GstElement *sink_bin = user_data;
+    OwrMediaSource * media_source = user_data;
+    GstElement *sink_bin;
     GstPad *sinkpad;
     GstObject *parent;
     GstElement *tee;
-
-    OWR_UNUSED(user_data);
 
     gst_pad_remove_probe(teepad, GST_PAD_PROBE_INFO_ID(info));
 
     sinkpad = gst_pad_get_peer(teepad);
     g_assert(sinkpad);
+    sink_bin = GST_ELEMENT(gst_object_get_parent(GST_OBJECT(sinkpad)));
 
     g_warn_if_fail(gst_pad_unlink(teepad, sinkpad));
     parent = gst_pad_get_parent(teepad);
@@ -640,6 +672,17 @@ static GstPadProbeReturn tee_idle_probe_cb(GstPad *teepad, GstPadProbeInfo *info
     gst_element_set_state(sink_bin, GST_STATE_NULL);
     gst_object_unref(sink_bin);
     gst_object_unref(parent);
+
+    /* Only the fakesink is left, shutdown */
+    if (tee->numsrcpads == 1) {
+      GHashTable *args;
+
+      args = g_hash_table_new(g_str_hash, g_str_equal);
+      g_hash_table_insert(args, "media_source", media_source);
+      g_object_ref (media_source);
+
+      _owr_schedule_with_hash_table((GSourceFunc)shutdown_media_source, args);
+    }
 
     return GST_PAD_PROBE_OK;
 }
@@ -700,8 +743,9 @@ static void owr_local_media_source_unlink(OwrMediaSource *media_source, GstPad *
     srcpad = gst_pad_get_peer(sinkpad);
     gst_object_unref(sinkpad);
 
-    gst_pad_add_probe(srcpad, GST_PAD_PROBE_TYPE_IDLE, tee_idle_probe_cb, sink_bin, NULL);
+    gst_pad_add_probe(srcpad, GST_PAD_PROBE_TYPE_IDLE, tee_idle_probe_cb, media_source, NULL);
     gst_object_unref(srcpad);
+    gst_object_unref(sink_bin);
 }
 
 OwrLocalMediaSource *_owr_local_media_source_new(gchar *name, OwrMediaType media_type,
