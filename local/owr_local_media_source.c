@@ -40,6 +40,9 @@
 
 #include <gst/gst.h>
 
+#include <stdio.h>
+#include <string.h>
+
 #ifdef __APPLE__
 #include <TargetConditionals.h>
 #endif
@@ -80,7 +83,7 @@ static guint unique_pad_id = 0;
 G_DEFINE_TYPE(OwrLocalMediaSource, owr_local_media_source, OWR_TYPE_MEDIA_SOURCE)
 
 static GstPad *owr_local_media_source_get_pad(OwrMediaSource *media_source, GstCaps *caps);
-
+static void owr_local_media_source_unlink(OwrMediaSource *media_source, GstPad *downstream_pad);
 
 struct _OwrLocalMediaSourcePrivate {
     guint device_index;
@@ -95,6 +98,7 @@ static void owr_local_media_source_class_init(OwrLocalMediaSourceClass *klass)
     g_type_class_add_private(klass, sizeof(OwrLocalMediaSourcePrivate));
 
     media_source_class->get_pad = (void *(*)(OwrMediaSource *, void *))owr_local_media_source_get_pad;
+    media_source_class->unlink = (void (*)(OwrMediaSource *, void *))owr_local_media_source_unlink;
 }
 
 static void owr_local_media_source_init(OwrLocalMediaSource *source)
@@ -598,6 +602,98 @@ static GstPad *owr_local_media_source_get_pad(OwrMediaSource *media_source, GstC
 
 done:
     return pad;
+}
+
+static GstPadProbeReturn tee_idle_probe_cb(GstPad *teepad, GstPadProbeInfo *info, gpointer user_data)
+{
+    GstElement *sink_bin = user_data;
+    GstPad *sinkpad;
+    GstObject *parent;
+    GstElement *tee;
+
+    OWR_UNUSED(user_data);
+
+    gst_pad_remove_probe(teepad, GST_PAD_PROBE_INFO_ID(info));
+
+    sinkpad = gst_pad_get_peer(teepad);
+    g_assert(sinkpad);
+
+    g_warn_if_fail(gst_pad_unlink(teepad, sinkpad));
+    parent = gst_pad_get_parent(teepad);
+    tee = GST_ELEMENT(parent);
+    gst_element_release_request_pad(tee, teepad);
+    gst_object_unref(parent);
+    gst_object_unref(sinkpad);
+
+    parent = gst_object_get_parent(GST_OBJECT(sink_bin));
+    g_assert(parent);
+
+    gst_bin_remove(GST_BIN(parent), sink_bin);
+    gst_element_set_state(sink_bin, GST_STATE_NULL);
+    gst_object_unref(sink_bin);
+    gst_object_unref(parent);
+
+    return GST_PAD_PROBE_OK;
+}
+
+static void owr_local_media_source_unlink(OwrMediaSource *media_source, GstPad *downstream_pad)
+{
+    GstPad *srcpad, *sinkpad;
+    gchar *pad_name, *bin_name, *parent_name;
+    guint source_id = -1;
+    GstObject *parent;
+    GstElement *sink_bin, *source_pipeline;
+
+    srcpad = gst_pad_get_peer(downstream_pad);
+    g_assert(srcpad);
+
+    pad_name = gst_pad_get_name(srcpad);
+    if (!pad_name || strcmp(pad_name, "src")) {
+        GST_WARNING_OBJECT(media_source, "Failed to get pad name when unlinking: %s",
+                pad_name ? pad_name : "");
+        g_free(pad_name);
+        return;
+    }
+
+    g_free(pad_name);
+
+    parent = gst_pad_get_parent(srcpad);
+    parent_name = gst_object_get_name(GST_OBJECT(parent));
+    gst_object_unref(srcpad);
+
+    if (!parent_name || sscanf(parent_name, "local-source-bin-%u", &source_id) != 1) {
+        GST_WARNING_OBJECT(media_source,
+                "Failed to get %s for clean up", parent_name);
+        return;
+    }
+    g_free(parent_name);
+
+    GST_DEBUG_OBJECT(media_source, "Unlinking source %u", source_id);
+    /* Automatically unlinks everything */
+    gst_element_set_state(GST_ELEMENT(parent), GST_STATE_NULL);
+    g_warn_if_fail(gst_bin_remove(GST_BIN(_owr_get_pipeline()), GST_ELEMENT(parent)));
+    GST_DEBUG_OBJECT(media_source, "Source %u successfully unlinked", source_id);
+
+    /* Unlink parts from the source pipeline */
+    source_pipeline = _owr_media_source_get_element(media_source);
+    g_assert(source_pipeline);
+    bin_name = g_strdup_printf("local-source-sink-bin-%u", source_id);
+    sink_bin = gst_bin_get_by_name(GST_BIN(source_pipeline), bin_name);
+    if (!sink_bin) {
+        GST_WARNING_OBJECT(media_source,
+                "Failed to get %s from source pipeline", bin_name);
+        g_free(bin_name);
+        return;
+    }
+    g_free(bin_name);
+
+    sinkpad = gst_element_get_static_pad(sink_bin, "sink");
+    /* The pad on the tee */
+    srcpad = gst_pad_get_peer(sinkpad);
+    gst_object_unref(sinkpad);
+
+    gst_pad_add_probe(srcpad, GST_PAD_PROBE_TYPE_IDLE, tee_idle_probe_cb, sink_bin, NULL);
+    gst_object_unref(srcpad);
 }
 
 OwrLocalMediaSource *_owr_local_media_source_new(gchar *name, OwrMediaType media_type,
