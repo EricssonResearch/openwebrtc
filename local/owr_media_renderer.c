@@ -179,7 +179,7 @@ static void owr_media_renderer_get_property(GObject *object, guint property_id,
 }
 
 
-GstPad *_owr_media_renderer_get_pad(OwrMediaRenderer *renderer)
+static GstPad *_owr_media_renderer_get_pad(OwrMediaRenderer *renderer)
 {
     GstElement *sink = NULL;
     OwrMediaRendererPrivate *priv;
