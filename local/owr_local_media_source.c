@@ -520,6 +520,8 @@ static GstPad *owr_local_media_source_get_pad(OwrMediaSource *media_source, GstC
             }
         case OWR_MEDIA_TYPE_VIDEO:
         {
+            gint fps_n, fps_d;
+
             switch (source_type) {
             case OWR_SOURCE_TYPE_CAPTURE:
                 CREATE_ELEMENT(source, VIDEO_SRC, "video-source");
@@ -549,7 +551,13 @@ static GstPad *owr_local_media_source_get_pad(OwrMediaSource *media_source, GstC
             source_caps = gst_caps_copy(caps);
             source_structure = gst_caps_get_structure(source_caps, 0);
             gst_structure_remove_field(source_structure, "format");
-            gst_structure_remove_field(source_structure, "framerate");
+
+            /* If possible try to limit the framerate at the source already */
+            if (gst_structure_get_fraction(source_structure, "framerate", &fps_n, &fps_d)) {
+              GstStructure *tmp = gst_structure_copy(source_structure);
+              gst_structure_remove_field(tmp, "framerate");
+              gst_caps_append_structure(source_caps, tmp);
+            }
             g_object_set(capsfilter, "caps", source_caps, NULL);
             gst_caps_unref(source_caps);
             gst_bin_add(GST_BIN(source_pipeline), capsfilter);
