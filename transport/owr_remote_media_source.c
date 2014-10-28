@@ -36,9 +36,30 @@
 #include "owr_media_source_private.h"
 #include "owr_types.h"
 #include "owr_utils.h"
+#include "owr_private.h"
 
 #include <gst/gst.h>
 
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
+
+#if defined(__APPLE__) && !TARGET_IPHONE_SIMULATOR
+#if TARGET_OS_IPHONE
+#define VIDEO_CONVERT "ercolorspace"
+#else
+#define VIDEO_CONVERT "videoconvert"
+#endif
+
+#elif defined(__ANDROID__)
+#define VIDEO_CONVERT "ercolorspace"
+
+#elif defined(__linux__)
+#define VIDEO_CONVERT "videoconvert"
+
+#else
+#define VIDEO_CONVERT "videoconvert"
+#endif
 
 #define OWR_REMOTE_MEDIA_SOURCE_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_REMOTE_MEDIA_SOURCE, OwrRemoteMediaSourcePrivate))
 
@@ -46,10 +67,14 @@ G_DEFINE_TYPE(OwrRemoteMediaSource, owr_remote_media_source, OWR_TYPE_MEDIA_SOUR
 
 struct _OwrRemoteMediaSourcePrivate {
     guint stream_id;
+
+    GstElement *source_tee;
 };
 
-static GstPad *owr_remote_media_source_get_pad(OwrMediaSource *media_source, GstCaps *caps);
+static guint unique_pad_id = 0;
 
+static GstPad *owr_remote_media_source_get_pad(OwrMediaSource *media_source, GstCaps *caps);
+static void owr_remote_media_source_unlink(OwrMediaSource *media_source, GstPad *downstream_pad);
 
 static void owr_remote_media_source_class_init(OwrRemoteMediaSourceClass *klass)
 {
@@ -58,6 +83,7 @@ static void owr_remote_media_source_class_init(OwrRemoteMediaSourceClass *klass)
     g_type_class_add_private(klass, sizeof(OwrRemoteMediaSourcePrivate));
 
     media_source_class->get_pad = (void *(*)(OwrMediaSource *, void *))owr_remote_media_source_get_pad;
+    media_source_class->unlink = (void (*)(OwrMediaSource *, void *))owr_remote_media_source_unlink;
 }
 
 static void owr_remote_media_source_init(OwrRemoteMediaSource *source)
@@ -67,32 +93,300 @@ static void owr_remote_media_source_init(OwrRemoteMediaSource *source)
     source->priv->stream_id = 0;
 }
 
+static void sync_to_parent(gpointer data, gpointer user_data)
+{
+    GstElement *element = GST_ELEMENT(data);
 
+    g_assert(data);
+    g_assert(!user_data);
+
+    gst_element_sync_state_with_parent(element);
+}
+
+#define LINK_ELEMENTS(a, b) \
+    if (!gst_element_link(a, b)) \
+        GST_ERROR("Failed to link " #a " -> " #b);
+
+#define CREATE_ELEMENT(elem, factory, name) \
+    elem = gst_element_factory_make(factory, name); \
+    if (!elem) \
+        GST_ERROR("Could not create " name " from factory " factory); \
+    g_assert(elem);
+
+#define CREATE_ELEMENT_WITH_ID(elem, factory, name, id) \
+{ \
+    gchar *temp_str = g_strdup_printf(name"-%u", id); \
+    elem = gst_element_factory_make(factory, temp_str); \
+    if (!elem) \
+        GST_ERROR("Could not create %s from factory " factory, temp_str); \
+    g_assert(elem); \
+    g_free(temp_str); \
+}
+
+static void source_pad_linked_cb(GstPad *pad, GstPad *peer, GstElement *valve)
+{
+  OWR_UNUSED(pad);
+  OWR_UNUSED(peer);
+  g_object_set(valve, "drop", FALSE, NULL);
+}
+
+static void source_pad_unlinked_cb(GstPad *pad, GstPad *peer, GstElement *valve)
+{
+  OWR_UNUSED(pad);
+  OWR_UNUSED(peer);
+  g_object_set(valve, "drop", TRUE, NULL);
+}
+
+/*
+ * create_post_tee_bin
+ *
+ * The following chain is created after the tee for each output from the
+ * source:
+ *
+ * +-----------+   +-------------------------------+   +------ +   +----------+
+ * | inter*src +---+ converters/queues/capsfilters +---+ valve +---+ ghostpad |
+ * +-----------+   +-------------------------------+   +-------+   +----------+
+ *
+ * The valve is opened and closed based on linking/unlinking the ghostpad to
+ * prevent not-linked errors.
+ *
+ * TODO: Share this with local media sources
+ *
+ */
+static GstPad *create_source_bin(OwrMediaSource *media_source, GstElement *source_pipeline,
+    GstElement *tee, GstCaps *caps)
+{
+    OwrMediaType media_type;
+    GstElement *source_bin, *source = NULL, *queue_pre, *queue_post;
+    GstElement *valve, *capsfilter;
+    GstElement *sink, *sink_queue, *sink_bin;
+    GstPad *bin_pad = NULL, *srcpad, *sinkpad;
+    GSList *list = NULL;
+    gchar *bin_name;
+    guint source_id;
+    gchar *channel_name;
+
+    source_id = g_atomic_int_add(&unique_pad_id, 1);
+
+    bin_name = g_strdup_printf("source-bin-%u", source_id);
+    source_bin = gst_bin_new(bin_name);
+    /* TODO: This should be the transport agent or renderer pipeline later */
+    if (!gst_bin_add(GST_BIN(_owr_get_pipeline()), source_bin)) {
+        GST_ERROR("Failed to add %s to source bin", bin_name);
+        g_free(bin_name);
+        g_object_unref(source_bin);
+        source_bin = NULL;
+        goto done;
+    }
+    g_free(bin_name);
+    gst_element_sync_state_with_parent(source_bin);
+
+    CREATE_ELEMENT_WITH_ID(queue_pre, "queue", "source-queue", source_id);
+    CREATE_ELEMENT_WITH_ID(capsfilter, "capsfilter", "source-output-capsfilter", source_id);
+    list = g_slist_append(list, capsfilter);
+    CREATE_ELEMENT_WITH_ID(queue_post, "queue", "source-output-queue", source_id);
+    list = g_slist_append(list, queue_post);
+    CREATE_ELEMENT_WITH_ID(valve, "valve", "source-valve", source_id);
+    g_object_set(valve, "drop", TRUE, NULL);
+    list = g_slist_append(list, valve);
+
+    CREATE_ELEMENT_WITH_ID(sink_queue, "queue", "sink-queue", source_id);
+
+    g_object_get(media_source, "media-type", &media_type, NULL);
+    switch (media_type) {
+    case OWR_MEDIA_TYPE_AUDIO:
+        {
+        GstElement *audioresample, *audioconvert;
+
+        CREATE_ELEMENT_WITH_ID(source, "interaudiosrc", "source", source_id);
+        CREATE_ELEMENT_WITH_ID(sink, "interaudiosink", "sink", source_id);
+
+        g_object_set(capsfilter, "caps", caps, NULL);
+
+        CREATE_ELEMENT_WITH_ID(audioresample, "audioresample", "source-audio-resample", source_id);
+        list = g_slist_prepend(list, audioresample);
+        CREATE_ELEMENT_WITH_ID(audioconvert, "audioconvert", "source-audio-convert", source_id);
+        list = g_slist_prepend(list, audioconvert);
+        list = g_slist_prepend(list, queue_pre);
+
+        gst_bin_add_many(GST_BIN(source_bin),
+            queue_pre, audioconvert, audioresample, capsfilter, queue_post, valve, NULL);
+        LINK_ELEMENTS(capsfilter, queue_post);
+        LINK_ELEMENTS(audioresample, capsfilter);
+        LINK_ELEMENTS(audioconvert, audioresample);
+        LINK_ELEMENTS(queue_pre, audioconvert);
+
+        break;
+        }
+    case OWR_MEDIA_TYPE_VIDEO:
+        {
+        GstElement *videorate = NULL, *videoscale, *videoconvert;
+        GstCaps *source_caps;
+        GstStructure *source_structure;
+        gint fps_n = 0, fps_d = 1;
+
+        CREATE_ELEMENT_WITH_ID(source, "intervideosrc", "source", source_id);
+        CREATE_ELEMENT_WITH_ID(sink, "intervideosink", "sink", source_id);
+
+        source_caps = gst_caps_copy(caps);
+        source_structure = gst_caps_get_structure(source_caps, 0);
+        if (gst_structure_get_fraction(source_structure, "framerate", &fps_n, &fps_d))
+            gst_structure_remove_field(source_structure, "framerate");
+        g_object_set(capsfilter, "caps", source_caps, NULL);
+        gst_caps_unref(source_caps);
+
+        CREATE_ELEMENT_WITH_ID(videoconvert, VIDEO_CONVERT, "source-video-convert", source_id);
+        list = g_slist_prepend(list, videoconvert);
+        CREATE_ELEMENT_WITH_ID(videoscale, "videoscale", "source-video-scale", source_id);
+        list = g_slist_prepend(list, videoscale);
+        if (fps_n > 0) {
+            CREATE_ELEMENT_WITH_ID(videorate, "videorate", "source-video-rate", source_id);
+            g_object_set(videorate, "drop-only", TRUE, "max-rate", fps_n / fps_d, NULL);
+            list = g_slist_prepend(list, videorate);
+            gst_bin_add(GST_BIN(source_bin), videorate);
+        }
+        list = g_slist_prepend(list, queue_pre);
+
+        gst_bin_add_many(GST_BIN(source_bin),
+            queue_pre, videoscale, videoconvert, capsfilter, queue_post, valve, NULL);
+        LINK_ELEMENTS(capsfilter, queue_post);
+        LINK_ELEMENTS(videoconvert, capsfilter);
+        LINK_ELEMENTS(videoscale, videoconvert);
+        if (videorate) {
+            LINK_ELEMENTS(videorate, videoscale);
+            LINK_ELEMENTS(queue_pre, videorate);
+        } else {
+            LINK_ELEMENTS(queue_pre, videoscale);
+        }
+
+        break;
+        }
+    case OWR_MEDIA_TYPE_UNKNOWN:
+    default:
+        g_assert_not_reached();
+        goto done;
+    }
+
+    channel_name = g_strdup_printf("source-%u", source_id);
+    g_object_set(source, "channel", channel_name, NULL);
+    g_object_set(sink, "channel", channel_name, NULL);
+    g_free(channel_name);
+
+    /* Add and link the inter*sink to the actual source pipeline */
+    bin_name = g_strdup_printf("source-sink-bin-%u", source_id);
+    sink_bin = gst_bin_new(bin_name);
+    gst_bin_add_many(GST_BIN(sink_bin), sink, sink_queue, NULL);
+    gst_element_sync_state_with_parent(sink);
+    gst_element_sync_state_with_parent(sink_queue);
+    LINK_ELEMENTS(sink_queue, sink);
+    sinkpad = gst_element_get_static_pad(sink_queue, "sink");
+    bin_pad = gst_ghost_pad_new("sink", sinkpad);
+    gst_object_unref(sinkpad);
+    gst_pad_set_active(bin_pad, TRUE);
+    gst_element_add_pad(sink_bin, bin_pad);
+    bin_pad = NULL;
+    gst_bin_add(GST_BIN(source_pipeline), sink_bin);
+    gst_element_sync_state_with_parent(sink_bin);
+    LINK_ELEMENTS(tee, sink_bin);
+
+    /* Start up our new bin and link it all */
+    LINK_ELEMENTS(queue_post, valve);
+    srcpad = gst_element_get_static_pad(valve, "src");
+    g_assert(srcpad);
+
+    bin_pad = gst_ghost_pad_new("src", srcpad);
+    gst_object_unref(srcpad);
+    g_signal_connect(bin_pad, "linked", G_CALLBACK(source_pad_linked_cb), valve);
+    g_signal_connect(bin_pad, "unlinked", G_CALLBACK(source_pad_unlinked_cb), valve);
+    gst_pad_set_active(bin_pad, TRUE);
+    gst_element_add_pad(source_bin, bin_pad);
+
+    gst_bin_add(GST_BIN(source_bin), source);
+    LINK_ELEMENTS(source, queue_pre);
+    list = g_slist_append(list, source);
+
+    g_slist_foreach(list, sync_to_parent, NULL);
+
+done:
+    g_slist_free(list);
+    list = NULL;
+
+    return bin_pad;
+}
+
+/* FIXME: Share this with local media sources */
 static GstPad *owr_remote_media_source_get_pad(OwrMediaSource *media_source, GstCaps *caps)
 {
     OwrRemoteMediaSource *remote_source;
-    GstPad *ghostpad = NULL;
-    gchar *pad_name = NULL;
+    OwrRemoteMediaSourcePrivate *priv;
+    GstElement *tee, *transport_bin;
     OwrMediaType media_type;
     OwrCodecType codec_type;
-
-    OWR_UNUSED(caps);
+    GstPad *pad = NULL;
 
     g_assert(media_source);
     remote_source = OWR_REMOTE_MEDIA_SOURCE(media_source);
+    priv = remote_source->priv;
 
     codec_type = _owr_media_source_get_codec(media_source);
     g_object_get(media_source, "media-type", &media_type, NULL);
 
-    if (media_type == OWR_MEDIA_TYPE_VIDEO)
-        pad_name = g_strdup_printf("video_src_%u_%u", codec_type, remote_source->priv->stream_id);
-    else if (media_type == OWR_MEDIA_TYPE_AUDIO)
-        pad_name = g_strdup_printf("audio_raw_src_%u", remote_source->priv->stream_id);
-    ghostpad = gst_element_get_static_pad(
-        _owr_media_source_get_element(media_source), pad_name);
-    g_free(pad_name);
+    transport_bin = _owr_media_source_get_element(media_source);
 
-    return ghostpad;
+    if (priv->source_tee) {
+        tee = priv->source_tee;
+    } else {
+        GstElement *fakesink, *queue;
+        GstPad *srcpad, *sinkpad;
+        gchar *pad_name, *tee_name, *queue_name, *fakesink_name;
+
+        if (media_type == OWR_MEDIA_TYPE_VIDEO) {
+            pad_name = g_strdup_printf("video_src_%u_%u", codec_type, remote_source->priv->stream_id);
+            tee_name = g_strdup_printf("video-src-tee-%u-%u", codec_type, remote_source->priv->stream_id);
+            queue_name = g_strdup_printf("video-src-tee-fakesink-queue-%u-%u", codec_type, remote_source->priv->stream_id);
+            fakesink_name = g_strdup_printf("video-src-tee-fakesink-%u-%u", codec_type, remote_source->priv->stream_id);
+        } else if (media_type == OWR_MEDIA_TYPE_AUDIO) {
+            pad_name = g_strdup_printf("audio_raw_src_%u", remote_source->priv->stream_id);
+            tee_name = g_strdup_printf("audio-src-tee-%u-%u", codec_type, remote_source->priv->stream_id);
+            queue_name = g_strdup_printf("audio-src-tee-fakesink-queue-%u-%u", codec_type, remote_source->priv->stream_id);
+            fakesink_name = g_strdup_printf("audio-src-tee-fakesink-%u-%u", codec_type, remote_source->priv->stream_id);
+        } else {
+            g_assert_not_reached();
+        }
+
+        tee = gst_element_factory_make ("tee", tee_name);
+        remote_source->priv->source_tee = tee;
+        fakesink = gst_element_factory_make ("fakesink", fakesink_name);
+        g_object_set(fakesink, "async", FALSE, NULL);
+        queue = gst_element_factory_make ("queue", queue_name);
+        g_free(tee_name);
+        g_free(queue_name);
+        g_free(fakesink_name);
+
+        gst_bin_add_many(GST_BIN(transport_bin), tee, queue, fakesink, NULL);
+        gst_element_sync_state_with_parent(tee);
+        gst_element_sync_state_with_parent(queue);
+        gst_element_sync_state_with_parent(fakesink);
+        LINK_ELEMENTS(tee, queue);
+        LINK_ELEMENTS(queue, fakesink);
+
+        /* Link the transport bin to our tee */
+        srcpad = gst_element_get_static_pad(transport_bin, pad_name);
+        g_free(pad_name);
+        sinkpad = gst_element_get_request_pad(tee, "src_%u");
+        gst_pad_link(srcpad, sinkpad);
+        gst_object_unref(sinkpad);
+    }
+
+    pad = create_source_bin(media_source, transport_bin, tee, caps);
+
+    return pad;
+}
+
+static void owr_remote_media_source_unlink(OwrMediaSource *media_source, GstPad *downstream_pad)
+{
+    OWR_UNUSED(media_source);
+    OWR_UNUSED(downstream_pad);
 }
 
 OwrRemoteMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
