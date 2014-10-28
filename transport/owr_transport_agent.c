@@ -84,7 +84,7 @@ struct _OwrTransportAgentPrivate {
     guint next_stream_id;
     guint agent_id;
     gchar *transport_bin_name;
-    GstElement *transport_bin;
+    GstElement *pipeline, *transport_bin;
     GstElement *rtpbin;
 
     GHashTable *streams;
@@ -139,7 +139,6 @@ static void owr_transport_agent_finalize(GObject *object)
     OwrTransportAgentPrivate *priv = NULL;
     OwrMediaSession *media_session = NULL;
     GList *sessions_list = NULL, *item = NULL;
-    gboolean ret;
 
     g_return_if_fail(_owr_is_initialized());
 
@@ -157,9 +156,8 @@ static void owr_transport_agent_finalize(GObject *object)
 
     g_object_unref(priv->nice_agent);
 
-    gst_element_set_state(priv->transport_bin, GST_STATE_NULL);
-    ret = gst_bin_remove(GST_BIN(_owr_get_pipeline()), priv->transport_bin);
-    g_warn_if_fail(ret);
+    gst_element_set_state(priv->pipeline, GST_STATE_NULL);
+    gst_object_unref(priv->pipeline);
     g_free(priv->transport_bin_name);
 
     gst_object_unref(priv->rtpbin);
@@ -194,11 +192,73 @@ static void owr_transport_agent_class_init(OwrTransportAgentClass *klass)
 
 }
 
+/* FIXME: Copy from owr/orw.c without any error handling whatsoever */
+static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer user_data)
+{
+    gboolean ret, is_warning = FALSE;
+    GstStateChangeReturn change_status;
+    gchar *message_type, *debug;
+    GError *error;
+    GstPipeline *pipeline = user_data;
+
+    g_return_val_if_fail(GST_IS_BUS(bus), TRUE);
+
+    (void)user_data;
+
+    switch (GST_MESSAGE_TYPE(msg)) {
+    case GST_MESSAGE_LATENCY:
+        ret = gst_bin_recalculate_latency(GST_BIN(pipeline));
+        g_warn_if_fail(ret);
+        break;
+
+    case GST_MESSAGE_CLOCK_LOST:
+        change_status = gst_element_set_state(GST_ELEMENT(pipeline), GST_STATE_PAUSED);
+        g_warn_if_fail(change_status != GST_STATE_CHANGE_FAILURE);
+        change_status = gst_element_set_state(GST_ELEMENT(pipeline), GST_STATE_PLAYING);
+        g_warn_if_fail(change_status != GST_STATE_CHANGE_FAILURE);
+        break;
+
+    case GST_MESSAGE_EOS:
+        g_print("End of stream\n");
+        break;
+
+    case GST_MESSAGE_WARNING:
+        is_warning = TRUE;
+
+    case GST_MESSAGE_ERROR:
+        if (is_warning) {
+            message_type = "Warning";
+            gst_message_parse_warning(msg, &error, &debug);
+        } else {
+            message_type = "Error";
+            gst_message_parse_error(msg, &error, &debug);
+        }
+
+        g_printerr("==== %s message start ====\n", message_type);
+        g_printerr("%s in element %s.\n", message_type, GST_OBJECT_NAME(msg->src));
+        g_printerr("%s: %s\n", message_type, error->message);
+        g_printerr("Debugging info: %s\n", (debug) ? debug : "none");
+
+        g_printerr("==== %s message stop ====\n", message_type);
+        /*GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(pipeline), GST_DEBUG_GRAPH_SHOW_ALL, "pipeline.dot");*/
+
+        g_error_free(error);
+        g_free(debug);
+        break;
+
+    default:
+        break;
+    }
+
+    return TRUE;
+}
 
 static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
 {
     OwrTransportAgentPrivate *priv;
+    GstBus *bus;
     GstStateChangeReturn state_change_status;
+    gchar *pipeline_name;
 
     transport_agent->priv = priv = OWR_TRANSPORT_AGENT_GET_PRIVATE(transport_agent);
 
@@ -219,6 +279,16 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
     g_signal_connect(G_OBJECT(priv->nice_agent), "candidate-gathering-done",
         G_CALLBACK(on_candidate_gathering_done), transport_agent);
 
+    pipeline_name = g_strdup_printf("transport-agent-%u", priv->agent_id);
+    priv->pipeline = gst_pipeline_new(pipeline_name);
+    g_free(pipeline_name);
+
+    bus = gst_pipeline_get_bus(GST_PIPELINE(priv->pipeline));
+    g_main_context_push_thread_default(_owr_get_main_context());
+    gst_bus_add_watch(bus, (GstBusFunc)bus_call, priv->pipeline);
+    g_main_context_pop_thread_default(_owr_get_main_context());
+    gst_object_unref(bus);
+
     priv->transport_bin_name = g_strdup_printf("transport_bin_%u", priv->agent_id);
     priv->transport_bin = gst_bin_new(priv->transport_bin_name);
     priv->rtpbin = gst_element_factory_make("rtpbin", "rtpbin");
@@ -231,10 +301,9 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
     g_signal_connect(priv->transport_bin, "pad-added", G_CALLBACK(on_transport_bin_pad_added), transport_agent);
 
     gst_bin_add(GST_BIN(priv->transport_bin), priv->rtpbin);
-    state_change_status = gst_element_set_state(priv->transport_bin, GST_STATE_PLAYING);
+    gst_bin_add(GST_BIN(priv->pipeline), priv->transport_bin);
+    state_change_status = gst_element_set_state(priv->pipeline, GST_STATE_PLAYING);
     g_warn_if_fail(state_change_status == GST_STATE_CHANGE_SUCCESS);
-
-    gst_bin_add(GST_BIN(_owr_get_pipeline()), priv->transport_bin);
 
     priv->local_min_port = 0;
     priv->local_max_port = 0;
@@ -453,7 +522,7 @@ static void update_helper_servers(OwrTransportAgent *transport_agent, guint stre
     }
 }
 
-static gboolean link_source_to_transport_bin(GstPad *srcpad, GstElement *transport_bin,
+static gboolean link_source_to_transport_bin(GstPad *srcpad, GstElement *pipeline, GstElement *transport_bin,
     OwrMediaType media_type, OwrCodecType codec_type, guint stream_id)
 {
     GstPad *sinkpad;
@@ -471,8 +540,8 @@ static gboolean link_source_to_transport_bin(GstPad *srcpad, GstElement *transpo
 
     ret = gst_pad_link(srcpad, sinkpad) == GST_PAD_LINK_OK;
     if (ret) {
-        gst_element_post_message(_owr_get_pipeline(),
-            gst_message_new_latency(GST_OBJECT(_owr_get_pipeline())));
+        gst_element_post_message(pipeline,
+            gst_message_new_latency(GST_OBJECT(pipeline)));
     }
 
     return ret;
@@ -524,8 +593,8 @@ static void handle_new_send_source(OwrTransportAgent *transport_agent,
     stream_id = get_stream_id(transport_agent, OWR_SESSION(media_session));
     g_return_if_fail(stream_id);
 
-    gst_bin_add(GST_BIN(_owr_get_pipeline), src);
-    if (!link_source_to_transport_bin(srcpad, transport_bin, media_type, codec_type, stream_id)) {
+    gst_bin_add(GST_BIN(transport_agent->priv->pipeline), src);
+    if (!link_source_to_transport_bin(srcpad, transport_agent->priv->pipeline, transport_bin, media_type, codec_type, stream_id)) {
         gchar *name = "";
         g_object_get(send_source, "name", &name, NULL);
         GST_ERROR("Failed to link \"%s\" with transport bin", name);
