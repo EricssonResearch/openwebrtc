@@ -60,12 +60,8 @@ static gboolean owr_initialized = FALSE;
 static GMainContext *owr_main_context = NULL;
 static GMainLoop *owr_main_loop = NULL;
 static GThread *owr_main_thread = NULL;
-static GstElement *owr_pipeline = NULL;
-
-static guint bus_watch_id = -1;
 
 static gpointer owr_run(gpointer data);
-static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer user_data);
 
 #ifdef OWR_STATIC
 GST_PLUGIN_STATIC_DECLARE(alaw);
@@ -170,7 +166,6 @@ static void gst_log_android_handler(GstDebugCategory *category,
 void owr_init()
 {
     gboolean owr_main_context_is_external;
-    GstBus *bus;
 
     g_return_if_fail(!owr_initialized);
 
@@ -240,19 +235,6 @@ void owr_init()
     if (!owr_main_context_is_external)
         owr_main_context = g_main_context_new();
 
-    owr_pipeline = gst_pipeline_new("OpenWebRTC");
-
-    bus = gst_pipeline_get_bus(GST_PIPELINE(owr_pipeline));
-    g_main_context_push_thread_default(owr_main_context);
-    bus_watch_id = gst_bus_add_watch(bus, (GstBusFunc)bus_call, NULL);
-    g_main_context_pop_thread_default(owr_main_context);
-    gst_object_unref(bus);
-
-    gst_element_set_state(owr_pipeline, GST_STATE_PLAYING);
-#ifdef OWR_DEBUG
-    g_signal_connect(owr_pipeline, "deep-notify", G_CALLBACK(gst_object_default_deep_notify), NULL);
-#endif
-
     if (owr_main_context_is_external)
         return;
 
@@ -312,74 +294,3 @@ void _owr_schedule_with_hash_table(GSourceFunc func, GHashTable *hash_table)
     g_source_attach(source, owr_main_context);
 }
 
-GstElement * _owr_get_pipeline()
-{
-    return owr_pipeline;
-}
-
-void owr_dump_dot_file(const gchar *base_filename)
-{
-    g_return_if_fail(owr_pipeline);
-    g_return_if_fail(base_filename);
-
-    GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(owr_pipeline), GST_DEBUG_GRAPH_SHOW_ALL, base_filename);
-}
-
-static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer user_data)
-{
-    gboolean ret, is_warning = FALSE;
-    GstStateChangeReturn change_status;
-    gchar *message_type, *debug;
-    GError *error;
-
-    g_return_val_if_fail(GST_IS_BUS(bus), TRUE);
-
-    (void)user_data;
-
-    switch (GST_MESSAGE_TYPE(msg)) {
-    case GST_MESSAGE_LATENCY:
-        ret = gst_bin_recalculate_latency(GST_BIN(owr_pipeline));
-        g_warn_if_fail(ret);
-        break;
-
-    case GST_MESSAGE_CLOCK_LOST:
-        change_status = gst_element_set_state(GST_ELEMENT(owr_pipeline), GST_STATE_PAUSED);
-        g_warn_if_fail(change_status != GST_STATE_CHANGE_FAILURE);
-        change_status = gst_element_set_state(GST_ELEMENT(owr_pipeline), GST_STATE_PLAYING);
-        g_warn_if_fail(change_status != GST_STATE_CHANGE_FAILURE);
-        break;
-
-    case GST_MESSAGE_EOS:
-        g_print("End of stream\n");
-        break;
-
-    case GST_MESSAGE_WARNING:
-        is_warning = TRUE;
-
-    case GST_MESSAGE_ERROR:
-        if (is_warning) {
-            message_type = "Warning";
-            gst_message_parse_warning(msg, &error, &debug);
-        } else {
-            message_type = "Error";
-            gst_message_parse_error(msg, &error, &debug);
-        }
-
-        g_printerr("==== %s message start ====\n", message_type);
-        g_printerr("%s in element %s.\n", message_type, GST_OBJECT_NAME(msg->src));
-        g_printerr("%s: %s\n", message_type, error->message);
-        g_printerr("Debugging info: %s\n", (debug) ? debug : "none");
-
-        g_printerr("==== %s message stop ====\n", message_type);
-        /*GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(owr_pipeline), GST_DEBUG_GRAPH_SHOW_ALL, "pipeline.dot");*/
-
-        g_error_free(error);
-        g_free(debug);
-        break;
-
-    default:
-        break;
-    }
-
-    return TRUE;
-}

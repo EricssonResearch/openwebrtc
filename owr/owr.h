@@ -32,7 +32,6 @@ G_BEGIN_DECLS
 
 void owr_init();
 void owr_init_with_main_context(GMainContext *main_context);
-void owr_dump_dot_file(const gchar *base_filename);
 
 G_END_DECLS
 
