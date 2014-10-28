@@ -66,8 +66,8 @@ struct _OwrMediaRendererPrivate {
     OwrMediaSource *source;
     gboolean disabled;
 
+    GstElement *pipeline;
     GstElement *src, *sink;
-    GstPad *srcpad, *sinkpad; /* srcpad from source, sinkpad in renderer */
 };
 
 static void owr_media_renderer_set_property(GObject *object, guint property_id,
@@ -83,13 +83,15 @@ static void owr_media_renderer_finalize(GObject *object)
     if (priv->source) {
         _owr_media_source_release_source(priv->source, priv->src);
         gst_element_set_state(priv->src, GST_STATE_NULL);
-        gst_bin_remove(GST_BIN(_owr_get_pipeline()), priv->src);
+        gst_bin_remove(GST_BIN(priv->pipeline), priv->src);
         g_object_unref(priv->source);
         priv->source = NULL;
     }
-    if (priv->sink) {
-        gst_element_set_state(priv->sink, GST_STATE_NULL);
-        gst_bin_remove(GST_BIN(_owr_get_pipeline()), priv->sink);
+
+    if (priv->pipeline) {
+        gst_element_set_state(priv->pipeline, GST_STATE_NULL);
+        gst_object_unref(priv->pipeline);
+        priv->pipeline = NULL;
         priv->sink = NULL;
     }
 
@@ -120,16 +122,87 @@ static void owr_media_renderer_class_init(OwrMediaRendererClass *klass)
     g_object_class_install_properties(gobject_class, N_PROPERTIES, obj_properties);
 }
 
+/* FIXME: Copy from owr/orw.c without any error handling whatsoever */
+static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer user_data)
+{
+    gboolean ret, is_warning = FALSE;
+    GstStateChangeReturn change_status;
+    gchar *message_type, *debug;
+    GError *error;
+    GstPipeline *pipeline = user_data;
+
+    g_return_val_if_fail(GST_IS_BUS(bus), TRUE);
+
+    (void)user_data;
+
+    switch (GST_MESSAGE_TYPE(msg)) {
+    case GST_MESSAGE_LATENCY:
+        ret = gst_bin_recalculate_latency(GST_BIN(pipeline));
+        g_warn_if_fail(ret);
+        break;
+
+    case GST_MESSAGE_CLOCK_LOST:
+        change_status = gst_element_set_state(GST_ELEMENT(pipeline), GST_STATE_PAUSED);
+        g_warn_if_fail(change_status != GST_STATE_CHANGE_FAILURE);
+        change_status = gst_element_set_state(GST_ELEMENT(pipeline), GST_STATE_PLAYING);
+        g_warn_if_fail(change_status != GST_STATE_CHANGE_FAILURE);
+        break;
+
+    case GST_MESSAGE_EOS:
+        g_print("End of stream\n");
+        break;
+
+    case GST_MESSAGE_WARNING:
+        is_warning = TRUE;
+
+    case GST_MESSAGE_ERROR:
+        if (is_warning) {
+            message_type = "Warning";
+            gst_message_parse_warning(msg, &error, &debug);
+        } else {
+            message_type = "Error";
+            gst_message_parse_error(msg, &error, &debug);
+        }
+
+        g_printerr("==== %s message start ====\n", message_type);
+        g_printerr("%s in element %s.\n", message_type, GST_OBJECT_NAME(msg->src));
+        g_printerr("%s: %s\n", message_type, error->message);
+        g_printerr("Debugging info: %s\n", (debug) ? debug : "none");
+
+        g_printerr("==== %s message stop ====\n", message_type);
+        /*GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(pipeline), GST_DEBUG_GRAPH_SHOW_ALL, "pipeline.dot");*/
+
+        g_error_free(error);
+        g_free(debug);
+        break;
+
+    default:
+        break;
+    }
+
+    return TRUE;
+}
+
 static void owr_media_renderer_init(OwrMediaRenderer *renderer)
 {
     OwrMediaRendererPrivate *priv;
+    GstBus *bus;
+
     renderer->priv = priv = OWR_MEDIA_RENDERER_GET_PRIVATE(renderer);
 
     priv->media_type = DEFAULT_MEDIA_TYPE;
     priv->source = DEFAULT_SOURCE;
     priv->disabled = DEFAULT_DISABLED;
 
+    priv->pipeline = gst_pipeline_new(NULL);
     priv->sink = NULL;
+    priv->src = NULL;
+
+    bus = gst_pipeline_get_bus(GST_PIPELINE(priv->pipeline));
+    g_main_context_push_thread_default(_owr_get_main_context());
+    gst_bus_add_watch(bus, (GstBusFunc)bus_call, priv->pipeline);
+    g_main_context_pop_thread_default(_owr_get_main_context());
+    gst_object_unref(bus);
 
     g_mutex_init(&priv->media_renderer_lock);
 }
@@ -200,6 +273,8 @@ static GstPad *_owr_media_renderer_get_pad(OwrMediaRenderer *renderer)
     g_assert(sink);
 
     priv->sink = sink;
+    gst_bin_add(GST_BIN(priv->pipeline), sink);
+    gst_element_set_state(priv->pipeline, GST_STATE_PLAYING);
 
 done:
     g_mutex_unlock(&priv->media_renderer_lock);
@@ -237,9 +312,8 @@ void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *s
     if (priv->source) {
         _owr_media_source_release_source(priv->source, priv->src);
         gst_element_set_state(priv->src, GST_STATE_NULL);
-        gst_bin_remove(GST_BIN(_owr_get_pipeline()), priv->src);
+        gst_bin_remove(GST_BIN(priv->pipeline), priv->src);
         priv->src = NULL;
-        priv->srcpad = NULL;
         g_object_unref(priv->source);
         priv->source = NULL;
     }
@@ -261,8 +335,10 @@ void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *s
 
     g_mutex_lock(&priv->media_renderer_lock);
 
-    gst_bin_add(GST_BIN(_owr_get_pipeline()), src);
+    gst_bin_add(GST_BIN(priv->pipeline), src);
     pad_link_return = gst_pad_link(srcpad, sinkpad);
+    gst_object_unref(sinkpad);
+    gst_object_unref(srcpad);
     if (pad_link_return != GST_PAD_LINK_OK) {
         GST_ERROR("Failed to link source with renderer (%d)", pad_link_return);
         ret = FALSE;
@@ -270,13 +346,11 @@ void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *s
     }
     gst_element_sync_state_with_parent(src);
 
-    gst_element_post_message(_owr_get_pipeline(), gst_message_new_latency(GST_OBJECT(_owr_get_pipeline())));
+    gst_element_post_message(priv->pipeline, gst_message_new_latency(GST_OBJECT(priv->pipeline)));
 
     priv->source = g_object_ref(source);
 
 done:
     priv->src = src;
-    priv->srcpad = srcpad;
-    priv->sinkpad = sinkpad;
     g_mutex_unlock(&priv->media_renderer_lock);
 }

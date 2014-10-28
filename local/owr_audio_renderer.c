@@ -152,9 +152,6 @@ static GstElement *owr_audio_renderer_get_element(OwrMediaRenderer *renderer)
     priv->renderer_bin = gst_bin_new(bin_name);
     g_free(bin_name);
 
-    gst_bin_add(GST_BIN(_owr_get_pipeline()), priv->renderer_bin);
-    gst_element_sync_state_with_parent(GST_ELEMENT(priv->renderer_bin));
-
     audioresample = gst_element_factory_make("audioresample", "audio-renderer-resample");
     audioconvert = gst_element_factory_make("audioconvert", "audio-renderer-convert");
 
@@ -190,12 +187,6 @@ static GstElement *owr_audio_renderer_get_element(OwrMediaRenderer *renderer)
     gst_pad_set_active(ghostpad, TRUE);
     gst_element_add_pad(priv->renderer_bin, ghostpad);
     gst_object_unref(sinkpad);
-
-    gst_element_sync_state_with_parent(sink);
-    gst_element_sync_state_with_parent(volume);
-    gst_element_sync_state_with_parent(capsfilter);
-    gst_element_sync_state_with_parent(audioconvert);
-    gst_element_sync_state_with_parent(audioresample);
 
 done:
     g_mutex_unlock(&priv->audio_renderer_lock);

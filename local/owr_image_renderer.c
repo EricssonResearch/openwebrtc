@@ -237,9 +237,6 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
     priv->renderer_bin = gst_bin_new(bin_name);
     g_free(bin_name);
 
-    gst_bin_add(GST_BIN(_owr_get_pipeline()), priv->renderer_bin);
-    gst_element_sync_state_with_parent(GST_ELEMENT(priv->renderer_bin));
-
     queue = gst_element_factory_make("queue", "image-renderer-queue");
     g_object_set(queue, "max-size-buffers", 3, "max-size-bytes", 0,
         "max-size-time", G_GUINT64_CONSTANT(0), "leaky", 2 /* leak downstream */, NULL);
@@ -290,12 +287,6 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
     gst_element_add_pad(priv->renderer_bin, ghostpad);
     gst_object_unref(sinkpad);
 
-    gst_element_sync_state_with_parent(sink);
-    gst_element_sync_state_with_parent(capsfilter);
-    gst_element_sync_state_with_parent(videoconvert);
-    gst_element_sync_state_with_parent(videoscale);
-    gst_element_sync_state_with_parent(videorate);
-    gst_element_sync_state_with_parent(queue);
 done:
     g_mutex_unlock(&priv->image_renderer_lock);
     return priv->renderer_bin;

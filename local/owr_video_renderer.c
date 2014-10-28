@@ -259,9 +259,6 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer)
     priv->renderer_bin = gst_bin_new(bin_name);
     g_free(bin_name);
 
-    gst_bin_add(GST_BIN(_owr_get_pipeline()), priv->renderer_bin);
-    gst_element_sync_state_with_parent(GST_ELEMENT(priv->renderer_bin));
-
     balance = gst_element_factory_make("videobalance", "video-renderer-balance");
     g_signal_connect_object(renderer, "notify::disabled", G_CALLBACK(renderer_disabled),
         balance, 0);
@@ -301,9 +298,6 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer)
     gst_element_add_pad(priv->renderer_bin, ghostpad);
     gst_object_unref(sinkpad);
 
-    gst_element_sync_state_with_parent(sink);
-    gst_element_sync_state_with_parent(queue);
-    gst_element_sync_state_with_parent(balance);
 done:
     g_mutex_unlock(&priv->video_renderer_lock);
     return priv->renderer_bin;
