@@ -26,6 +26,8 @@ For support, questions and discussions:
 ## Examples using OpenWebRTC
 Bowser is a mobile browser that uses OpenWebRTC as a WebRTC back-end. As you can see [here](https://github.com/EricssonResearch/bowser), Bowser is in fact a very thin layer of UI code on top of OpenWebRTC.
 
+We are also writing some [example code and applications](https://github.com/EricssonResearch/openwebrtc-examples) to help you get started using OpenWebRTC on various platforms.
+
 Before being released publicly, OpenWebRTC has been used by Ericsson Research to build several research prototypes such as [this](http://www.ericsson.com/research-blog/context-aware-communication/field-service-support-google-glass-webrtc/) and [that](http://www.ericsson.com/research-blog/5g/remote-excavation-using-webrtc-real-time-video-eye-5g/). 
 
 ## License
