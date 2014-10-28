@@ -67,14 +67,12 @@ G_DEFINE_TYPE(OwrRemoteMediaSource, owr_remote_media_source, OWR_TYPE_MEDIA_SOUR
 
 struct _OwrRemoteMediaSourcePrivate {
     guint stream_id;
-
-    GstElement *source_tee;
 };
 
 static guint unique_pad_id = 0;
 
-static GstPad *owr_remote_media_source_get_pad(OwrMediaSource *media_source, GstCaps *caps);
-static void owr_remote_media_source_unlink(OwrMediaSource *media_source, GstPad *downstream_pad);
+static GstElement *owr_remote_media_source_request_source(OwrMediaSource *media_source, GstCaps *caps);
+static void owr_remote_media_source_release_source(OwrMediaSource *media_source, GstElement *source);
 
 static void owr_remote_media_source_class_init(OwrRemoteMediaSourceClass *klass)
 {
@@ -82,8 +80,8 @@ static void owr_remote_media_source_class_init(OwrRemoteMediaSourceClass *klass)
 
     g_type_class_add_private(klass, sizeof(OwrRemoteMediaSourcePrivate));
 
-    media_source_class->get_pad = (void *(*)(OwrMediaSource *, void *))owr_remote_media_source_get_pad;
-    media_source_class->unlink = (void (*)(OwrMediaSource *, void *))owr_remote_media_source_unlink;
+    media_source_class->request_source = (void *(*)(OwrMediaSource *, void *))owr_remote_media_source_request_source;
+    media_source_class->release_source = (void (*)(OwrMediaSource *, void *))owr_remote_media_source_release_source;
 }
 
 static void owr_remote_media_source_init(OwrRemoteMediaSource *source)
@@ -91,16 +89,6 @@ static void owr_remote_media_source_init(OwrRemoteMediaSource *source)
     source->priv = OWR_REMOTE_MEDIA_SOURCE_GET_PRIVATE(source);
 
     source->priv->stream_id = 0;
-}
-
-static void sync_to_parent(gpointer data, gpointer user_data)
-{
-    GstElement *element = GST_ELEMENT(data);
-
-    g_assert(data);
-    g_assert(!user_data);
-
-    gst_element_sync_state_with_parent(element);
 }
 
 #define LINK_ELEMENTS(a, b) \
@@ -123,45 +111,27 @@ static void sync_to_parent(gpointer data, gpointer user_data)
     g_free(temp_str); \
 }
 
-static void source_pad_linked_cb(GstPad *pad, GstPad *peer, GstElement *valve)
-{
-  OWR_UNUSED(pad);
-  OWR_UNUSED(peer);
-  g_object_set(valve, "drop", FALSE, NULL);
-}
-
-static void source_pad_unlinked_cb(GstPad *pad, GstPad *peer, GstElement *valve)
-{
-  OWR_UNUSED(pad);
-  OWR_UNUSED(peer);
-  g_object_set(valve, "drop", TRUE, NULL);
-}
-
 /*
  * create_post_tee_bin
  *
  * The following chain is created after the tee for each output from the
  * source:
  *
- * +-----------+   +-------------------------------+   +------ +   +----------+
- * | inter*src +---+ converters/queues/capsfilters +---+ valve +---+ ghostpad |
- * +-----------+   +-------------------------------+   +-------+   +----------+
- *
- * The valve is opened and closed based on linking/unlinking the ghostpad to
- * prevent not-linked errors.
+ * +-----------+   +-------------------------------+   +----------+
+ * | inter*src +---+ converters/queues/capsfilters +---+ ghostpad |
+ * +-----------+   +-------------------------------+   +----------+
  *
  * TODO: Share this with local media sources
  *
  */
-static GstPad *create_source_bin(OwrMediaSource *media_source, GstElement *source_pipeline,
+static GstElement *create_source_bin(OwrMediaSource *media_source, GstElement *source_pipeline,
     GstElement *tee, GstCaps *caps)
 {
     OwrMediaType media_type;
     GstElement *source_bin, *source = NULL, *queue_pre, *queue_post;
-    GstElement *valve, *capsfilter;
+    GstElement *capsfilter;
     GstElement *sink, *sink_queue, *sink_bin;
     GstPad *bin_pad = NULL, *srcpad, *sinkpad;
-    GSList *list = NULL;
     gchar *bin_name;
     guint source_id;
     gchar *channel_name;
@@ -170,25 +140,11 @@ static GstPad *create_source_bin(OwrMediaSource *media_source, GstElement *sourc
 
     bin_name = g_strdup_printf("source-bin-%u", source_id);
     source_bin = gst_bin_new(bin_name);
-    /* TODO: This should be the transport agent or renderer pipeline later */
-    if (!gst_bin_add(GST_BIN(_owr_get_pipeline()), source_bin)) {
-        GST_ERROR("Failed to add %s to source bin", bin_name);
-        g_free(bin_name);
-        g_object_unref(source_bin);
-        source_bin = NULL;
-        goto done;
-    }
     g_free(bin_name);
-    gst_element_sync_state_with_parent(source_bin);
 
     CREATE_ELEMENT_WITH_ID(queue_pre, "queue", "source-queue", source_id);
     CREATE_ELEMENT_WITH_ID(capsfilter, "capsfilter", "source-output-capsfilter", source_id);
-    list = g_slist_append(list, capsfilter);
     CREATE_ELEMENT_WITH_ID(queue_post, "queue", "source-output-queue", source_id);
-    list = g_slist_append(list, queue_post);
-    CREATE_ELEMENT_WITH_ID(valve, "valve", "source-valve", source_id);
-    g_object_set(valve, "drop", TRUE, NULL);
-    list = g_slist_append(list, valve);
 
     CREATE_ELEMENT_WITH_ID(sink_queue, "queue", "sink-queue", source_id);
 
@@ -204,13 +160,10 @@ static GstPad *create_source_bin(OwrMediaSource *media_source, GstElement *sourc
         g_object_set(capsfilter, "caps", caps, NULL);
 
         CREATE_ELEMENT_WITH_ID(audioresample, "audioresample", "source-audio-resample", source_id);
-        list = g_slist_prepend(list, audioresample);
         CREATE_ELEMENT_WITH_ID(audioconvert, "audioconvert", "source-audio-convert", source_id);
-        list = g_slist_prepend(list, audioconvert);
-        list = g_slist_prepend(list, queue_pre);
 
         gst_bin_add_many(GST_BIN(source_bin),
-            queue_pre, audioconvert, audioresample, capsfilter, queue_post, valve, NULL);
+            queue_pre, audioconvert, audioresample, capsfilter, queue_post, NULL);
         LINK_ELEMENTS(capsfilter, queue_post);
         LINK_ELEMENTS(audioresample, capsfilter);
         LINK_ELEMENTS(audioconvert, audioresample);
@@ -236,19 +189,15 @@ static GstPad *create_source_bin(OwrMediaSource *media_source, GstElement *sourc
         gst_caps_unref(source_caps);
 
         CREATE_ELEMENT_WITH_ID(videoconvert, VIDEO_CONVERT, "source-video-convert", source_id);
-        list = g_slist_prepend(list, videoconvert);
         CREATE_ELEMENT_WITH_ID(videoscale, "videoscale", "source-video-scale", source_id);
-        list = g_slist_prepend(list, videoscale);
         if (fps_n > 0) {
             CREATE_ELEMENT_WITH_ID(videorate, "videorate", "source-video-rate", source_id);
             g_object_set(videorate, "drop-only", TRUE, "max-rate", fps_n / fps_d, NULL);
-            list = g_slist_prepend(list, videorate);
             gst_bin_add(GST_BIN(source_bin), videorate);
         }
-        list = g_slist_prepend(list, queue_pre);
 
         gst_bin_add_many(GST_BIN(source_bin),
-            queue_pre, videoscale, videoconvert, capsfilter, queue_post, valve, NULL);
+            queue_pre, videoscale, videoconvert, capsfilter, queue_post, NULL);
         LINK_ELEMENTS(capsfilter, queue_post);
         LINK_ELEMENTS(videoconvert, capsfilter);
         LINK_ELEMENTS(videoscale, videoconvert);
@@ -290,39 +239,30 @@ static GstPad *create_source_bin(OwrMediaSource *media_source, GstElement *sourc
     LINK_ELEMENTS(tee, sink_bin);
 
     /* Start up our new bin and link it all */
-    LINK_ELEMENTS(queue_post, valve);
-    srcpad = gst_element_get_static_pad(valve, "src");
+    srcpad = gst_element_get_static_pad(queue_post, "src");
     g_assert(srcpad);
 
     bin_pad = gst_ghost_pad_new("src", srcpad);
     gst_object_unref(srcpad);
-    g_signal_connect(bin_pad, "linked", G_CALLBACK(source_pad_linked_cb), valve);
-    g_signal_connect(bin_pad, "unlinked", G_CALLBACK(source_pad_unlinked_cb), valve);
     gst_pad_set_active(bin_pad, TRUE);
     gst_element_add_pad(source_bin, bin_pad);
 
     gst_bin_add(GST_BIN(source_bin), source);
     LINK_ELEMENTS(source, queue_pre);
-    list = g_slist_append(list, source);
-
-    g_slist_foreach(list, sync_to_parent, NULL);
 
 done:
-    g_slist_free(list);
-    list = NULL;
 
-    return bin_pad;
+    return source_bin;
 }
 
 /* FIXME: Share this with local media sources */
-static GstPad *owr_remote_media_source_get_pad(OwrMediaSource *media_source, GstCaps *caps)
+static GstElement *owr_remote_media_source_request_source(OwrMediaSource *media_source, GstCaps *caps)
 {
     OwrRemoteMediaSource *remote_source;
     OwrRemoteMediaSourcePrivate *priv;
-    GstElement *tee, *transport_bin;
+    GstElement *tee, *transport_bin, *source_element;
     OwrMediaType media_type;
     OwrCodecType codec_type;
-    GstPad *pad = NULL;
 
     g_assert(media_source);
     remote_source = OWR_REMOTE_MEDIA_SOURCE(media_source);
@@ -331,11 +271,9 @@ static GstPad *owr_remote_media_source_get_pad(OwrMediaSource *media_source, Gst
     codec_type = _owr_media_source_get_codec(media_source);
     g_object_get(media_source, "media-type", &media_type, NULL);
 
-    transport_bin = _owr_media_source_get_element(media_source);
+    transport_bin = _owr_media_source_get_source_bin(media_source);
 
-    if (priv->source_tee) {
-        tee = priv->source_tee;
-    } else {
+    if (!(tee = _owr_media_source_get_source_tee(media_source))) {
         GstElement *fakesink, *queue;
         GstPad *srcpad, *sinkpad;
         gchar *pad_name, *tee_name, *queue_name, *fakesink_name;
@@ -355,7 +293,7 @@ static GstPad *owr_remote_media_source_get_pad(OwrMediaSource *media_source, Gst
         }
 
         tee = gst_element_factory_make ("tee", tee_name);
-        remote_source->priv->source_tee = tee;
+        _owr_media_source_set_source_tee(media_source, tee);
         fakesink = gst_element_factory_make ("fakesink", fakesink_name);
         g_object_set(fakesink, "async", FALSE, NULL);
         queue = gst_element_factory_make ("queue", queue_name);
@@ -378,15 +316,15 @@ static GstPad *owr_remote_media_source_get_pad(OwrMediaSource *media_source, Gst
         gst_object_unref(sinkpad);
     }
 
-    pad = create_source_bin(media_source, transport_bin, tee, caps);
+    source_element = create_source_bin(media_source, transport_bin, tee, caps);
 
-    return pad;
+    return source_element;
 }
 
-static void owr_remote_media_source_unlink(OwrMediaSource *media_source, GstPad *downstream_pad)
+static void owr_remote_media_source_release_source(OwrMediaSource *media_source, GstElement *source)
 {
     OWR_UNUSED(media_source);
-    OWR_UNUSED(downstream_pad);
+    OWR_UNUSED(source);
 }
 
 OwrRemoteMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
@@ -414,7 +352,7 @@ OwrRemoteMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
     /* take a ref on the transport bin as the media source element is
      * unreffed on finalization */
     g_object_ref(transport_bin);
-    _owr_media_source_set_element(OWR_MEDIA_SOURCE(source), transport_bin);
+    _owr_media_source_set_source_bin(OWR_MEDIA_SOURCE(source), transport_bin);
 
     _owr_media_source_set_codec(OWR_MEDIA_SOURCE(source), codec_type);
 

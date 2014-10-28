@@ -62,12 +62,14 @@ G_DEFINE_TYPE(OwrMediaSource, owr_media_source, G_TYPE_OBJECT)
 struct _OwrMediaSourcePrivate {
     gchar *name;
     OwrMediaType media_type;
-    guint index;
 
     OwrSourceType type;
     OwrCodecType codec_type;
 
+    /* The bin or pipeline that contains the data producers */
     GstElement *source_bin;
+    /* Tee element from which we can tap the source for multiple consumers */
+    GstElement *source_tee;
 };
 
 static void owr_media_source_set_property(GObject *object, guint property_id,
@@ -86,7 +88,7 @@ static void owr_media_source_finalize(GObject *object)
         GstElement *source_bin = priv->source_bin;
         priv->source_bin = NULL;
         gst_element_set_state(source_bin, GST_STATE_NULL);
-        gst_bin_remove(GST_BIN(_owr_get_pipeline()), source_bin);
+        gst_object_unref(source_bin);
     }
 
     g_mutex_clear(&source->lock);
@@ -131,8 +133,8 @@ static void owr_media_source_init(OwrMediaSource *source)
     priv->media_type = DEFAULT_MEDIA_TYPE;
     priv->type = DEFAULT_TYPE;
 
-    priv->index = (guint)-1;
     priv->source_bin = NULL;
+    priv->source_tee = NULL;
 
     g_mutex_init(&source->lock);
 }
@@ -188,8 +190,8 @@ static void owr_media_source_get_property(GObject *object, guint property_id,
 
 
 /* call with the media_source lock
- * element is transfer none */
-GstElement *_owr_media_source_get_element(OwrMediaSource *media_source)
+ * bin is transfer none */
+GstElement *_owr_media_source_get_source_bin(OwrMediaSource *media_source)
 {
     g_return_val_if_fail(OWR_IS_MEDIA_SOURCE(media_source), NULL);
 
@@ -197,36 +199,55 @@ GstElement *_owr_media_source_get_element(OwrMediaSource *media_source)
 }
 
 /* call with the media_source lock
- * element is transfer full */
-void _owr_media_source_set_element(OwrMediaSource *media_source, GstElement *element)
+ * bin is transfer full */
+void _owr_media_source_set_source_bin(OwrMediaSource *media_source, GstElement *bin)
 {
     g_return_if_fail(OWR_IS_MEDIA_SOURCE(media_source));
-    g_return_if_fail(!element || GST_IS_ELEMENT(element));
+    g_return_if_fail(!bin || GST_IS_ELEMENT(bin));
 
-    media_source->priv->source_bin = element;
+    media_source->priv->source_bin = bin;
+}
+
+/* call with the media_source lock
+ * tee is transfer none */
+GstElement *_owr_media_source_get_source_tee(OwrMediaSource *media_source)
+{
+    g_return_val_if_fail(OWR_IS_MEDIA_SOURCE(media_source), NULL);
+
+    return media_source->priv->source_tee;
+}
+
+/* call with the media_source lock
+ * tee is transfer full */
+void _owr_media_source_set_source_tee(OwrMediaSource *media_source, GstElement *tee)
+{
+    g_return_if_fail(OWR_IS_MEDIA_SOURCE(media_source));
+    g_return_if_fail(!tee || GST_IS_ELEMENT(tee));
+
+    media_source->priv->source_tee = tee;
 }
 
 /* caps is transfer none */
-GstPad *_owr_media_source_get_pad(OwrMediaSource *media_source, GstCaps *caps)
+GstElement *_owr_media_source_request_source(OwrMediaSource *media_source, GstCaps *caps)
 {
-    GstPad *ghostpad = NULL;
+    GstElement *source;
 
     g_return_val_if_fail(OWR_IS_MEDIA_SOURCE(media_source), NULL);
 
     g_mutex_lock(&media_source->lock);
-    ghostpad = OWR_MEDIA_SOURCE_GET_CLASS(media_source)->get_pad(media_source, caps);
+    source = OWR_MEDIA_SOURCE_GET_CLASS(media_source)->request_source(media_source, caps);
     g_mutex_unlock(&media_source->lock);
 
-    return ghostpad;
+    return source;
 }
 
-void _owr_media_source_unlink(OwrMediaSource *media_source, GstPad *downstream_pad)
+void _owr_media_source_release_source(OwrMediaSource *media_source, GstElement *source)
 {
     g_return_if_fail(OWR_IS_MEDIA_SOURCE(media_source));
-    g_return_if_fail(GST_IS_PAD(downstream_pad));
+    g_return_if_fail(GST_IS_ELEMENT(source));
 
     g_mutex_lock(&media_source->lock);
-    OWR_MEDIA_SOURCE_GET_CLASS(media_source)->unlink(media_source, downstream_pad);
+    OWR_MEDIA_SOURCE_GET_CLASS(media_source)->release_source(media_source, source);
     g_mutex_unlock(&media_source->lock);
 }
 

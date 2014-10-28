@@ -483,7 +483,7 @@ static void handle_new_send_source(OwrTransportAgent *transport_agent,
 {
     OwrMediaSource *send_source;
     OwrPayload *send_payload;
-    GstElement *transport_bin;
+    GstElement *transport_bin, *src;
     GstCaps *caps;
     OwrCodecType codec_type = OWR_CODEC_TYPE_NONE;
     OwrMediaType media_type = OWR_MEDIA_TYPE_UNKNOWN;
@@ -514,19 +514,24 @@ static void handle_new_send_source(OwrTransportAgent *transport_agent,
     */
 
     caps = _owr_payload_create_raw_caps(send_payload);
-    srcpad = _owr_media_source_get_pad(send_source, caps);
+    src = _owr_media_source_request_source(send_source, caps);
+    g_assert(src);
     gst_caps_unref(caps);
+    srcpad = gst_element_get_static_pad(src, "src");
     g_assert(srcpad);
     transport_bin = transport_agent->priv->transport_bin;
 
     stream_id = get_stream_id(transport_agent, OWR_SESSION(media_session));
     g_return_if_fail(stream_id);
 
+    gst_bin_add(GST_BIN(_owr_get_pipeline), src);
     if (!link_source_to_transport_bin(srcpad, transport_bin, media_type, codec_type, stream_id)) {
         gchar *name = "";
         g_object_get(send_source, "name", &name, NULL);
         GST_ERROR("Failed to link \"%s\" with transport bin", name);
     }
+
+    gst_element_sync_state_with_parent(src);
 }
 
 static void maybe_handle_new_send_source_with_payload(OwrTransportAgent *transport_agent,

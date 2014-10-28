@@ -66,7 +66,7 @@ struct _OwrMediaRendererPrivate {
     OwrMediaSource *source;
     gboolean disabled;
 
-    GstElement *sink;
+    GstElement *src, *sink;
     GstPad *srcpad, *sinkpad; /* srcpad from source, sinkpad in renderer */
 };
 
@@ -81,7 +81,9 @@ static void owr_media_renderer_finalize(GObject *object)
     OwrMediaRendererPrivate *priv = renderer->priv;
 
     if (priv->source) {
-        _owr_media_source_unlink(priv->source, priv->sinkpad);
+        _owr_media_source_release_source(priv->source, priv->src);
+        gst_element_set_state(priv->src, GST_STATE_NULL);
+        gst_bin_remove(GST_BIN(_owr_get_pipeline()), priv->src);
         g_object_unref(priv->source);
         priv->source = NULL;
     }
@@ -215,6 +217,7 @@ void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *s
 {
     OwrMediaRendererPrivate *priv;
     gboolean ret = TRUE;
+    GstElement *src;
     GstPad *srcpad, *sinkpad;
     GstCaps *caps;
     GstPadLinkReturn pad_link_return;
@@ -226,11 +229,16 @@ void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *s
 
     g_mutex_lock(&priv->media_renderer_lock);
 
-    if (source == priv->source)
+    if (source == priv->source) {
+        g_mutex_unlock(&priv->media_renderer_lock);
         return;
+    }
 
     if (priv->source) {
-        _owr_media_source_unlink(priv->source, priv->sinkpad);
+        _owr_media_source_release_source(priv->source, priv->src);
+        gst_element_set_state(priv->src, GST_STATE_NULL);
+        gst_bin_remove(GST_BIN(_owr_get_pipeline()), priv->src);
+        priv->src = NULL;
         priv->srcpad = NULL;
         g_object_unref(priv->source);
         priv->source = NULL;
@@ -245,24 +253,29 @@ void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *s
     sinkpad = _owr_media_renderer_get_pad(renderer);
     g_assert(sinkpad);
     caps = OWR_MEDIA_RENDERER_GET_CLASS(renderer)->get_caps(renderer);
-    srcpad = _owr_media_source_get_pad(source, caps);
+    src = _owr_media_source_request_source(source, caps);
     gst_caps_unref(caps);
+    g_assert(src);
+    srcpad = gst_element_get_static_pad(src, "src");
     g_assert(srcpad);
 
     g_mutex_lock(&priv->media_renderer_lock);
 
+    gst_bin_add(GST_BIN(_owr_get_pipeline()), src);
     pad_link_return = gst_pad_link(srcpad, sinkpad);
     if (pad_link_return != GST_PAD_LINK_OK) {
         GST_ERROR("Failed to link source with renderer (%d)", pad_link_return);
         ret = FALSE;
         goto done;
     }
+    gst_element_sync_state_with_parent(src);
 
     gst_element_post_message(_owr_get_pipeline(), gst_message_new_latency(GST_OBJECT(_owr_get_pipeline())));
 
     priv->source = g_object_ref(source);
 
 done:
+    priv->src = src;
     priv->srcpad = srcpad;
     priv->sinkpad = sinkpad;
     g_mutex_unlock(&priv->media_renderer_lock);

@@ -41,11 +41,14 @@
 
 G_BEGIN_DECLS
 
-GstPad *_owr_media_source_get_pad(OwrMediaSource *media_source, GstCaps *caps);
-void _owr_media_source_unlink(OwrMediaSource *media_source, GstPad *downstream_pad);
+GstElement *_owr_media_source_get_source_bin(OwrMediaSource *media_source);
+void _owr_media_source_set_source_bin(OwrMediaSource *media_source, GstElement *bin);
 
-void _owr_media_source_set_element(OwrMediaSource *media_source, GstElement *element);
-GstElement *_owr_media_source_get_element(OwrMediaSource *media_source);
+GstElement *_owr_media_source_get_source_tee(OwrMediaSource *media_source);
+void _owr_media_source_set_source_tee(OwrMediaSource *media_source, GstElement *tee);
+
+GstElement *_owr_media_source_request_source(OwrMediaSource *media_source, GstCaps *caps);
+void _owr_media_source_release_source(OwrMediaSource *media_source, GstElement *source);
 
 void _owr_media_source_set_type(OwrMediaSource *source, OwrSourceType type);
 

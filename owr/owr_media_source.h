@@ -59,8 +59,8 @@ struct _OwrMediaSourceClass {
     GObjectClass parent_class;
 
     /*< private >*/
-    void *(*get_pad)(OwrMediaSource *media_source, void *caps);
-    void (*unlink)(OwrMediaSource *media_source, void *downstream_pad);
+    void *(*request_source)(OwrMediaSource *media_source, void *caps);
+    void  (*release_source)(OwrMediaSource *media_source, void *source);
 };
 
 GType owr_media_source_get_type(void) G_GNUC_CONST;
