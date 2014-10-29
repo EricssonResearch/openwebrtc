@@ -257,7 +257,6 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
 {
     OwrTransportAgentPrivate *priv;
     GstBus *bus;
-    GstStateChangeReturn state_change_status;
     gchar *pipeline_name;
 
     transport_agent->priv = priv = OWR_TRANSPORT_AGENT_GET_PRIVATE(transport_agent);
@@ -302,8 +301,6 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
 
     gst_bin_add(GST_BIN(priv->transport_bin), priv->rtpbin);
     gst_bin_add(GST_BIN(priv->pipeline), priv->transport_bin);
-    state_change_status = gst_element_set_state(priv->pipeline, GST_STATE_PLAYING);
-    g_warn_if_fail(state_change_status == GST_STATE_CHANGE_SUCCESS);
 
     priv->local_min_port = 0;
     priv->local_max_port = 0;
@@ -625,6 +622,7 @@ static gboolean add_media_session(GHashTable *args)
     gchar *send_rtp_sink_pad_name;
     GstPad *rtp_sink_pad;
     GObject *session;
+    GstStateChangeReturn state_change_status;
 
     g_return_val_if_fail(args, FALSE);
 
@@ -703,6 +701,9 @@ static gboolean add_media_session(GHashTable *args)
         on_new_remote_candidate(transport_agent, FALSE, OWR_SESSION(media_session));
     if (_owr_session_get_forced_remote_candidates(OWR_SESSION(media_session)))
         on_new_remote_candidate(transport_agent, TRUE, OWR_SESSION(media_session));
+
+    state_change_status = gst_element_set_state(transport_agent->priv->pipeline, GST_STATE_PLAYING);
+    g_warn_if_fail(state_change_status != GST_STATE_CHANGE_FAILURE);
 
 end:
     g_object_unref(media_session);
