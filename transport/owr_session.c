@@ -172,7 +172,7 @@ static void owr_session_on_new_candidate(OwrSession *session, OwrCandidate *cand
 
     priv = session->priv;
     g_warn_if_fail(!priv->gathering_done);
-    priv->local_candidates = g_slist_append(priv->local_candidates, candidate);
+    priv->local_candidates = g_slist_append(priv->local_candidates, g_object_ref(candidate));
 }
 
 static void owr_session_on_candidate_gathering_done(OwrSession *session)

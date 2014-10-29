@@ -1168,6 +1168,7 @@ static gboolean emit_new_candidate(GHashTable *args)
     g_return_val_if_fail(owr_candidate, FALSE);
 
     g_signal_emit_by_name(media_session, "on-new-candidate", owr_candidate);
+    g_object_unref(owr_candidate);
 
 out:
     g_free(foundation);
@@ -1479,6 +1480,7 @@ static gboolean emit_on_incoming_source(GHashTable *args)
 
     g_signal_emit_by_name(media_session, "on-incoming-source", source);
 
+    g_object_unref(source);
     g_hash_table_unref(args);
     return FALSE;
 }
@@ -1795,6 +1797,7 @@ static gboolean emit_stats_signal(GHashTable *stats_hash)
     g_return_val_if_fail(OWR_IS_MEDIA_SESSION(media_session), FALSE);
     g_hash_table_remove(stats_hash, "media_session");
     g_signal_emit_by_name(media_session, "on-new-stats", stats_hash, NULL);
+    g_hash_table_unref(stats_hash);
     return FALSE;
 }
 

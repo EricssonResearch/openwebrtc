@@ -175,18 +175,14 @@ static void owr_media_session_on_incoming_source(OwrMediaSession *media_session,
     g_warn_if_fail(source);
 
     g_mutex_lock(&media_session->priv->remote_source_lock);
-    media_session->priv->remote_sources = g_slist_append(media_session->priv->remote_sources, source);
+    media_session->priv->remote_sources = g_slist_append(media_session->priv->remote_sources, g_object_ref(source));
     g_mutex_unlock(&media_session->priv->remote_source_lock);
-
-    g_object_unref(source);
 }
 
 static void owr_media_session_on_new_stats(OwrMediaSession *media_session, GHashTable *stats)
 {
     g_warn_if_fail(media_session);
     g_warn_if_fail(stats);
-
-    g_hash_table_unref(stats);
 }
 
 static void owr_media_session_finalize(GObject *object)
