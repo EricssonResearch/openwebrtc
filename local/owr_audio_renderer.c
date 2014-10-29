@@ -169,10 +169,6 @@ static GstElement *owr_audio_renderer_get_element(OwrMediaRenderer *renderer)
     g_object_set(sink, "buffer-time", SINK_BUFFER_TIME,
         "latency-time", G_GINT64_CONSTANT(10000), NULL);
 
-    /* async false is needed when using live sources to not require prerolling
-     * as prerolling is not possible from live sources in GStreamer */
-    g_object_set(sink, "async", FALSE, NULL);
-
     gst_bin_add_many(GST_BIN(priv->renderer_bin), audioresample, audioconvert, capsfilter,
         volume, sink, NULL);
 

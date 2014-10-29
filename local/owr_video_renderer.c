@@ -266,8 +266,7 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer)
 
     queue = gst_element_factory_make("queue", "video-renderer-queue");
     g_assert(queue);
-    g_object_set(queue, "max-size-buffers", 3, "max-size-bytes", 0, "max-size-time", G_GUINT64_CONSTANT(0),
-        "leaky", 2 /* downstream leaky */, NULL);
+    g_object_set(queue, "max-size-buffers", 3, "max-size-bytes", 0, "max-size-time", G_GUINT64_CONSTANT(0), NULL);
 
     sink = gst_element_factory_make(VIDEO_SINK, "video-renderer-sink");
     g_assert(sink);
@@ -281,10 +280,6 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer)
         if (GST_IS_BIN(sink))
             g_object_unref(sink_element);
     }
-
-    /* async false is needed when using live sources to not require prerolling
-     * as prerolling is not possible from live sources in GStreamer */
-    g_object_set(sink, "async", FALSE, NULL);
 
     gst_bin_add_many(GST_BIN(priv->renderer_bin), balance, queue, sink, NULL);
 

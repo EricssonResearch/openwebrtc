@@ -239,7 +239,7 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
 
     queue = gst_element_factory_make("queue", "image-renderer-queue");
     g_object_set(queue, "max-size-buffers", 3, "max-size-bytes", 0,
-        "max-size-time", G_GUINT64_CONSTANT(0), "leaky", 2 /* leak downstream */, NULL);
+        "max-size-time", G_GUINT64_CONSTANT(0), NULL);
 
     videorate = gst_element_factory_make("videorate", "image-renderer-rate");
     max_framerate = priv->max_framerate > 0.0 ? priv->max_framerate : LIMITED_FRAMERATE;
@@ -267,9 +267,7 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
     g_assert(sink);
     priv->appsink = sink;
 
-    /* async false is needed when using live sources to not require prerolling
-     * as prerolling is not possible from live sources in GStreamer */
-    g_object_set(sink, "async", FALSE, "max-buffers", 1, "drop", TRUE, "qos", TRUE, NULL);
+    g_object_set(sink, "max-buffers", 1, "drop", TRUE, "qos", TRUE, NULL);
 
     gst_bin_add_many(GST_BIN(priv->renderer_bin), queue, videorate, videoscale,
         videoconvert, capsfilter, sink, NULL);
