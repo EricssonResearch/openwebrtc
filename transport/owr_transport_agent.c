@@ -1372,7 +1372,7 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
         queue = gst_element_factory_make("queue", name);
         g_free(name);
         g_object_set(queue, "max-size-buffers", 3, "max-size-bytes", 0,
-            "max-size-time", G_GUINT64_CONSTANT(0), "leaky", 2 /* leak downstream */, NULL);
+            "max-size-time", G_GUINT64_CONSTANT(0), NULL);
 
         encoder = _owr_payload_create_encoder(payload);
         parser = _owr_payload_create_parser(payload);
