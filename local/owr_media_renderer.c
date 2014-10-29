@@ -321,8 +321,15 @@ void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *s
     g_mutex_unlock(&priv->media_renderer_lock);
     /* FIXME - too much locking/unlocking of the same lock across private API? */
 
-    if (!source)
+    if (!source) {
+        /* Shut down sink if we have no source */
+        if (priv->sink) {
+            gst_element_set_state(priv->pipeline, GST_STATE_NULL);
+            gst_bin_remove(GST_BIN(priv->pipeline), priv->sink);
+            priv->sink = NULL;
+        }
         return;
+    }
 
     sinkpad = _owr_media_renderer_get_pad(renderer);
     g_assert(sinkpad);
