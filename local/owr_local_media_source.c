@@ -291,6 +291,10 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
         g_free(bin_name);
         bin_name = NULL;
 
+#ifdef OWR_DEBUG
+        g_signal_connect(source_pipeline, "deep-notify", G_CALLBACK(gst_object_default_deep_notify), NULL);
+#endif
+
         bus = gst_pipeline_get_bus(GST_PIPELINE(source_pipeline));
         g_main_context_push_thread_default(_owr_get_main_context());
         gst_bus_add_watch(bus, (GstBusFunc)bus_call, source_pipeline);

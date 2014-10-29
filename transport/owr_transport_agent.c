@@ -278,6 +278,10 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
     priv->pipeline = gst_pipeline_new(pipeline_name);
     g_free(pipeline_name);
 
+#ifdef OWR_DEBUG
+    g_signal_connect(priv->pipeline, "deep-notify", G_CALLBACK(gst_object_default_deep_notify), NULL);
+#endif
+
     bus = gst_pipeline_get_bus(GST_PIPELINE(priv->pipeline));
     g_main_context_push_thread_default(_owr_get_main_context());
     gst_bus_add_watch(bus, (GstBusFunc)bus_call, priv->pipeline);
