@@ -45,12 +45,6 @@
 #define DEFAULT_WIDTH 0
 #define DEFAULT_HEIGHT 0
 
-#if defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR && !defined(__arm64__))
-#define VIDEO_CONVERT "ercolorspace"
-#else
-#define VIDEO_CONVERT "videoconvert"
-#endif
-
 #define DEFAULT_MAX_FRAMERATE 0.0
 
 #define LIMITED_WIDTH 640
@@ -218,7 +212,7 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
     OwrImageRenderer *image_renderer;
     OwrImageRendererPrivate *priv;
     GstElement *sink;
-    GstElement *queue, *videorate, *videoscale, *videoconvert, *capsfilter;
+    GstElement *queue, *videorate, *capsfilter;
     GstCaps *filter_caps;
     GstPad *ghostpad, *sinkpad;
     gdouble max_framerate;
@@ -245,9 +239,6 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
     max_framerate = priv->max_framerate > 0.0 ? priv->max_framerate : LIMITED_FRAMERATE;
     g_object_set(videorate, "drop-only", TRUE, "max-rate", (gint)max_framerate, NULL);
 
-    videoscale = gst_element_factory_make("videoscale", "image-renderer-scale");
-    videoconvert = gst_element_factory_make(VIDEO_CONVERT, "image-renderer-convert");
-
     capsfilter = gst_element_factory_make("capsfilter", "image-renderer-capsfilter");
     filter_caps = gst_caps_new_empty_simple("video/x-raw");
     gst_caps_set_simple(filter_caps, "format", G_TYPE_STRING, "BGRA", NULL);
@@ -269,13 +260,10 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
 
     g_object_set(sink, "max-buffers", 1, "drop", TRUE, "qos", TRUE, NULL);
 
-    gst_bin_add_many(GST_BIN(priv->renderer_bin), queue, videorate, videoscale,
-        videoconvert, capsfilter, sink, NULL);
+    gst_bin_add_many(GST_BIN(priv->renderer_bin), queue, videorate, capsfilter, sink, NULL);
 
     LINK_ELEMENTS(capsfilter, sink);
-    LINK_ELEMENTS(videoconvert, capsfilter);
-    LINK_ELEMENTS(videoscale, videoconvert);
-    LINK_ELEMENTS(videorate, videoscale);
+    LINK_ELEMENTS(videorate, capsfilter);
     LINK_ELEMENTS(queue, videorate);
 
     sinkpad = gst_element_get_static_pad(queue, "sink");
