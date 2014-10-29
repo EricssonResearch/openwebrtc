@@ -1610,10 +1610,10 @@ static void setup_audio_receive_elements(GstPad *new_pad, guint32 session_id, Ow
 {
     GstElement *receive_output_bin;
     gchar *pad_name = NULL;
-    GstElement *rtp_capsfilter, *rtpdepay, *decoded_valve, *parser, *decoder, *capsfilter;
+    GstElement *rtp_capsfilter, *rtpdepay, *parser, *decoder, *decoded_valve;
     GstPad *rtp_caps_sink_pad = NULL, *pad = NULL, *ghost_pad = NULL;
     gchar *element_name = NULL;
-    GstCaps *rtp_caps = NULL, *caps = NULL;
+    GstCaps *rtp_caps = NULL;
     gboolean link_ok = FALSE;
     gboolean sync_ok = TRUE;
 
@@ -1645,21 +1645,14 @@ static void setup_audio_receive_elements(GstPad *new_pad, guint32 session_id, Ow
     parser = _owr_payload_create_parser(payload);
     decoder = _owr_payload_create_decoder(payload);
 
-    element_name = g_strdup_printf("recv_capsfilter_%u", session_id);
-    capsfilter = gst_element_factory_make("capsfilter", element_name);
-    g_free(element_name);
-    caps = _owr_payload_create_raw_caps(payload);
-    g_object_set(capsfilter, "caps", caps, NULL);
-    gst_caps_unref(caps);
-
     gst_bin_add_many(GST_BIN(receive_output_bin), rtp_capsfilter, rtpdepay,
-        decoded_valve, decoder, capsfilter, NULL);
-    link_ok = gst_element_link_many(rtp_capsfilter, rtpdepay, decoded_valve, NULL);
+        decoded_valve, decoder, NULL);
+    link_ok = gst_element_link_many(rtp_capsfilter, rtpdepay, NULL);
     if (parser) {
         gst_bin_add(GST_BIN(receive_output_bin), parser);
-        link_ok &= gst_element_link_many(parser, decoder, decoded_valve, capsfilter, NULL);
+        link_ok &= gst_element_link_many(rtpdepay, parser, decoder, decoded_valve, NULL);
     } else {
-        link_ok &= gst_element_link_many(decoder, decoded_valve, capsfilter, NULL);
+        link_ok &= gst_element_link_many(rtpdepay, decoder, decoded_valve, NULL);
     }
     g_warn_if_fail(link_ok);
 
@@ -1671,7 +1664,6 @@ static void setup_audio_receive_elements(GstPad *new_pad, guint32 session_id, Ow
     }
     ghost_pad = NULL;
 
-    sync_ok &= gst_element_sync_state_with_parent(capsfilter);
     sync_ok &= gst_element_sync_state_with_parent(decoder);
     if (parser)
         sync_ok &= gst_element_sync_state_with_parent(parser);
@@ -1680,7 +1672,7 @@ static void setup_audio_receive_elements(GstPad *new_pad, guint32 session_id, Ow
     sync_ok &= gst_element_sync_state_with_parent(rtp_capsfilter);
     g_warn_if_fail(sync_ok);
 
-    pad = gst_element_get_static_pad(capsfilter, "src");
+    pad = gst_element_get_static_pad(decoded_valve, "src");
     pad_name = g_strdup_printf("audio_raw_src_%u", session_id);
     add_pads_to_bin_and_transport_bin(pad, receive_output_bin,
         transport_agent->priv->transport_bin, pad_name);
