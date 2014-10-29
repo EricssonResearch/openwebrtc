@@ -54,6 +54,7 @@ enum {
     N_PROPERTIES
 };
 
+static guint unique_bin_id = 0;
 static GParamSpec *obj_properties[N_PROPERTIES] = {NULL, };
 
 #define OWR_MEDIA_RENDERER_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_MEDIA_RENDERER, OwrMediaRendererPrivate))
@@ -187,6 +188,7 @@ static void owr_media_renderer_init(OwrMediaRenderer *renderer)
 {
     OwrMediaRendererPrivate *priv;
     GstBus *bus;
+    gchar *bin_name;
 
     renderer->priv = priv = OWR_MEDIA_RENDERER_GET_PRIVATE(renderer);
 
@@ -194,7 +196,10 @@ static void owr_media_renderer_init(OwrMediaRenderer *renderer)
     priv->source = DEFAULT_SOURCE;
     priv->disabled = DEFAULT_DISABLED;
 
-    priv->pipeline = gst_pipeline_new(NULL);
+    bin_name = g_strdup_printf("media-renderer-%u", g_atomic_int_add(&unique_bin_id, 1));
+    priv->pipeline = gst_pipeline_new(bin_name);
+    g_free(bin_name);
+
     priv->sink = NULL;
     priv->src = NULL;
 
