@@ -370,3 +370,16 @@ done:
     priv->src = src;
     g_mutex_unlock(&priv->media_renderer_lock);
 }
+
+void owr_media_renderer_dump_dot_file(OwrMediaRenderer *renderer, const gchar *base_file_name, gboolean with_ts)
+{
+    g_return_if_fail(OWR_IS_MEDIA_RENDERER(renderer));
+    g_return_if_fail(base_file_name != NULL);
+    g_return_if_fail(renderer->priv->pipeline);
+
+    if (with_ts) {
+        GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(renderer->priv->pipeline), GST_DEBUG_GRAPH_SHOW_ALL, base_file_name);
+    } else {
+        GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(renderer->priv->pipeline), GST_DEBUG_GRAPH_SHOW_ALL, base_file_name);
+    }
+}

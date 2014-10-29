@@ -541,3 +541,16 @@ void _owr_media_source_set_codec(OwrMediaSource *media_source, OwrCodecType code
     /* an enum is an int type so we can use atomic assignment */
     g_atomic_int_set(&media_source->priv->codec_type, codec_type);
 }
+
+void owr_media_source_dump_dot_file(OwrMediaSource *source, const gchar *base_file_name, gboolean with_ts)
+{
+    g_return_if_fail(OWR_IS_MEDIA_SOURCE(source));
+    g_return_if_fail(base_file_name != NULL);
+    g_return_if_fail(source->priv->source_bin);
+
+    if (with_ts) {
+        GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(source->priv->source_bin), GST_DEBUG_GRAPH_SHOW_ALL, base_file_name);
+    } else {
+        GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(source->priv->source_bin), GST_DEBUG_GRAPH_SHOW_ALL, base_file_name);
+    }
+}

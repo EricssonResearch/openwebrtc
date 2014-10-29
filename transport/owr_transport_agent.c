@@ -1862,3 +1862,16 @@ static void on_feedback_rtcp(GObject *session, guint fbtype, guint type, guint s
         gst_object_unref(rtp_sink_pad);
     }
 }
+
+void owr_transport_agent_dump_dot_file(OwrTransportAgent *transport_agent, const gchar *base_file_name, gboolean with_ts)
+{
+    g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
+    g_return_if_fail(base_file_name != NULL);
+    g_return_if_fail(transport_agent->priv->pipeline);
+
+    if (with_ts) {
+        GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(transport_agent->priv->pipeline), GST_DEBUG_GRAPH_SHOW_ALL, base_file_name);
+    } else {
+        GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(transport_agent->priv->pipeline), GST_DEBUG_GRAPH_SHOW_ALL, base_file_name);
+    }
+}

@@ -64,6 +64,7 @@ struct _OwrMediaSourceClass {
 };
 
 GType owr_media_source_get_type(void) G_GNUC_CONST;
+void owr_media_source_dump_dot_file(OwrMediaSource *source, const gchar *base_file_name, gboolean with_ts);
 
 G_END_DECLS
 
