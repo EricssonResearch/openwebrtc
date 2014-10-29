@@ -72,10 +72,10 @@ OwrRemoteMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
     GEnumClass *enum_class;
     GEnumValue *enum_value;
     gchar *name;
-    GstElement *tee;
+    GstElement *source_bin, *tee;
     GstElement *fakesink, *queue;
-    GstPad *srcpad, *sinkpad;
-    gchar *pad_name, *tee_name, *queue_name, *fakesink_name;
+    GstPad *srcpad, *sinkpad, *ghostpad;
+    gchar *pad_name, *bin_name;
 
     enum_class = G_ENUM_CLASS(g_type_class_ref(OWR_TYPE_MEDIA_TYPE));
     enum_value = g_enum_get_value(enum_class, media_type);
@@ -94,46 +94,42 @@ OwrRemoteMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
     /* take a ref on the transport bin as the media source element is
      * unreffed on finalization */
     g_object_ref(transport_bin);
-    _owr_media_source_set_source_bin(OWR_MEDIA_SOURCE(source), transport_bin);
     _owr_media_source_set_codec(OWR_MEDIA_SOURCE(source), codec_type);
 
     /* create source tee and everything */
     if (media_type == OWR_MEDIA_TYPE_VIDEO) {
+        bin_name = g_strdup_printf("video-src-%u-%u", codec_type, stream_id);
         pad_name = g_strdup_printf("video_src_%u_%u", codec_type, stream_id);
-        tee_name = g_strdup_printf("video-src-tee-%u-%u", codec_type, stream_id);
-        queue_name = g_strdup_printf("video-src-tee-fakesink-queue-%u-%u", codec_type, stream_id);
-        fakesink_name = g_strdup_printf("video-src-tee-fakesink-%u-%u", codec_type, stream_id);
     } else if (media_type == OWR_MEDIA_TYPE_AUDIO) {
+        bin_name = g_strdup_printf("audio-src-%u-%u", codec_type, stream_id);
         pad_name = g_strdup_printf("audio_raw_src_%u", stream_id);
-        tee_name = g_strdup_printf("audio-src-tee-%u-%u", codec_type, stream_id);
-        queue_name = g_strdup_printf("audio-src-tee-fakesink-queue-%u-%u", codec_type, priv->stream_id);
-        fakesink_name = g_strdup_printf("audio-src-tee-fakesink-%u-%u", codec_type, priv->stream_id);
     } else {
         g_assert_not_reached();
     }
 
-    tee = gst_element_factory_make ("tee", tee_name);
+    source_bin = gst_bin_new(bin_name);
+    _owr_media_source_set_source_bin(OWR_MEDIA_SOURCE(source), source_bin);
+    tee = gst_element_factory_make ("tee", "tee");
     _owr_media_source_set_source_tee(OWR_MEDIA_SOURCE(source), tee);
-    fakesink = gst_element_factory_make ("fakesink", fakesink_name);
+    fakesink = gst_element_factory_make ("fakesink", "fakesink");
     g_object_set(fakesink, "async", FALSE, NULL);
-    queue = gst_element_factory_make ("queue", queue_name);
-    g_free(tee_name);
-    g_free(queue_name);
-    g_free(fakesink_name);
+    queue = gst_element_factory_make ("queue", "queue");
+    g_free(bin_name);
 
-    gst_bin_add_many(GST_BIN(transport_bin), tee, queue, fakesink, NULL);
-    gst_element_sync_state_with_parent(tee);
-    gst_element_sync_state_with_parent(queue);
-    gst_element_sync_state_with_parent(fakesink);
+    gst_bin_add_many(GST_BIN(source_bin), tee, queue, fakesink, NULL);
     LINK_ELEMENTS(tee, queue);
     LINK_ELEMENTS(queue, fakesink);
+    sinkpad = gst_element_get_static_pad(tee, "sink");
+    ghostpad = gst_ghost_pad_new("sink", sinkpad);
+    gst_object_unref(sinkpad);
+    gst_element_add_pad(source_bin, ghostpad);
+    gst_bin_add(GST_BIN(transport_bin), source_bin);
+    gst_element_sync_state_with_parent(source_bin);
 
     /* Link the transport bin to our tee */
     srcpad = gst_element_get_static_pad(transport_bin, pad_name);
     g_free(pad_name);
-    sinkpad = gst_element_get_request_pad(tee, "src_%u");
-    gst_pad_link(srcpad, sinkpad);
-    gst_object_unref(sinkpad);
+    gst_pad_link(srcpad, ghostpad);
 
     return source;
 }
