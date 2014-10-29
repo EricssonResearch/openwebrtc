@@ -524,7 +524,8 @@ OwrPayload * _owr_media_session_get_receive_payload(OwrMediaSession *media_sessi
         if (pt == payload_type)
             break;
     }
-    g_object_ref(payload);
+    if (pt == payload_type)
+        g_object_ref(payload);
     g_rw_lock_reader_unlock(&media_session->priv->rw_lock);
 
     if (pt == payload_type)
