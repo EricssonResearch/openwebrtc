@@ -51,31 +51,20 @@
 #define AUDIO_SRC "osxaudiosrc"
 #define VIDEO_SRC "avfvideosrc"
 
-#if TARGET_OS_IPHONE && !defined(__arm64__)
-#define VIDEO_CONVERT "ercolorspace"
-#else
-#define VIDEO_CONVERT "videoconvert"
-#endif
-
 #elif defined(__ANDROID__)
 #define AUDIO_SRC "openslessrc"
 #define VIDEO_SRC "androidvideosource"
-#define VIDEO_CONVERT "ercolorspace"
 
 #elif defined(__linux__)
 #define AUDIO_SRC  "pulsesrc"
 #define VIDEO_SRC  "v4l2src"
-#define VIDEO_CONVERT "videoconvert"
 
 #else
 #define AUDIO_SRC  "audiotestsrc"
 #define VIDEO_SRC  "videotestsrc"
-#define VIDEO_CONVERT "videoconvert"
 #endif
 
-
 static guint unique_bin_id = 0;
-static guint unique_pad_id = 0;
 
 #define OWR_LOCAL_MEDIA_SOURCE_GET_PRIVATE(obj) \
     (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_LOCAL_MEDIA_SOURCE, OwrLocalMediaSourcePrivate))
@@ -83,7 +72,6 @@ static guint unique_pad_id = 0;
 G_DEFINE_TYPE(OwrLocalMediaSource, owr_local_media_source, OWR_TYPE_MEDIA_SOURCE)
 
 static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_source, GstCaps *caps);
-static void owr_local_media_source_release_source(OwrMediaSource *media_source, GstElement *source);
 
 struct _OwrLocalMediaSourcePrivate {
     guint device_index;
@@ -96,7 +84,6 @@ static void owr_local_media_source_class_init(OwrLocalMediaSourceClass *klass)
     g_type_class_add_private(klass, sizeof(OwrLocalMediaSourcePrivate));
 
     media_source_class->request_source = (void *(*)(OwrMediaSource *, void *))owr_local_media_source_request_source;
-    media_source_class->release_source = (void (*)(OwrMediaSource *, void *))owr_local_media_source_release_source;
 }
 
 static void owr_local_media_source_init(OwrLocalMediaSource *source)
@@ -105,7 +92,6 @@ static void owr_local_media_source_init(OwrLocalMediaSource *source)
     source->priv = priv = OWR_LOCAL_MEDIA_SOURCE_GET_PRIVATE(source);
     priv->device_index = 0;
 }
-
 
 #define LINK_ELEMENTS(a, b) \
     if (!gst_element_link(a, b)) \
@@ -116,16 +102,6 @@ static void owr_local_media_source_init(OwrLocalMediaSource *source)
     if (!elem) \
         GST_ERROR("Could not create " name " from factory " factory); \
     g_assert(elem);
-
-#define CREATE_ELEMENT_WITH_ID(elem, factory, name, id) \
-{ \
-    gchar *temp_str = g_strdup_printf(name"-%u", id); \
-    elem = gst_element_factory_make(factory, temp_str); \
-    if (!elem) \
-        GST_ERROR("Could not create %s from factory " factory, temp_str); \
-    g_assert(elem); \
-    g_free(temp_str); \
-}
 
 /* FIXME: Copy from owr/orw.c without any error handling whatsoever */
 static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer user_data)
@@ -188,148 +164,60 @@ static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer user_data)
     return TRUE;
 }
 
-/*
- * create_post_tee_bin
- *
- * The following chain is created after the tee for each output from the
- * source:
- *
- * +-----------+   +-------------------------------+   +----------+
- * | inter*src +---+ converters/queues/capsfilters +---+ ghostpad |
- * +-----------+   +-------------------------------+   +----------+
- *
- * TODO: Share this with remote media sources
- *
- */
-static GstElement *create_source_bin(OwrMediaSource *media_source, GstElement *source_pipeline,
-    GstElement *tee, GstCaps *caps)
+static gboolean shutdown_media_source(GHashTable *args)
 {
-    OwrMediaType media_type;
-    GstElement *source_bin, *source = NULL, *queue_pre, *queue_post;
-    GstElement *capsfilter;
-    GstElement *sink, *sink_queue, *sink_bin;
-    GstPad *bin_pad = NULL, *srcpad, *sinkpad;
-    gchar *bin_name;
-    guint source_id;
-    gchar *channel_name;
+    OwrMediaSource *media_source;
+    OwrLocalMediaSource *local_media_source;
+    GstElement *source_pipeline, *source_tee;
 
-    source_id = g_atomic_int_add(&unique_pad_id, 1);
+    media_source = g_hash_table_lookup(args, "media_source");
+    g_assert(media_source);
+    local_media_source = OWR_LOCAL_MEDIA_SOURCE(media_source);
 
-    bin_name = g_strdup_printf("local-source-bin-%u", source_id);
-    source_bin = gst_bin_new(bin_name);
-    g_free(bin_name);
-
-    CREATE_ELEMENT_WITH_ID(queue_pre, "queue", "source-queue", source_id);
-    CREATE_ELEMENT_WITH_ID(capsfilter, "capsfilter", "source-output-capsfilter", source_id);
-    CREATE_ELEMENT_WITH_ID(queue_post, "queue", "source-output-queue", source_id);
-
-    CREATE_ELEMENT_WITH_ID(sink_queue, "queue", "sink-queue", source_id);
-
-    g_object_get(media_source, "media-type", &media_type, NULL);
-    switch (media_type) {
-    case OWR_MEDIA_TYPE_AUDIO:
-        {
-        GstElement *audioresample, *audioconvert;
-
-        CREATE_ELEMENT_WITH_ID(source, "interaudiosrc", "source", source_id);
-        CREATE_ELEMENT_WITH_ID(sink, "interaudiosink", "sink", source_id);
-
-        g_object_set(capsfilter, "caps", caps, NULL);
-
-        CREATE_ELEMENT_WITH_ID(audioresample, "audioresample", "source-audio-resample", source_id);
-        CREATE_ELEMENT_WITH_ID(audioconvert, "audioconvert", "source-audio-convert", source_id);
-
-        gst_bin_add_many(GST_BIN(source_bin),
-            queue_pre, audioconvert, audioresample, capsfilter, queue_post, NULL);
-        LINK_ELEMENTS(capsfilter, queue_post);
-        LINK_ELEMENTS(audioresample, capsfilter);
-        LINK_ELEMENTS(audioconvert, audioresample);
-        LINK_ELEMENTS(queue_pre, audioconvert);
-
-        break;
-        }
-    case OWR_MEDIA_TYPE_VIDEO:
-        {
-        GstElement *videorate = NULL, *videoscale, *videoconvert;
-        GstCaps *source_caps;
-        GstStructure *source_structure;
-        gint fps_n = 0, fps_d = 1;
-
-        CREATE_ELEMENT_WITH_ID(source, "intervideosrc", "source", source_id);
-        CREATE_ELEMENT_WITH_ID(sink, "intervideosink", "sink", source_id);
-
-        source_caps = gst_caps_copy(caps);
-        source_structure = gst_caps_get_structure(source_caps, 0);
-        if (gst_structure_get_fraction(source_structure, "framerate", &fps_n, &fps_d))
-            gst_structure_remove_field(source_structure, "framerate");
-        g_object_set(capsfilter, "caps", source_caps, NULL);
-        gst_caps_unref(source_caps);
-
-        CREATE_ELEMENT_WITH_ID(videoconvert, VIDEO_CONVERT, "source-video-convert", source_id);
-        CREATE_ELEMENT_WITH_ID(videoscale, "videoscale", "source-video-scale", source_id);
-        if (fps_n > 0) {
-            CREATE_ELEMENT_WITH_ID(videorate, "videorate", "source-video-rate", source_id);
-            g_object_set(videorate, "drop-only", TRUE, "max-rate", fps_n / fps_d, NULL);
-            gst_bin_add(GST_BIN(source_bin), videorate);
-        }
-
-        gst_bin_add_many(GST_BIN(source_bin),
-            queue_pre, videoscale, videoconvert, capsfilter, queue_post, NULL);
-        LINK_ELEMENTS(capsfilter, queue_post);
-        LINK_ELEMENTS(videoconvert, capsfilter);
-        LINK_ELEMENTS(videoscale, videoconvert);
-        if (videorate) {
-            LINK_ELEMENTS(videorate, videoscale);
-            LINK_ELEMENTS(queue_pre, videorate);
-        } else {
-            LINK_ELEMENTS(queue_pre, videoscale);
-        }
-
-        break;
-        }
-    case OWR_MEDIA_TYPE_UNKNOWN:
-    default:
-        g_assert_not_reached();
-        goto done;
+    source_pipeline = _owr_media_source_get_source_bin(media_source);
+    if (!source_pipeline) {
+        g_object_unref(media_source);
+        return FALSE;
     }
 
-    channel_name = g_strdup_printf("local-source-%u", source_id);
-    g_object_set(source, "channel", channel_name, NULL);
-    g_object_set(sink, "channel", channel_name, NULL);
-    g_free(channel_name);
+    source_tee = _owr_media_source_get_source_tee(media_source);
+    if (!source_tee) {
+        g_object_unref(media_source);
+        return FALSE;
+    }
 
-    /* Add and link the inter*sink to the actual source pipeline */
-    bin_name = g_strdup_printf("local-source-sink-bin-%u", source_id);
-    sink_bin = gst_bin_new(bin_name);
-    gst_bin_add_many(GST_BIN(sink_bin), sink, sink_queue, NULL);
-    gst_element_sync_state_with_parent(sink);
-    gst_element_sync_state_with_parent(sink_queue);
-    LINK_ELEMENTS(sink_queue, sink);
-    sinkpad = gst_element_get_static_pad(sink_queue, "sink");
-    bin_pad = gst_ghost_pad_new("sink", sinkpad);
-    gst_object_unref(sinkpad);
-    gst_pad_set_active(bin_pad, TRUE);
-    gst_element_add_pad(sink_bin, bin_pad);
-    bin_pad = NULL;
-    gst_bin_add(GST_BIN(source_pipeline), sink_bin);
-    gst_element_sync_state_with_parent(sink_bin);
-    LINK_ELEMENTS(tee, sink_bin);
+    if (source_tee->numsrcpads != 1) {
+        g_object_unref(media_source);
+        return FALSE;
+    }
 
-    /* Start up our new bin and link it all */
-    srcpad = gst_element_get_static_pad(queue_post, "src");
-    g_assert(srcpad);
+    _owr_media_source_set_source_bin(media_source, NULL);
+    _owr_media_source_set_source_tee(media_source, NULL);
 
-    bin_pad = gst_ghost_pad_new("src", srcpad);
-    gst_object_unref(srcpad);
-    gst_pad_set_active(bin_pad, TRUE);
-    gst_element_add_pad(source_bin, bin_pad);
+    gst_element_set_state(source_pipeline, GST_STATE_NULL);
+    gst_object_unref(source_pipeline);
 
-    gst_bin_add(GST_BIN(source_bin), source);
-    LINK_ELEMENTS(source, queue_pre);
+    g_object_unref(media_source);
 
-done:
+    return FALSE;
+}
 
-    return source_bin;
+static void tee_pad_removed_cb(GstElement *tee, GstPad *old_pad, gpointer user_data)
+{
+    OwrMediaSource *media_source = user_data;
+
+    OWR_UNUSED(old_pad);
+
+    /* Only the fakesink is left, shutdown */
+    if (tee->numsrcpads == 1) {
+      GHashTable *args;
+
+      args = g_hash_table_new(g_str_hash, g_str_equal);
+      g_hash_table_insert(args, "media_source", media_source);
+      g_object_ref (media_source);
+
+      _owr_schedule_with_hash_table((GSourceFunc)shutdown_media_source, args);
+    }
 }
 
 /*
@@ -362,23 +250,19 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
 {
     OwrLocalMediaSource *local_source;
     OwrLocalMediaSourcePrivate *priv;
-    GstElement *source_pipeline;
-    OwrMediaType media_type = OWR_MEDIA_TYPE_UNKNOWN;
-    OwrSourceType source_type = OWR_SOURCE_TYPE_UNKNOWN;
-    GstElement *source_element = NULL, *source_tee = NULL;
+    GstElement *source_element = NULL;
 
     g_assert(media_source);
     local_source = OWR_LOCAL_MEDIA_SOURCE(media_source);
     priv = local_source->priv;
 
-    g_object_get(media_source, "media-type", &media_type, "type", &source_type, NULL);
-
     /* only create the source bin for this media source once */
     if (_owr_media_source_get_source_bin(media_source)) {
         GST_DEBUG_OBJECT(media_source, "Re-using existing source element/bin");
-        source_pipeline = _owr_media_source_get_source_bin(media_source);
-        source_tee = _owr_media_source_get_source_tee(media_source);
     } else {
+        OwrMediaType media_type = OWR_MEDIA_TYPE_UNKNOWN;
+        OwrSourceType source_type = OWR_SOURCE_TYPE_UNKNOWN;
+        GstElement *source_pipeline;
         GstElement *source, *capsfilter = NULL, *tee;
         GstElement *queue, *fakesink;
         GEnumClass *media_enum_class, *source_enum_class;
@@ -387,6 +271,8 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
         GstCaps *source_caps;
         GstStructure *source_structure;
         GstBus *bus;
+
+        g_object_get(media_source, "media-type", &media_type, "type", &source_type, NULL);
 
         media_enum_class = G_ENUM_CLASS(g_type_class_ref(OWR_TYPE_MEDIA_TYPE));
         source_enum_class = G_ENUM_CLASS(g_type_class_ref(OWR_TYPE_SOURCE_TYPE));
@@ -542,141 +428,18 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
         gst_element_sync_state_with_parent(source);
         _owr_media_source_set_source_bin(media_source, source_pipeline);
         _owr_media_source_set_source_tee(media_source, tee);
-        source_tee = tee;
         if (gst_element_set_state(source_pipeline, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE) {
             GST_ERROR("Failed to set local source pipeline %s to playing", GST_OBJECT_NAME(source_pipeline));
             /* FIXME: We should handle this and don't expose the source */
         }
+
+        g_signal_connect(tee, "pad-removed", G_CALLBACK(tee_pad_removed_cb), media_source);
     }
 
-    source_element = create_source_bin(media_source, source_pipeline, source_tee, caps);
+    source_element = OWR_MEDIA_SOURCE_CLASS(owr_local_media_source_parent_class)->request_source (media_source, caps);
 
 done:
     return source_element;
-}
-
-static gboolean shutdown_media_source(GHashTable *args)
-{
-    OwrMediaSource *media_source;
-    OwrLocalMediaSource *local_media_source;
-    GstElement *source_pipeline, *source_tee;
-
-    media_source = g_hash_table_lookup(args, "media_source");
-    g_assert(media_source);
-    local_media_source = OWR_LOCAL_MEDIA_SOURCE(media_source);
-
-    source_pipeline = _owr_media_source_get_source_bin(media_source);
-    if (!source_pipeline) {
-        g_object_unref(media_source);
-        return FALSE;
-    }
-
-    source_tee = _owr_media_source_get_source_tee(media_source);
-    if (!source_tee) {
-        g_object_unref(media_source);
-        return FALSE;
-    }
-
-    if (source_tee->numsrcpads != 1) {
-        g_object_unref(media_source);
-        return FALSE;
-    }
-
-    _owr_media_source_set_source_bin(media_source, NULL);
-    _owr_media_source_set_source_tee(media_source, NULL);
-
-    gst_element_set_state(source_pipeline, GST_STATE_NULL);
-    gst_object_unref(source_pipeline);
-
-    g_object_unref(media_source);
-
-    return FALSE;
-}
-
-static GstPadProbeReturn tee_idle_probe_cb(GstPad *teepad, GstPadProbeInfo *info, gpointer user_data)
-{
-    OwrMediaSource * media_source = user_data;
-    GstElement *sink_bin;
-    GstPad *sinkpad;
-    GstObject *parent;
-    GstElement *tee;
-
-    gst_pad_remove_probe(teepad, GST_PAD_PROBE_INFO_ID(info));
-
-    sinkpad = gst_pad_get_peer(teepad);
-    g_assert(sinkpad);
-    sink_bin = GST_ELEMENT(gst_object_get_parent(GST_OBJECT(sinkpad)));
-
-    g_warn_if_fail(gst_pad_unlink(teepad, sinkpad));
-    parent = gst_pad_get_parent(teepad);
-    tee = GST_ELEMENT(parent);
-    gst_element_release_request_pad(tee, teepad);
-    gst_object_unref(parent);
-    gst_object_unref(sinkpad);
-
-    parent = gst_object_get_parent(GST_OBJECT(sink_bin));
-    g_assert(parent);
-
-    gst_bin_remove(GST_BIN(parent), sink_bin);
-    gst_element_set_state(sink_bin, GST_STATE_NULL);
-    gst_object_unref(sink_bin);
-    gst_object_unref(parent);
-
-    GST_DEBUG_OBJECT(media_source, "Source successfully unlinked");
-
-    /* Only the fakesink is left, shutdown */
-    if (tee->numsrcpads == 1) {
-      GHashTable *args;
-
-      args = g_hash_table_new(g_str_hash, g_str_equal);
-      g_hash_table_insert(args, "media_source", media_source);
-      g_object_ref (media_source);
-
-      _owr_schedule_with_hash_table((GSourceFunc)shutdown_media_source, args);
-    }
-
-    return GST_PAD_PROBE_OK;
-}
-
-static void owr_local_media_source_release_source(OwrMediaSource *media_source, GstElement *source)
-{
-    GstPad *srcpad, *sinkpad;
-    gchar *bin_name, *source_name;
-    guint source_id = -1;
-    GstElement *sink_bin, *source_pipeline;
-
-    source_name = gst_object_get_name(GST_OBJECT(source));
-
-    if (!source_name || sscanf(source_name, "local-source-bin-%u", &source_id) != 1) {
-        GST_WARNING_OBJECT(media_source,
-                "Failed to get %s for clean up", source_name);
-        return;
-    }
-    g_free(source_name);
-
-    GST_DEBUG_OBJECT(media_source, "Unlinking source %u", source_id);
-
-    /* Unlink parts from the source pipeline */
-    source_pipeline = _owr_media_source_get_source_bin(media_source);
-    g_assert(source_pipeline);
-    bin_name = g_strdup_printf("local-source-sink-bin-%u", source_id);
-    sink_bin = gst_bin_get_by_name(GST_BIN(source_pipeline), bin_name);
-    if (!sink_bin) {
-        GST_WARNING_OBJECT(media_source,
-                "Failed to get %s from source pipeline", bin_name);
-        g_free(bin_name);
-        return;
-    }
-    g_free(bin_name);
-
-    sinkpad = gst_element_get_static_pad(sink_bin, "sink");
-    /* The pad on the tee */
-    srcpad = gst_pad_get_peer(sinkpad);
-    gst_object_unref(sinkpad);
-
-    gst_pad_add_probe(srcpad, GST_PAD_PROBE_TYPE_IDLE, tee_idle_probe_cb, media_source, NULL);
-    gst_object_unref(srcpad);
-    gst_object_unref(sink_bin);
 }
 
 OwrLocalMediaSource *_owr_local_media_source_new(gchar *name, OwrMediaType media_type,
