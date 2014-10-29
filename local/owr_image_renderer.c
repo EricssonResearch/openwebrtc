@@ -212,8 +212,7 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
     OwrImageRenderer *image_renderer;
     OwrImageRendererPrivate *priv;
     GstElement *sink;
-    GstElement *queue, *videorate, *capsfilter;
-    GstCaps *filter_caps;
+    GstElement *queue, *videorate;
     GstPad *ghostpad, *sinkpad;
     gdouble max_framerate;
     gchar *bin_name;
@@ -239,31 +238,15 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
     max_framerate = priv->max_framerate > 0.0 ? priv->max_framerate : LIMITED_FRAMERATE;
     g_object_set(videorate, "drop-only", TRUE, "max-rate", (gint)max_framerate, NULL);
 
-    capsfilter = gst_element_factory_make("capsfilter", "image-renderer-capsfilter");
-    filter_caps = gst_caps_new_empty_simple("video/x-raw");
-    gst_caps_set_simple(filter_caps, "format", G_TYPE_STRING, "BGRA", NULL);
-    if (priv->width > 0)
-        gst_caps_set_simple(filter_caps, "width", G_TYPE_INT, priv->width, NULL);
-    if (priv->height > 0)
-        gst_caps_set_simple(filter_caps, "height", G_TYPE_INT, priv->height, NULL);
-    if (!priv->width && !priv->height) {
-        gst_caps_set_simple(filter_caps,
-            "width", G_TYPE_INT, LIMITED_WIDTH,
-            "height", G_TYPE_INT, LIMITED_HEIGHT, NULL);
-    }
-    g_object_set(capsfilter, "caps", filter_caps, NULL);
-    gst_caps_unref(filter_caps);
-
     sink = gst_element_factory_make("appsink", "image-renderer-appsink");
     g_assert(sink);
     priv->appsink = sink;
 
     g_object_set(sink, "max-buffers", 1, "drop", TRUE, "qos", TRUE, NULL);
 
-    gst_bin_add_many(GST_BIN(priv->renderer_bin), queue, videorate, capsfilter, sink, NULL);
+    gst_bin_add_many(GST_BIN(priv->renderer_bin), queue, videorate, sink, NULL);
 
-    LINK_ELEMENTS(capsfilter, sink);
-    LINK_ELEMENTS(videorate, capsfilter);
+    LINK_ELEMENTS(videorate, sink);
     LINK_ELEMENTS(queue, videorate);
 
     sinkpad = gst_element_get_static_pad(queue, "sink");
