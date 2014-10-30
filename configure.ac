@@ -12,6 +12,8 @@ AM_SILENT_RULES([yes])
 
 AC_PROG_CC
 AC_PROG_CC_STDC
+dnl only needed for Apple, but can't be conditional
+AC_PROG_OBJC
 
 LT_INIT
 
@@ -74,6 +76,24 @@ if test "x$enable_owr_static" = xyes; then
   [Define if building static])
 fi
 AM_CONDITIONAL(OWR_STATIC, test x$enable_owr_static = xyes)
+
+dnl pick dependencies and build flags based on OS
+case "$host_os" in
+  darwin*)
+    is_apple=yes
+    ;;
+  linux-android*)
+    ;;
+  linux*)
+    PKG_CHECK_MODULES(PULSE, [libpulse libpulse-mainloop-glib])
+    PKG_CHECK_MODULES(V4L2, [libv4l2])
+    OWR_DEVICE_LIST_EXT_CFLAGS="\$(PULSE_CFLAGS) \$(V4L2_CFLAGS)"
+    OWR_DEVICE_LIST_EXT_LIBS="\$(PULSE_LIBS) \$(V4L2_LIBS)"
+    ;;
+esac
+
+AC_SUBST(OWR_DEVICE_LIST_EXT_LIBS)
+AM_CONDITIONAL(TARGET_APPLE, test x$is_apple = xyes)
 
 AC_OUTPUT([
 Makefile

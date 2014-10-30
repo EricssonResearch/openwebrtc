@@ -6,6 +6,7 @@ AM_CPPFLAGS = \
     -DPACKAGE_DATA_DIR=\""$(pkgdatadir)"\" \
     $(GLIB_CFLAGS) \
     $(GSTREAMER_CFLAGS) \
+    $(OWR_DEVICE_LIST_EXT_CFLAGS) \
     -I$(top_srcdir)/owr
 
 AM_CFLAGS = \
@@ -17,11 +18,6 @@ noinst_LTLIBRARIES = libopenwebrtc_local.la
 
 libopenwebrtc_local_la_SOURCES = \
     owr_local.c \
-if TARGET_APPLE
-    apple_sources = owr_device_list_avf.m
-    apple_noinst_headers = owr_device_list_avf_private.h
-endif
-
     owr_local_media_source.c \
     owr_media_renderer.c \
     owr_audio_renderer.c \
@@ -29,13 +25,16 @@ endif
     owr_image_renderer.c \
     owr_image_server.c \
     owr_window_registry.c \
-    owr_image_server.c \
-    owr_device_list.c \
-    $(apple_sources)
+    owr_device_list.c
+
+if TARGET_APPLE
+libopenwebrtc_local_la_SOURCES += owr_device_list_avf.m
+endif
 
 libopenwebrtc_local_la_LIBADD = \
     $(GSTREAMER_LIBS) \
-    $(GLIB_LIBS)
+    $(GLIB_LIBS) \
+    $(OWR_DEVICE_LIST_EXT_LIBS)
 
 includedir = $(prefix)/include/owr
 include_HEADERS = \
@@ -45,15 +44,18 @@ include_HEADERS = \
     owr_audio_renderer.h \
     owr_video_renderer.h \
     owr_image_renderer.h \
+    owr_image_renderer_private.h \
     owr_image_server.h \
     owr_window_registry.h \
-    owr_image_renderer_private.h \
     owr_device_list_private.h
 
 noinst_HEADERS = \
     owr_local_media_source_private.h \
     owr_image_renderer_private.h \
-    owr_window_registry_private.h \
-    $(apple_noinst_headers)
+    owr_window_registry_private.h
+
+if TARGET_APPLE
+noinst_HEADERS += owr_device_list_avf_private.h
+endif
 
 -include $(top_srcdir)/git.mk
