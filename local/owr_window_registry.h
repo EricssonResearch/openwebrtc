@@ -34,6 +34,13 @@
 
 G_BEGIN_DECLS
 
+/**
+ * OwrWindowHandle:
+ *
+ * An opaque pointer to a native window
+ */
+typedef gpointer OwrWindowHandle;
+
 #define OWR_TYPE_WINDOW_REGISTRY             (owr_window_registry_get_type())
 #define OWR_WINDOW_REGISTRY(obj)             (G_TYPE_CHECK_INSTANCE_CAST((obj), OWR_TYPE_WINDOW_REGISTRY, OwrWindowRegistry))
 #define OWR_WINDOW_REGISTRY_CLASS(klass)     (G_TYPE_CHECK_CLASS_CAST((klass), OWR_TYPE_WINDOW_REGISTRY, OwrWindowRegistryClass))
