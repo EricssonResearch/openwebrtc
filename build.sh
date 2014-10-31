@@ -140,7 +140,34 @@ build(){
             --host=${target_triple} \
             --enable-debug=$debug ${configure_flags} &&
         patch -p0 < $REPO_ROOT/libtool.diff &&
-        make && make install
+        make && make install &&
+        if [[ $target_triple == "arm-linux-androideabi" ]]; then
+            local android_jar="$(find $(dirname $(which adb))/../platforms/*/android.jar | tail -n 1)"
+            local jni_dir="$builddir/gen_jni"
+            mkdir -p "$installdir/jar" &&
+            (
+                local jar_name="openwebrtc.jar"
+                local java_build_dir="$jni_dir/owr"
+                mkdir -p $java_build_dir &&
+                cd $java_build_dir &&
+                javac $jni_dir/java/com/ericsson/research/owr/* -d "./" -classpath $android_jar &&
+                mkdir -p lib/armeabi/ &&
+                cp -f "$installdir/lib/libopenwebrtc.so" lib/armeabi/ &&
+                jar cvf $jar_name . &&
+                cp -f $jar_name "$installdir/jar/$jar_name"
+                ) &&
+            (
+                local jar_name="openwebrtc_bridge.jar"
+                local java_build_dir="$jni_dir/bridge"
+                mkdir -p $java_build_dir &&
+                cd $java_build_dir &&
+                javac $REPO_ROOT/gen_jni/com/ericsson/research/owr/* -d "./" &&
+                mkdir -p lib/armeabi/ &&
+                cp -f "$installdir/lib/libopenwebrtc_bridge.so" lib/armeabi/ &&
+                jar cvf $jar_name . &&
+                cp -f $jar_name "$installdir/jar/$jar_name"
+                )
+        fi
     )
 }
 
