@@ -92,9 +92,26 @@ case "$host_os" in
     OWR_DEVICE_LIST_EXT_LIBS="\$(PULSE_LIBS) \$(V4L2_LIBS)"
     ;;
 esac
-
 AC_SUBST(OWR_DEVICE_LIST_EXT_LIBS)
 AM_CONDITIONAL(TARGET_APPLE, test x$is_apple = xyes)
+
+dnl generate java bindings or not
+AC_MSG_CHECKING([whether to generate java bindings or not])
+AC_ARG_ENABLE(owr-java,
+AC_HELP_STRING(
+  [--enable-owr-java],
+  [Enable java owr @<:@default=no@:>@]),
+[case "${enableval}" in
+  yes) enable_owr_java=yes ;;
+  no)  enable_owr_java=no ;;
+  *) AC_MSG_ERROR(bad value ${enableval} for --enable-owr-java) ;;
+esac],[enable_owr_java=no])
+AC_MSG_RESULT([$enable_owr_java])
+if test "x$enable_owr_java" = xyes; then
+  AC_DEFINE(OWR_JAVA, 1,
+  [Define if generating bindings for java])
+fi
+AM_CONDITIONAL(OWR_JAVA, test x$enable_owr_java = xyes)
 
 AC_OUTPUT([
 Makefile
@@ -108,6 +125,7 @@ owr/openwebrtc-0.1.pc
 transport/Makefile
 local/Makefile
 tests/Makefile
+gen_jni/Makefile
 docs/Makefile
 docs/reference/Makefile
 docs/reference/owr/Makefile

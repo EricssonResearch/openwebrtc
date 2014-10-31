@@ -88,8 +88,8 @@ build(){
             export PLATFORM_GSTREAMER_LIBS="-framework CoreMedia -framework CoreVideo -framework AVFoundation -framework Foundation -framework OpenGLES -lgstosxaudio -lgstapplemedia -framework AssetsLibrary -framework CoreAudio -framework AudioToolbox -weak_framework VideoToolbox"
             export PLATFORM_CXX_LIBS="-lc++"
         elif [[ $target_triple == "arm-linux-androideabi" ]]; then
-            local platform_ldflags="-llog -Wl,--allow-multiple-definition "
-            local configure_flags="--disable-static --enable-owr-static --enable-shared --disable-introspection"
+            local platform_ldflags="-llog -Wl,--allow-multiple-definition -landroid "
+            local configure_flags="--disable-static --enable-owr-static --enable-shared --disable-introspection --enable-owr-java"
             local seed_platform_libs="-ljavascriptcoregtk-3.0 -licui18n -licuuc -licudata"
             export PLATFORM_GLIB_LIBS="-lffi -liconv -lintl "
             export PLATFORM_GSTREAMER_LIBS="-lgstopensles -lOpenSLES -lGLESv2 -lEGL"

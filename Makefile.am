@@ -1,6 +1,10 @@
 ## Process this file with automake to produce Makefile.in
 
-SUBDIRS = transport local owr bridge tests docs
+if OWR_JAVA
+gen_jni_SUBDIRS=gen_jni
+endif
+
+SUBDIRS = transport local $(gen_jni_SUBDIRS) owr bridge tests docs
 
 if OWR_DEBUG
 DEBUG_CFLAGS = "-g"

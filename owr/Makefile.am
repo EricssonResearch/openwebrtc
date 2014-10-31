@@ -34,6 +34,13 @@ libopenwebrtc_la_DEPENDENCIES = \
     $(top_builddir)/local/libopenwebrtc_local.la \
     $(top_builddir)/transport/libopenwebrtc_transport.la
 
+if OWR_JAVA
+libopenwebrtc_la_LIBADD += \
+    $(top_builddir)/gen_jni/libopenwebrtc_jni.la
+libopenwebrtc_la_DEPENDENCIES += \
+    $(top_builddir)/gen_jni/libopenwebrtc_jni.la
+endif
+
 libopenwebrtc_la_LDFLAGS = -export-dynamic -version-info 3601
 
 if OWR_STATIC
