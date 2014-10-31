@@ -39,12 +39,15 @@ libopenwebrtc_la_DEPENDENCIES = \
 libopenwebrtc_la_LDFLAGS = -export-dynamic -version-info 3601
 
 if OWR_STATIC
-libopenwebrtc_la_LDFLAGS += -export-symbols $(top_srcdir)/libopenwebrtc.exp
+libopenwebrtc.sym: $(top_srcdir)/libopenwebrtc.exp
+	python ${srcdir}/symbols_to_sym.py $(top_srcdir)/libopenwebrtc.exp $@ ${host}
+BUILT_SOURCES = libopenwebrtc.sym
+libopenwebrtc_la_LDFLAGS += -export-symbols libopenwebrtc.sym
 libopenwebrtc_la_SOURCES += \
     owr_require_symbols.c
 CLEANFILES += owr_require_symbols.c
 owr_require_symbols.c:
-	python ${srcdir}/symbols_to_source.py $(top_srcdir)/libopenwebrtc.exp $@
+	python ${srcdir}/symbols_to_source.py $(top_srcdir)/libopenwebrtc.exp $@ ${host}
 endif
 
 includedir = $(prefix)/include/owr
