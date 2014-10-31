@@ -246,7 +246,7 @@ gboolean owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSourc
 
     gst_element_post_message(_owr_get_pipeline(), gst_message_new_latency(GST_OBJECT(_owr_get_pipeline())));
 
-    priv->source = source;
+    priv->source = g_object_ref(source);
 
 done:
     priv->srcpad = srcpad;
