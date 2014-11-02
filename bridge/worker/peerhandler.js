@@ -224,11 +224,16 @@ function PeerHandler(configuration, client, jsonRpc) {
                     urls.push(iceServer.url)
 
                 urls.forEach(function (url) {
-                    var urlParts = url.match(/^(stun|turn):([\w.\-]+):?(\d+)?\/*.*/);
+                    var urlParts = url.match(/^(stun|turn):([\w.\-]+):?(\d+)?(\?transport=(udp|tcp))?.*/);
                     if (!urlParts)
                         return;
-                    var type = urlParts[1] == "stun" ? owr.HelperServerType.STUN
-                        : owr.HelperServerType.TURN_UDP;
+                    var type;
+                    if (urlParts[1] == "stun")
+                        type = owr.HelperServerType.STUN;
+                    else if (urlParts[5] == "tcp")
+                        type = owr.HelperServerType.TURN_TCP;
+                    else
+                        type = owr.HelperServerType.TURN_UDP;
                     var address = urlParts[2];
                     var port = parseInt(urlParts[3]) || 3478;
 
