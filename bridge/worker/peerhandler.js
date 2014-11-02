@@ -47,7 +47,7 @@ function PeerHandler(configuration, client, jsonRpc) {
         numberOfReceivePreparedMediaSessions = mediaSessions.length;
 
         function prepareMediaSession(mediaSession, mdesc) {
-            mediaSession.rtcp_mux = !isInitiator && !!mdesc.rtcp.mux;
+            mediaSession.rtcp_mux = !isInitiator && !!(mdesc.rtcp && mdesc.rtcp.mux);
 
             mediaSession.signal.connect("notify::send-ssrc", function () {
                 var mdescIndex = localSessionInfo.mediaDescriptions.indexOf(mdesc);
@@ -149,7 +149,7 @@ function PeerHandler(configuration, client, jsonRpc) {
             if (!mdesc)
                 continue;
 
-            mediaSession.rtcp_mux = mdesc.rtcp ? !!mdesc.rtcp.mux : false;
+            mediaSession.rtcp_mux = !!(mdesc.rtcp && mdesc.rtcp.mux);
 
             if (mdesc.ice && mdesc.ice.candidates) {
                 mdesc.ice.candidates.forEach(function (candidate) {

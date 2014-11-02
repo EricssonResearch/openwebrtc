@@ -490,7 +490,7 @@
                 }
 
                 lmdesc.payloads = rmdesc.payloads;
-                lmdesc.rtcp.mux = rmdesc.rtcp.mux;
+                lmdesc.rtcp.mux = !!(rmdesc.rtcp && rmdesc.rtcp.mux);
                 if (lmdesc.dtls.setup == "actpass")
                     lmdesc.dtls.setup = "passive";
             }
