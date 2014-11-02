@@ -151,33 +151,33 @@ function checkArguments(name, argsTypeTemplate, numRequired, args) {
 }
 
 function checkType(name, value, typeTemplate) {
-    var expetedTypes = typeTemplate.split(/\s*\|\s*/);
-    if (!canConvert(value, expetedTypes)) {
+    var expectedTypes = typeTemplate.split(/\s*\|\s*/);
+    if (!canConvert(value, expectedTypes)) {
         throw new TypeError(name + " is of wrong type (expected " +
-            expetedTypes.join(" or ") + ")");
+            expectedTypes.join(" or ") + ")");
     }
 }
 
-function canConvert(value, expetedTypes) {
+function canConvert(value, expectedTypes) {
     var type = typeof value;
-    for (var i = 0; i < expetedTypes.length; i++) {
-        var expetedType = expetedTypes[i];
-        if (expetedType == "string" || expetedType == "boolean")
+    for (var i = 0; i < expectedTypes.length; i++) {
+        var expectedType = expectedTypes[i];
+        if (expectedType == "string" || expectedType == "boolean")
             return true; // type conversion will never throw
-        if (expetedType == "number") {
+        if (expectedType == "number") {
             var asNumber = +value;
             if (!isNaN(asNumber) && asNumber != -Infinity && asNumber != Infinity)
                 return true;
         }
         if (type == "object") {
-            if (expetedType == "object")
+            if (expectedType == "object")
                 return true;
             // could be a specific object type or host object (e.g. Array)
-            var constructor = self[expetedType];
+            var constructor = self[expectedType];
             if (constructor && value instanceof constructor)
                 return true;
         }
-        if (type == expetedType && expetedType == "function")
+        if (type == expectedType && expectedType == "function")
             return true;
     }
     return false;
