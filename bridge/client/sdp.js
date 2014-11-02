@@ -44,7 +44,7 @@ if (typeof(SDP) == "undefined")
         "nack": "^a=rtcp-fb:${type} nack$",
         "nackpli": "^a=rtcp-fb:${type} nack pli$",
         "ccmfir": "^a=rtcp-fb:${type} ccm fir$",
-        "rtcp": "^a=rtcp:([\\d]+) IN (IP[46]) ([\\d\\.a-f\\:]+).*$",
+        "rtcp": "^a=rtcp:([\\d]+)( IN (IP[46]) ([\\d\\.a-f\\:]+))?.*$",
         "rtcpmux": "^a=rtcp-mux.*$",
         "cname": "^a=ssrc:(\\d+) cname:([\\w+/\\-@\\.]+).*$",
         "msid": "^a=(ssrc:\\d+ )?msid:([\\w+/\\-=]+) +([\\w+/\\-=]+).*$",
@@ -86,7 +86,7 @@ if (typeof(SDP) == "undefined")
             "${dtlsSetupLine}" +
             "${sctpmapLine}",
 
-        "rtcp": "a=rtcp:${port} ${netType} ${addressType} ${address}\r\n",
+        "rtcp": "a=rtcp:${port}${[ ]netType}${[ ]addressType}${[ ]address}\r\n",
         "rtcpMux": "a=rtcp-mux\r\n",
 
         "rtpMap": "a=rtpmap:${type} ${encodingName}/${clockRate}${[/]channels}\r\n",
@@ -227,10 +227,12 @@ if (typeof(SDP) == "undefined")
             if (rtcp) {
                 mediaDescription.rtcp = {
                     "netType": "IN",
-                    "addressType": rtcp[2],
-                    "address": rtcp[3],
                     "port": parseInt(rtcp[1])
                 };
+                if (rtcp[2]) {
+                    mediaDescription.rtcp.addressType = rtcp[3];
+                    mediaDescription.rtcp.address = rtcp[4];
+                }
             }
             var rtcpmux = match(mblock, regexps.rtcpmux, "m", sblock);
             if (rtcpmux) {
@@ -400,11 +402,14 @@ if (typeof(SDP) == "undefined")
             mblock = fillTemplate(mblock, payloadInfo);
 
             var rtcpInfo = {"rtcpLine": "", "rtcpMuxLine": ""};
-            if (mediaDescription.rtcp.address && mediaDescription.rtcp.port) {
+            if (mediaDescription.rtcp.port) {
                 addDefaults(mediaDescription.rtcp, {
                     "netType": "IN",
-                    "addressType": "IP4"
+                    "addressType": "IP4",
+                    "address": ""
                 });
+                if (!mediaDescription.rtcp.address)
+                    mediaDescription.rtcp.netType = mediaDescription.rtcp.addressType = "";
                 rtcpInfo.rtcpLine = fillTemplate(templates.rtcp, mediaDescription.rtcp);
             }
             if (mediaDescription.rtcp.mux)
