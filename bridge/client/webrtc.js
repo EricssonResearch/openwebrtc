@@ -481,8 +481,7 @@
                 var rmdesc = remoteSessionInfo.mediaDescriptions[i];
                 if (!lmdesc) {
                     lmdesc = {
-                        "type": remoteSessionInfo.mediaDescriptions[i].type,
-                        "payloads": remoteSessionInfo.mediaDescriptions[i].payloads,
+                        "type": rmdesc.type,
                         "rtcp": {},
                         "dtls": { "setup": rmdesc.dtls.setup == "active" ? "passive" : "active" }
                     };
