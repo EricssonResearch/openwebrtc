@@ -56,14 +56,16 @@ struct _OwrVideoPayloadPrivate {
 enum {
     PROP_0,
 
-    PROP_MEDIA_TYPE,
     PROP_CCM_FIR,
     PROP_NACK_PLI,
     PROP_WIDTH,
     PROP_HEIGHT,
     PROP_FRAMERATE,
 
-    N_PROPERTIES
+    N_PROPERTIES,
+
+    /* override properties */
+    PROP_MEDIA_TYPE
 };
 
 static GParamSpec *obj_properties[N_PROPERTIES] = { NULL, };
@@ -71,7 +73,6 @@ static GParamSpec *obj_properties[N_PROPERTIES] = { NULL, };
 static void owr_video_payload_set_property(GObject *object, guint property_id, const GValue *value, GParamSpec *pspec)
 {
     OwrVideoPayloadPrivate *priv;
-    GObjectClass *parent_class;
 
     g_return_if_fail(object);
     g_return_if_fail(value);
@@ -101,8 +102,7 @@ static void owr_video_payload_set_property(GObject *object, guint property_id, c
         break;
 
     default:
-        parent_class = g_type_class_peek_parent(OWR_VIDEO_PAYLOAD_GET_CLASS(object));
-        parent_class->set_property(object, property_id, value, pspec);
+        G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
         break;
     }
 }
@@ -110,7 +110,6 @@ static void owr_video_payload_set_property(GObject *object, guint property_id, c
 static void owr_video_payload_get_property(GObject *object, guint property_id, GValue *value, GParamSpec *pspec)
 {
     OwrVideoPayloadPrivate *priv;
-    GObjectClass *parent_class;
 
     g_return_if_fail(object);
     g_return_if_fail(value);
@@ -139,9 +138,12 @@ static void owr_video_payload_get_property(GObject *object, guint property_id, G
         g_value_set_double(value, priv->framerate);
         break;
 
+    case PROP_MEDIA_TYPE:
+        g_value_set_uint(value, OWR_MEDIA_TYPE_VIDEO);
+        break;
+
     default:
-        parent_class = g_type_class_peek_parent(OWR_VIDEO_PAYLOAD_GET_CLASS(object));
-        parent_class->get_property(object, property_id, value, pspec);
+        G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
         break;
     }
 }
@@ -154,13 +156,7 @@ static void owr_video_payload_class_init(OwrVideoPayloadClass *klass)
     gobject_class->set_property = owr_video_payload_set_property;
     gobject_class->get_property = owr_video_payload_get_property;
 
-    obj_properties[PROP_MEDIA_TYPE] = g_param_spec_uint(
-        "media-type", "Media type",
-        "The type of media (always VIDEO for video payloads)",
-        OWR_MEDIA_TYPE_VIDEO /* min */,
-        OWR_MEDIA_TYPE_VIDEO /* max */,
-        OWR_MEDIA_TYPE_VIDEO /* default */,
-        G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS);
+    g_object_class_override_property(gobject_class, PROP_MEDIA_TYPE, "media-type");
 
     obj_properties[PROP_CCM_FIR] = g_param_spec_boolean(
         "ccm-fir", "CCM FIR",
@@ -206,7 +202,6 @@ OwrPayload * owr_video_payload_new(OwrCodecType codec_type, guint payload_type, 
     gboolean ccm_fir, gboolean nack_pli)
 {
     OwrPayload *payload = g_object_new(OWR_TYPE_VIDEO_PAYLOAD,
-        "media-type", OWR_MEDIA_TYPE_VIDEO,
         "codec-type", codec_type,
         "payload-type", payload_type,
         "clock-rate", clock_rate,

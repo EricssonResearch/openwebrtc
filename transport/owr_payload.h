@@ -61,8 +61,6 @@ struct _OwrPayloadClass {
 
 GType owr_payload_get_type(void) G_GNUC_CONST;
 
-OwrPayload * owr_payload_new(OwrMediaType media_type, OwrCodecType codec_type, guint payload_type, guint clock_rate);
-
 G_END_DECLS
 
 #endif /* __OWR_PAYLOAD_H__ */

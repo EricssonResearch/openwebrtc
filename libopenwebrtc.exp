@@ -26,7 +26,6 @@ owr_media_session_set_send_source
 owr_media_source_get_type
 owr_media_type_get_type
 owr_payload_get_type
-owr_payload_new
 owr_remote_media_source_get_type
 owr_session_add_remote_candidate
 owr_session_force_remote_candidate

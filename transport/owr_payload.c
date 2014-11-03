@@ -54,7 +54,6 @@
 G_DEFINE_TYPE(OwrPayload, owr_payload, G_TYPE_OBJECT)
 
 struct _OwrPayloadPrivate {
-    OwrMediaType media_type;
     OwrCodecType codec_type;
     guint payload_type;
     guint clock_rate;
@@ -90,9 +89,6 @@ static void owr_payload_set_property(GObject *object, guint property_id, const G
     priv = OWR_PAYLOAD(object)->priv;
 
     switch (property_id) {
-    case PROP_MEDIA_TYPE:
-        priv->media_type = g_value_get_uint(value);
-        break;
     case PROP_CODEC_TYPE:
         priv->codec_type = g_value_get_uint(value);
         break;
@@ -126,7 +122,7 @@ static void owr_payload_get_property(GObject *object, guint property_id, GValue 
 
     switch (property_id) {
     case PROP_MEDIA_TYPE:
-        g_value_set_uint(value, priv->media_type);
+        g_assert_not_reached();
         break;
     case PROP_CODEC_TYPE:
         g_value_set_uint(value, priv->codec_type);
@@ -203,7 +199,7 @@ static void owr_payload_class_init(OwrPayloadClass *klass)
     obj_properties[PROP_MEDIA_TYPE] = g_param_spec_uint("media-type", "Media type",
         "The type of media",
         OWR_MEDIA_TYPE_AUDIO, OWR_MEDIA_TYPE_VIDEO, OWR_MEDIA_TYPE_AUDIO,
-        G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS);
+        G_PARAM_READABLE | G_PARAM_STATIC_STRINGS);
 
     obj_properties[PROP_CODEC_TYPE] = g_param_spec_uint("codec-type", "Codec Type",
         "The type of codec",
@@ -243,15 +239,6 @@ static void owr_payload_init(OwrPayload *payload)
     payload->priv->mtu = DEFAULT_MTU;
     payload->priv->bitrate = DEFAULT_BITRATE;
 }
-
-
-OwrPayload * owr_payload_new(OwrMediaType media_type, OwrCodecType codec_type, guint payload_type, guint clock_rate)
-{
-    OwrPayload *payload = g_object_new(OWR_TYPE_PAYLOAD, "media-type", media_type, "codec-type",
-        codec_type, "payload-type", payload_type, "clock-rate", clock_rate, NULL);
-    return payload;
-}
-
 
 
 /* Private methods */
@@ -440,6 +427,7 @@ GstElement * _owr_payload_create_payload_packetizer(OwrPayload *payload)
 {
     GstElement * pay = NULL;
     gchar *element_name = NULL;
+    OwrMediaType media_type;
 
     g_return_val_if_fail(payload, NULL);
 
@@ -449,7 +437,8 @@ GstElement * _owr_payload_create_payload_packetizer(OwrPayload *payload)
 
     g_object_bind_property(payload, "mtu", pay, "mtu", G_BINDING_SYNC_CREATE);
 
-    switch (payload->priv->media_type) {
+    g_object_get(payload, "media-type", &media_type, NULL);
+    switch (media_type) {
     case OWR_MEDIA_TYPE_AUDIO:
         if (OWR_IS_AUDIO_PAYLOAD(payload)) {
             g_object_bind_property(OWR_AUDIO_PAYLOAD(payload), "ptime", pay, "min-ptime", G_BINDING_SYNC_CREATE);
@@ -488,13 +477,17 @@ GstElement * _owr_payload_create_payload_depacketizer(OwrPayload *payload)
 
 OwrMediaType _owr_payload_get_media_type(OwrPayload *payload)
 {
-    return payload->priv->media_type;
+    OwrMediaType media_type;
+
+    g_object_get(payload, "media-type", &media_type, NULL);
+    return media_type;
 }
 
 
 GstCaps * _owr_payload_create_rtp_caps(OwrPayload *payload)
 {
     OwrPayloadPrivate *priv;
+    OwrMediaType media_type;
     GstCaps *caps = NULL;
     GEnumClass *enum_class;
     GEnumValue *enum_value;
@@ -534,8 +527,10 @@ GstCaps * _owr_payload_create_rtp_caps(OwrPayload *payload)
         "payload", G_TYPE_INT, priv->payload_type,
         "clock-rate", G_TYPE_INT, priv->clock_rate,
         NULL);
+
+    g_object_get(payload, "media-type", &media_type, NULL);
     enum_class = G_ENUM_CLASS(g_type_class_ref(OWR_TYPE_MEDIA_TYPE));
-    enum_value = g_enum_get_value(enum_class, priv->media_type);
+    enum_value = g_enum_get_value(enum_class, media_type);
     if (enum_value)
         gst_caps_set_simple(caps, "media", G_TYPE_STRING, enum_value->value_nick, NULL);
     g_type_class_unref(enum_class);
@@ -544,7 +539,7 @@ GstCaps * _owr_payload_create_rtp_caps(OwrPayload *payload)
         g_object_get(OWR_VIDEO_PAYLOAD(payload), "ccm-fir", &ccm_fir, "nack-pli", &nack_pli, NULL);
         gst_caps_set_simple(caps, "rtcp-fb-ccm-fir", G_TYPE_BOOLEAN, ccm_fir, "rtcp-fb-nack-pli",
             G_TYPE_BOOLEAN, nack_pli, NULL);
-    } else if (priv->media_type == OWR_MEDIA_TYPE_AUDIO) {
+    } else if (media_type == OWR_MEDIA_TYPE_AUDIO) {
         guint channels = 0;
         if (OWR_IS_AUDIO_PAYLOAD(payload))
             g_object_get(OWR_AUDIO_PAYLOAD(payload), "channels", &channels, NULL);
@@ -562,6 +557,7 @@ GstCaps * _owr_payload_create_rtp_caps(OwrPayload *payload)
 GstCaps * _owr_payload_create_raw_caps(OwrPayload *payload)
 {
     OwrPayloadPrivate *priv;
+    OwrMediaType media_type;
     GstCaps *caps = NULL;
     guint channels = 0;
     guint width = 0, height = 0;
@@ -571,7 +567,9 @@ GstCaps * _owr_payload_create_raw_caps(OwrPayload *payload)
     g_return_val_if_fail(payload, NULL);
     priv = payload->priv;
 
-    switch (priv->media_type) {
+    g_object_get(payload, "media-type", &media_type, NULL);
+
+    switch (media_type) {
     case OWR_MEDIA_TYPE_AUDIO:
         if (OWR_IS_AUDIO_PAYLOAD(payload))
             g_object_get(OWR_AUDIO_PAYLOAD(payload), "channels", &channels, NULL);
