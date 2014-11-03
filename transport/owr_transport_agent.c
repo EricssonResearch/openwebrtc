@@ -763,6 +763,7 @@ static gboolean add_media_session(GHashTable *args)
     g_object_set_data(session, "session_id", GUINT_TO_POINTER(stream_id));
     g_signal_connect_after(session, "on-sending-rtcp", G_CALLBACK(on_sending_rtcp), transport_agent);
     g_signal_connect(session, "on-feedback-rtcp", G_CALLBACK(on_feedback_rtcp), transport_agent);
+    g_object_unref(session);
 
     maybe_handle_new_send_source_with_payload(transport_agent, media_session);
     if (_owr_session_get_remote_candidates(OWR_SESSION(media_session)))
