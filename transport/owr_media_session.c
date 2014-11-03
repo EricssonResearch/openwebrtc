@@ -235,7 +235,7 @@ static void owr_media_session_class_init(OwrMediaSessionClass *klass)
     media_session_signals[SIGNAL_ON_NEW_STATS] = g_signal_new("on-new-stats",
         G_OBJECT_CLASS_TYPE(klass), G_SIGNAL_RUN_CLEANUP,
         G_STRUCT_OFFSET(OwrMediaSessionClass, on_new_stats), NULL, NULL,
-        g_cclosure_marshal_VOID__BOXED, G_TYPE_NONE, 1, G_TYPE_HASH_TABLE);
+        NULL, G_TYPE_NONE, 1, G_TYPE_HASH_TABLE);
 
     /**
     * OwrMediaSession::on-incoming-source:
@@ -247,7 +247,7 @@ static void owr_media_session_class_init(OwrMediaSessionClass *klass)
     media_session_signals[SIGNAL_ON_INCOMING_SOURCE] = g_signal_new("on-incoming-source",
         G_OBJECT_CLASS_TYPE(klass), G_SIGNAL_RUN_CLEANUP,
         G_STRUCT_OFFSET(OwrMediaSessionClass, on_incoming_source), NULL, NULL,
-        g_cclosure_marshal_VOID__OBJECT, G_TYPE_NONE, 1, OWR_TYPE_REMOTE_MEDIA_SOURCE);
+        NULL, G_TYPE_NONE, 1, OWR_TYPE_REMOTE_MEDIA_SOURCE);
 
     gobject_class->set_property = owr_media_session_set_property;
     gobject_class->get_property = owr_media_session_get_property;
@@ -550,7 +550,7 @@ void _owr_media_session_set_on_send_payload(OwrMediaSession *media_session, GClo
     g_return_if_fail(on_send_payload);
 
     media_session->priv->on_send_payload = on_send_payload;
-    g_closure_set_marshal(media_session->priv->on_send_payload, g_cclosure_marshal_VOID__VOID);
+    g_closure_set_marshal(media_session->priv->on_send_payload, g_cclosure_marshal_generic);
 }
 
 void _owr_media_session_set_on_send_source(OwrMediaSession *media_session, GClosure *on_send_source)

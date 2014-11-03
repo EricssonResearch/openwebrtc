@@ -220,7 +220,7 @@ static void owr_session_class_init(OwrSessionClass *klass)
     session_signals[SIGNAL_ON_NEW_CANDIDATE] = g_signal_new("on-new-candidate",
         G_OBJECT_CLASS_TYPE(klass), G_SIGNAL_RUN_FIRST,
         G_STRUCT_OFFSET(OwrSessionClass, on_new_candidate), NULL, NULL,
-        g_cclosure_marshal_VOID__OBJECT, G_TYPE_NONE, 1, OWR_TYPE_CANDIDATE);
+        NULL, G_TYPE_NONE, 1, OWR_TYPE_CANDIDATE);
 
     /**
     * OwrSession::on-candidate-gathering-done:
@@ -232,7 +232,7 @@ static void owr_session_class_init(OwrSessionClass *klass)
         g_signal_new("on-candidate-gathering-done",
         G_OBJECT_CLASS_TYPE(klass), G_SIGNAL_RUN_FIRST,
         G_STRUCT_OFFSET(OwrSessionClass, on_candidate_gathering_done), NULL, NULL,
-        g_cclosure_marshal_VOID__VOID, G_TYPE_NONE, 0);
+        NULL, G_TYPE_NONE, 0);
 
     gobject_class->set_property = owr_session_set_property;
     gobject_class->get_property = owr_session_get_property;
@@ -416,7 +416,7 @@ void _owr_session_set_on_remote_candidate(OwrSession *session, GClosure *on_remo
     g_return_if_fail(on_remote_candidate);
 
     session->priv->on_remote_candidate = on_remote_candidate;
-    g_closure_set_marshal(session->priv->on_remote_candidate, g_cclosure_marshal_VOID__BOOLEAN);
+    g_closure_set_marshal(session->priv->on_remote_candidate, g_cclosure_marshal_generic);
 }
 
 
