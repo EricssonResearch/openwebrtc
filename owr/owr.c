@@ -267,6 +267,7 @@ static gpointer owr_run(gpointer data)
     g_return_val_if_fail(!data, NULL);
     g_main_context_push_thread_default(owr_main_context);
     g_main_loop_run(owr_main_loop);
+    g_main_context_pop_thread_default(owr_main_context);
     return NULL;
 }
 
@@ -285,7 +286,12 @@ GMainLoop * _owr_get_main_loop()
     return owr_main_loop;
 }
 
-
+/**
+ * _owr_schedule_with_hash_table:
+ * @func:
+ * @hash_table: (transfer full):
+ *
+ */
 void _owr_schedule_with_hash_table(GSourceFunc func, GHashTable *hash_table)
 {
     GSource *source = g_idle_source_new();
