@@ -72,6 +72,7 @@ OwrRemoteMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
     GEnumClass *enum_class;
     GEnumValue *enum_value;
     gchar *name;
+    GstElement *transport_pipeline;
     GstElement *source_bin, *tee;
     GstElement *fakesink, *queue;
     GstPad *srcpad, *sinkpad, *ghostpad;
@@ -116,6 +117,7 @@ OwrRemoteMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
     queue = gst_element_factory_make ("queue", "queue");
     g_free(bin_name);
 
+    transport_pipeline = GST_ELEMENT(gst_element_get_parent(transport_bin));
     gst_bin_add_many(GST_BIN(source_bin), tee, queue, fakesink, NULL);
     LINK_ELEMENTS(tee, queue);
     LINK_ELEMENTS(queue, fakesink);
@@ -123,13 +125,16 @@ OwrRemoteMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
     ghostpad = gst_ghost_pad_new("sink", sinkpad);
     gst_object_unref(sinkpad);
     gst_element_add_pad(source_bin, ghostpad);
-    gst_bin_add(GST_BIN(transport_bin), source_bin);
+    gst_bin_add(GST_BIN(transport_pipeline), source_bin);
     gst_element_sync_state_with_parent(source_bin);
+    gst_object_unref(transport_pipeline);
 
     /* Link the transport bin to our tee */
     srcpad = gst_element_get_static_pad(transport_bin, pad_name);
     g_free(pad_name);
-    gst_pad_link(srcpad, ghostpad);
+    if (gst_pad_link(srcpad, ghostpad) != GST_PAD_LINK_OK) {
+        GST_ERROR("Failed to link source bin to the outside");
+    }
 
     return source;
 }
