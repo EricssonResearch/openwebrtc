@@ -112,6 +112,11 @@ guintptr _owr_window_registry_lookup(OwrWindowRegistry *window_registry,
     return (guintptr)g_hash_table_lookup(window_registry->priv->registry_hash_table, tag);
 }
 
+/**
+ * owr_window_registry_get:
+ *
+ * Returns: (transfer none):
+ */
 OwrWindowRegistry *owr_window_registry_get(void)
 {
     G_LOCK(owr_window_registry_mutex);
