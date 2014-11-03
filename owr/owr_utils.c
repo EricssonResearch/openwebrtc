@@ -34,43 +34,6 @@
 
 #include "owr_types.h"
 
-void _owr_utils_remove_request_pad(GstPad *pad)
-{
-    GstPad *peerpad;
-    GstElement *peerparent, *parent;
-    GstPadTemplate *padtemplate;
-    gboolean result;
-
-    parent = gst_pad_get_parent_element(pad);
-    peerpad = gst_pad_get_peer(pad);
-    g_return_if_fail(GST_IS_PAD(peerpad));
-    peerparent = gst_pad_get_parent_element(peerpad);
-
-    gst_pad_set_active(pad, FALSE);
-    gst_pad_set_active(peerpad, FALSE);
-
-    result = gst_pad_unlink(pad, peerpad);
-    g_warn_if_fail(result);
-
-    /* release the pads if they are request pads */
-    padtemplate = gst_pad_get_pad_template(pad);
-    if (padtemplate) {
-        if (GST_PAD_TEMPLATE_PRESENCE(padtemplate) == GST_PAD_REQUEST)
-            gst_element_release_request_pad(parent, pad);
-        gst_object_unref(padtemplate);
-    }
-    padtemplate = gst_pad_get_pad_template(peerpad);
-    if (padtemplate) {
-        if (GST_PAD_TEMPLATE_PRESENCE(padtemplate) == GST_PAD_REQUEST)
-            gst_element_release_request_pad(peerparent, peerpad);
-        gst_object_unref(padtemplate);
-    }
-
-    gst_object_unref(peerpad);
-    gst_object_unref(peerparent);
-    gst_object_unref(parent);
-}
-
 OwrCodecType _owr_caps_to_codec_type(GstCaps *caps)
 {
     GstStructure *structure;
