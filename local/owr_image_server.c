@@ -171,6 +171,13 @@ OwrImageServer *owr_image_server_new(guint port)
     return g_object_new(OWR_TYPE_IMAGE_SERVER, "port", port, NULL);
 }
 
+/**
+ * owr_image_server_add_image_renderer:
+ * @image_server:
+ * @image_renderer: (transfer full):
+ * @tag:
+ *
+ */
 void owr_image_server_add_image_renderer(OwrImageServer *image_server,
     OwrImageRenderer *image_renderer, const gchar *tag)
 {
@@ -186,9 +193,10 @@ void owr_image_server_add_image_renderer(OwrImageServer *image_server,
 
     if (!g_hash_table_contains(priv->image_renderers, tag)) {
         g_hash_table_insert(priv->image_renderers, g_strdup(tag), image_renderer);
-        g_object_ref(image_renderer);
-    } else
+    } else {
+        g_object_unref(image_renderer);
         g_warning("Image renderer not added, an image renderer is already added for this tag");
+    }
 
     g_mutex_unlock(&priv->image_renderers_mutex);
 
