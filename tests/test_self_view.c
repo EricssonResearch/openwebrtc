@@ -34,14 +34,26 @@
 #include "owr_audio_renderer.h"
 #include "owr_video_renderer.h"
 
-gboolean dump_pipeline(gpointer user_data)
+static OwrMediaSource *audio_source = NULL, *video_source = NULL;
+static OwrMediaRenderer *audio_renderer = NULL, *video_renderer = NULL;
+
+static gboolean dump_pipeline(gpointer user_data)
 {
-    g_print("Dumping pipeline\n");
-    owr_dump_dot_file("test_self_view");
+    g_print("Dumping pipelines\n");
+
+    if (audio_source)
+        owr_media_source_dump_dot_file(audio_source, "test_self_view-audio_source", FALSE);
+    if (audio_renderer)
+        owr_media_renderer_dump_dot_file(audio_renderer, "test_self_view-audio_renderer", FALSE);
+
+    if (video_source)
+        owr_media_source_dump_dot_file(video_source, "test_self_view-video_source", FALSE);
+    if (video_renderer)
+        owr_media_renderer_dump_dot_file(video_renderer, "test_self_view-video_renderer", FALSE);
     return FALSE;
 }
 
-void got_sources(GList *sources, gpointer user_data)
+static void got_sources(GList *sources, gpointer user_data)
 {
     OwrMediaSource *source = NULL;
     static gboolean have_video = FALSE, have_audio = FALSE;
@@ -65,7 +77,10 @@ void got_sources(GList *sources, gpointer user_data)
             renderer = owr_video_renderer_new(NULL);
             g_assert(renderer);
 
+            g_object_set(renderer, "width", 1280, "height", 720, "max-framerate", 30.0, NULL);
             owr_media_renderer_set_source(OWR_MEDIA_RENDERER(renderer), source);
+            video_renderer = OWR_MEDIA_RENDERER(renderer);
+            video_source = source;
         } else if (!have_audio && media_type == OWR_MEDIA_TYPE_AUDIO && source_type == OWR_SOURCE_TYPE_CAPTURE) {
             OwrAudioRenderer *renderer;
 
@@ -75,6 +90,8 @@ void got_sources(GList *sources, gpointer user_data)
             g_assert(renderer);
 
             owr_media_renderer_set_source(OWR_MEDIA_RENDERER(renderer), source);
+            audio_renderer = OWR_MEDIA_RENDERER(renderer);
+            audio_source = source;
         }
 
         if (have_video && have_audio)

@@ -39,16 +39,17 @@
 #include "owr_media_session.h"
 #include "owr_transport_agent.h"
 
-OwrTransportAgent *recv_transport_agent = NULL;
-OwrMediaSession *recv_session_audio = NULL;
-OwrMediaSession *recv_session_video = NULL;
-OwrTransportAgent *send_transport_agent = NULL;
-OwrMediaSession *send_session_audio = NULL;
-OwrMediaSession *send_session_video = NULL;
+static OwrTransportAgent *recv_transport_agent = NULL;
+static OwrMediaSession *recv_session_audio = NULL;
+static OwrMediaSession *recv_session_video = NULL;
+static OwrTransportAgent *send_transport_agent = NULL;
+static OwrMediaSession *send_session_audio = NULL;
+static OwrMediaSession *send_session_video = NULL;
 
-void got_remote_source(OwrMediaSession *session, OwrMediaSource *source, gpointer user_data)
+static void got_remote_source(OwrMediaSession *session, OwrMediaSource *source, gpointer user_data)
 {
     gchar *name = NULL;
+    OwrMediaRenderer *owr_renderer = NULL;
     OwrMediaType media_type;
 
     g_assert(!user_data);
@@ -66,6 +67,7 @@ void got_remote_source(OwrMediaSession *session, OwrMediaSource *source, gpointe
 
         g_print("Connecting source to video renderer\n");
         owr_media_renderer_set_source(OWR_MEDIA_RENDERER(renderer), source);
+        owr_renderer = OWR_MEDIA_RENDERER(renderer);
     } else if (media_type == OWR_MEDIA_TYPE_AUDIO) {
         OwrAudioRenderer *renderer;
 
@@ -75,30 +77,27 @@ void got_remote_source(OwrMediaSession *session, OwrMediaSource *source, gpointe
 
         g_print("Connecting source to audio renderer\n");
         owr_media_renderer_set_source(OWR_MEDIA_RENDERER(renderer), source);
+        owr_renderer = OWR_MEDIA_RENDERER(renderer);
     }
 
     g_free(name);
 
-    owr_dump_dot_file("test_receive");
+    owr_media_source_dump_dot_file(source, "test_receive-got_remote_source-source", TRUE);
+    owr_media_renderer_dump_dot_file(owr_renderer, "test_receive-got_remote_source-renderer", TRUE);
+    owr_transport_agent_dump_dot_file(recv_transport_agent, "test_receive-got_remote_source-transport_agent", TRUE);
 }
 
-void got_candidate(OwrMediaSession *session_a, OwrCandidate *candidate, OwrMediaSession *session_b)
+static void got_candidate(OwrMediaSession *session_a, OwrCandidate *candidate, OwrMediaSession *session_b)
 {
     owr_session_add_remote_candidate(OWR_SESSION(session_b), candidate);
 }
 
-gboolean dump_cb(gpointer *user_data) {
-    if (user_data)
-        return G_SOURCE_REMOVE;
-    g_print("Dumping pipeline!\n");
-    owr_dump_dot_file("test_send_receive_timeout");
-    return G_SOURCE_REMOVE;
-}
-
-void got_sources(GList *sources, gpointer user_data)
+static void got_sources(GList *sources, gpointer user_data)
 {
     OwrMediaSource *source = NULL;
     static gboolean have_video = FALSE, have_audio = FALSE;
+    OwrMediaRenderer *video_renderer = NULL;
+    OwrMediaSource *audio_source = NULL, *video_source = NULL;
 
     g_assert(sources);
 
@@ -117,8 +116,9 @@ void got_sources(GList *sources, gpointer user_data)
             have_video = TRUE;
 
             payload = owr_video_payload_new(OWR_CODEC_TYPE_VP8, 103, 90000, TRUE, FALSE);
-
+            g_object_set(payload, "width", 1280, "height", 720, "framerate", 30.0, NULL);
             owr_media_session_set_send_payload(send_session_video, payload);
+            g_object_unref(payload);
 
             owr_media_session_set_send_source(send_session_video, source);
 
@@ -128,19 +128,23 @@ void got_sources(GList *sources, gpointer user_data)
 
             renderer = owr_video_renderer_new(NULL);
             g_assert(renderer);
+            g_object_set(renderer, "width", 1280, "height", 720, "max-framerate", 30.0, NULL);
             owr_media_renderer_set_source(OWR_MEDIA_RENDERER(renderer), source);
+            video_renderer = OWR_MEDIA_RENDERER(renderer);
+            video_source = source;
         } else if (!have_audio && media_type == OWR_MEDIA_TYPE_AUDIO && source_type == OWR_SOURCE_TYPE_CAPTURE) {
             OwrPayload *payload;
 
             have_audio = TRUE;
 
             payload = owr_audio_payload_new(OWR_CODEC_TYPE_OPUS, 100, 48000, 1);
-
             owr_media_session_set_send_payload(send_session_audio, payload);
+            g_object_unref(payload);
 
             owr_media_session_set_send_source(send_session_audio, source);
 
             owr_transport_agent_add_session(send_transport_agent, OWR_SESSION(send_session_audio));
+            audio_source = source;
         }
 
         if (have_video && have_audio)
@@ -149,7 +153,13 @@ void got_sources(GList *sources, gpointer user_data)
         sources = sources->next;
     }
 
-    owr_dump_dot_file("test_send");
+    if (audio_source)
+        owr_media_source_dump_dot_file(audio_source, "test_send-got_source-audio_source", TRUE);
+    if (video_source)
+        owr_media_source_dump_dot_file(video_source, "test_send-got_source-video_source", TRUE);
+    if (video_renderer)
+        owr_media_renderer_dump_dot_file(video_renderer, "test_send-got_source-video_renderer", TRUE);
+    owr_transport_agent_dump_dot_file(send_transport_agent, "test_send-got_source-transport_agent", TRUE);
 }
 
 int main() {
@@ -189,8 +199,8 @@ int main() {
     g_signal_connect(recv_session_video, "on-incoming-source", G_CALLBACK(got_remote_source), NULL);
 
     receive_payload = owr_video_payload_new(OWR_CODEC_TYPE_VP8, 103, 90000, TRUE, FALSE);
-
     owr_media_session_add_receive_payload(recv_session_video, receive_payload);
+    g_object_unref(receive_payload);
 
     owr_transport_agent_add_session(recv_transport_agent, OWR_SESSION(recv_session_video));
 
@@ -199,8 +209,8 @@ int main() {
     g_signal_connect(recv_session_audio, "on-incoming-source", G_CALLBACK(got_remote_source), NULL);
 
     receive_payload = owr_audio_payload_new(OWR_CODEC_TYPE_OPUS, 100, 48000, 1);
-
     owr_media_session_add_receive_payload(recv_session_audio, receive_payload);
+    g_object_unref(receive_payload);
 
     owr_transport_agent_add_session(recv_transport_agent, OWR_SESSION(recv_session_audio));
 
@@ -208,9 +218,6 @@ int main() {
     /* PREPARE FOR SENDING */
 
     owr_get_capture_sources(OWR_MEDIA_TYPE_AUDIO|OWR_MEDIA_TYPE_VIDEO, got_sources, NULL);
-
-
-    g_timeout_add_seconds(10, (GSourceFunc)dump_cb, NULL);
 
     g_main_loop_run(loop);
 
