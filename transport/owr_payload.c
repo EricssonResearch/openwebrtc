@@ -576,8 +576,6 @@ GstCaps * _owr_payload_create_raw_caps(OwrPayload *payload)
         if (OWR_IS_AUDIO_PAYLOAD(payload))
             g_object_get(OWR_AUDIO_PAYLOAD(payload), "channels", &channels, NULL);
         caps = gst_caps_new_simple("audio/x-raw",
-            "format", G_TYPE_STRING, "S16LE",
-            "layout", G_TYPE_STRING, "interleaved",
             "rate", G_TYPE_INT, priv->clock_rate,
             NULL);
         if (channels > 0) {
