@@ -370,10 +370,12 @@ static gboolean add_remote_candidate(GHashTable *args)
 
     if (priv->on_remote_candidate) {
         g_value_init(&params[0], OWR_TYPE_SESSION);
-        g_value_set_instance(&params[0], session);
+        g_value_set_object(&params[0], session);
         g_value_init(&params[1], G_TYPE_BOOLEAN);
         g_value_set_boolean(&params[1], forced);
         g_closure_invoke(priv->on_remote_candidate, NULL, 2, (const GValue *)&params, NULL);
+        g_value_unset(&params[0]);
+        g_value_unset(&params[1]);
     }
 
 end:

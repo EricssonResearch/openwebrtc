@@ -457,8 +457,9 @@ static gboolean set_send_payload(GHashTable *args)
 
     if (priv->on_send_payload) {
         g_value_init(&params[0], OWR_TYPE_MEDIA_SESSION);
-        g_value_set_instance(&params[0], media_session);
+        g_value_set_object(&params[0], media_session);
         g_closure_invoke(priv->on_send_payload, NULL, 1, (const GValue *)&params, NULL);
+        g_value_unset(&params[0]);
     }
 
     g_object_unref(media_session);
@@ -485,10 +486,12 @@ static gboolean set_send_source(GHashTable *args)
 
     if (priv->on_send_source) {
         g_value_init(&params[0], OWR_TYPE_MEDIA_SESSION);
-        g_value_set_instance(&params[0], media_session);
+        g_value_set_object(&params[0], media_session);
         g_value_init(&params[1], OWR_TYPE_MEDIA_SOURCE);
-        g_value_set_instance(&params[1], source);
+        g_value_set_object(&params[1], source);
         g_closure_invoke(priv->on_send_source, NULL, 2, (const GValue *)&params, NULL);
+        g_value_unset(&params[0]);
+        g_value_unset(&params[1]);
     }
 
     media_session->priv->send_source = source;
