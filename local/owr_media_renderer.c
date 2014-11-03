@@ -32,7 +32,6 @@
 #endif
 #include "owr_media_renderer.h"
 
-#include "owr_media_renderer_private.h"
 #include "owr_media_source.h"
 #include "owr_media_source_private.h"
 #include "owr_private.h"
@@ -87,10 +86,12 @@ static void owr_media_renderer_finalize(GObject *object)
         gst_bin_remove(GST_BIN(priv->pipeline), priv->src);
         g_object_unref(priv->source);
         priv->source = NULL;
+        priv->src = NULL;
     }
 
     if (priv->pipeline) {
         gst_element_set_state(priv->pipeline, GST_STATE_NULL);
+        gst_bin_remove(GST_BIN(priv->pipeline), priv->sink);
         gst_object_unref(priv->pipeline);
         priv->pipeline = NULL;
         priv->sink = NULL;
@@ -365,9 +366,9 @@ void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *s
     gst_element_post_message(priv->pipeline, gst_message_new_latency(GST_OBJECT(priv->pipeline)));
 
     priv->source = g_object_ref(source);
+    priv->src = src;
 
 done:
-    priv->src = src;
     g_mutex_unlock(&priv->media_renderer_lock);
 }
 

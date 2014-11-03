@@ -42,7 +42,6 @@ include_HEADERS = \
 
 noinst_HEADERS = \
     owr_local_media_source_private.h \
-    owr_media_renderer_private.h \
     owr_image_renderer_private.h \
     owr_window_registry_private.h
 

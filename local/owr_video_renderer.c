@@ -94,9 +94,16 @@ static void owr_video_renderer_finalize(GObject *object)
     OwrVideoRenderer *renderer = OWR_VIDEO_RENDERER(object);
     OwrVideoRendererPrivate *priv = renderer->priv;
 
-    g_mutex_clear(&priv->video_renderer_lock);
+    if (priv->renderer_bin) {
+        gst_element_set_state(priv->renderer_bin, GST_STATE_NULL);
+        gst_object_unref(priv->renderer_bin);
+        priv->renderer_bin = NULL;
+    }
 
     g_free(priv->tag);
+    priv->tag = NULL;
+
+    g_mutex_clear(&priv->video_renderer_lock);
 
     G_OBJECT_CLASS(owr_video_renderer_parent_class)->finalize(object);
 }
@@ -295,7 +302,7 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer)
 
 done:
     g_mutex_unlock(&priv->video_renderer_lock);
-    return priv->renderer_bin;
+    return gst_object_ref(priv->renderer_bin);
 }
 
 static GstCaps *owr_video_renderer_get_caps(OwrMediaRenderer *renderer)

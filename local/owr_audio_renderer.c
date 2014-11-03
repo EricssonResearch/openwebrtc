@@ -85,6 +85,11 @@ static void owr_audio_renderer_finalize(GObject *object)
     OwrAudioRenderer *renderer = OWR_AUDIO_RENDERER(object);
     OwrAudioRendererPrivate *priv = renderer->priv;
 
+    if (priv->renderer_bin) {
+        gst_element_set_state(priv->renderer_bin, GST_STATE_NULL);
+        gst_object_unref(priv->renderer_bin);
+    }
+
     g_mutex_clear(&priv->audio_renderer_lock);
 
     G_OBJECT_CLASS(owr_audio_renderer_parent_class)->finalize(object);
@@ -186,7 +191,7 @@ static GstElement *owr_audio_renderer_get_element(OwrMediaRenderer *renderer)
 
 done:
     g_mutex_unlock(&priv->audio_renderer_lock);
-    return priv->renderer_bin;
+    return gst_object_ref (priv->renderer_bin);
 }
 
 static GstCaps *owr_audio_renderer_get_caps(OwrMediaRenderer *renderer)

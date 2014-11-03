@@ -91,6 +91,13 @@ static void owr_image_renderer_finalize(GObject *object)
     OwrImageRenderer *renderer = OWR_IMAGE_RENDERER(object);
     OwrImageRendererPrivate *priv = renderer->priv;
 
+    if (priv->renderer_bin) {
+        gst_element_set_state(priv->renderer_bin, GST_STATE_NULL);
+        gst_object_unref(priv->renderer_bin);
+        priv->renderer_bin = NULL;
+        priv->appsink = NULL;
+    }
+
     g_mutex_clear(&priv->image_renderer_lock);
 
     G_OBJECT_CLASS(owr_image_renderer_parent_class)->finalize(object);
@@ -258,7 +265,7 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
 
 done:
     g_mutex_unlock(&priv->image_renderer_lock);
-    return priv->renderer_bin;
+    return gst_object_ref(priv->renderer_bin);
 }
 
 static GstCaps *owr_image_renderer_get_caps(OwrMediaRenderer *renderer)
@@ -341,6 +348,12 @@ static void fill_bmp_header(guint8 *image_data, guint image_width, guint image_h
     data += 4;
 }
 
+/**
+ * _owr_image_renderer_pull_bmp_image:
+ * @image_renderer:
+ *
+ * Returns: (transfer full):
+ */
 GBytes * _owr_image_renderer_pull_bmp_image(OwrImageRenderer *image_renderer)
 {
     GstCaps *caps;
@@ -366,8 +379,6 @@ GBytes * _owr_image_renderer_pull_bmp_image(OwrImageRenderer *image_renderer)
         gst_sample_unref(sample);
         return NULL;
     }
-
-    gst_buffer_ref(buf);
 
     caps = gst_sample_get_caps(sample);
     s = gst_caps_get_structure(caps, 0);
@@ -408,7 +419,6 @@ GBytes * _owr_image_renderer_pull_bmp_image(OwrImageRenderer *image_renderer)
     }
 
     gst_buffer_unmap(buf, &info);
-    gst_buffer_unref(buf);
     gst_sample_unref(sample);
 
     return g_bytes_new_take(image_data, total_size);
