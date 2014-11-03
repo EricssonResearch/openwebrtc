@@ -67,7 +67,6 @@ struct _OwrMediaSessionPrivate {
     GPtrArray *receive_payloads;
     GClosure *on_send_payload;
     GClosure *on_send_source;
-    OwrMediaSource *new_send_source;
     GSList *remote_sources;
     GMutex remote_source_lock;
 };
@@ -208,8 +207,6 @@ static void owr_media_session_finalize(GObject *object)
 
     if (priv->send_source)
         owr_media_session_set_send_source(media_session, NULL);
-    if (priv->new_send_source)
-        g_object_unref(priv->new_send_source);
 
     if (priv->send_payload)
         g_object_unref(priv->send_payload);
@@ -297,7 +294,6 @@ static void owr_media_session_init(OwrMediaSession *media_session)
     priv->receive_payloads = g_ptr_array_new_with_free_func((GDestroyNotify)g_object_unref);
     priv->on_send_payload = NULL;
     priv->on_send_source = NULL;
-    priv->new_send_source = NULL;
     priv->remote_sources = NULL;
     g_mutex_init(&priv->remote_source_lock);
     g_rw_lock_init(&priv->rw_lock);
@@ -487,19 +483,15 @@ static gboolean set_send_source(GHashTable *args)
 
     priv = media_session->priv;
 
-    media_session->priv->send_source = source;
-
     if (priv->on_send_source) {
         g_value_init(&params[0], OWR_TYPE_MEDIA_SESSION);
         g_value_set_instance(&params[0], media_session);
         g_value_init(&params[1], OWR_TYPE_MEDIA_SOURCE);
         g_value_set_instance(&params[1], source);
         g_closure_invoke(priv->on_send_source, NULL, 2, (const GValue *)&params, NULL);
-    } else {
-        if (priv->new_send_source)
-            g_object_unref(priv->new_send_source);
-        priv->new_send_source = source;
     }
+
+    media_session->priv->send_source = source;
 
     g_object_unref(media_session);
     g_hash_table_unref(args);
@@ -565,10 +557,6 @@ void _owr_media_session_set_on_send_source(OwrMediaSession *media_session, GClos
 
     media_session->priv->on_send_source = on_send_source;
     g_closure_set_marshal(media_session->priv->on_send_source, g_cclosure_marshal_generic);
-    if (media_session->priv->new_send_source) {
-        owr_media_session_set_send_source(media_session, media_session->priv->new_send_source);
-        media_session->priv->new_send_source = NULL;
-    }
 }
 
 void _owr_media_session_clear_closures(OwrMediaSession *media_session)
