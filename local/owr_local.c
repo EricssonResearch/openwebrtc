@@ -107,7 +107,7 @@ static GList *get_capture_sources(OwrMediaType types)
 
 /**
  * OwrCaptureSourcesCallback:
- * @sources: (transfer full) (element-type OwrMediaSource): list of sources
+ * @sources: (transfer none) (element-type OwrMediaSource): list of sources
  * @user_data: (allow-none): the data passed to owr_get_capture_sources
  *
  * Prototype for the callback passed to owr_get_capture_sources()
@@ -119,6 +119,7 @@ static gboolean capture_sources_callback(GHashTable *args)
 {
     OwrCaptureSourcesCallback *callbacks;
     OwrMediaType media_types;
+    GList *capture_sources;
     gpointer user_data;
 
     g_return_val_if_fail(args, FALSE);
@@ -126,7 +127,10 @@ static gboolean capture_sources_callback(GHashTable *args)
     callbacks = g_hash_table_lookup(args, "callback");
     media_types = GPOINTER_TO_UINT(g_hash_table_lookup(args, "media_types"));
     user_data = g_hash_table_lookup(args, "user_data");
-    callbacks[0](get_capture_sources(media_types), user_data);
+
+    capture_sources = get_capture_sources(media_types);
+    callbacks[0](capture_sources, user_data);
+    g_list_free_full(capture_sources, (GDestroyNotify) g_object_unref);
 
     g_free(callbacks);
     g_hash_table_unref(args);
