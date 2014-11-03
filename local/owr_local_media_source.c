@@ -177,17 +177,23 @@ static gboolean shutdown_media_source(GHashTable *args)
     source_pipeline = _owr_media_source_get_source_bin(media_source);
     if (!source_pipeline) {
         g_object_unref(media_source);
+        g_hash_table_unref(args);
         return FALSE;
     }
 
     source_tee = _owr_media_source_get_source_tee(media_source);
     if (!source_tee) {
+        gst_object_unref(source_pipeline);
         g_object_unref(media_source);
+        g_hash_table_unref(args);
         return FALSE;
     }
 
     if (source_tee->numsrcpads != 1) {
+        gst_object_unref(source_pipeline);
+        gst_object_unref(source_tee);
         g_object_unref(media_source);
+        g_hash_table_unref(args);
         return FALSE;
     }
 
@@ -196,8 +202,10 @@ static gboolean shutdown_media_source(GHashTable *args)
 
     gst_element_set_state(source_pipeline, GST_STATE_NULL);
     gst_object_unref(source_pipeline);
+    gst_object_unref(source_tee);
 
     g_object_unref(media_source);
+    g_hash_table_unref(args);
 
     return FALSE;
 }
@@ -251,18 +259,18 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
     OwrLocalMediaSource *local_source;
     OwrLocalMediaSourcePrivate *priv;
     GstElement *source_element = NULL;
+    GstElement *source_pipeline;
 
     g_assert(media_source);
     local_source = OWR_LOCAL_MEDIA_SOURCE(media_source);
     priv = local_source->priv;
 
     /* only create the source bin for this media source once */
-    if (_owr_media_source_get_source_bin(media_source)) {
+    if ((source_pipeline = _owr_media_source_get_source_bin(media_source))) {
         GST_DEBUG_OBJECT(media_source, "Re-using existing source element/bin");
     } else {
         OwrMediaType media_type = OWR_MEDIA_TYPE_UNKNOWN;
         OwrSourceType source_type = OWR_SOURCE_TYPE_UNKNOWN;
-        GstElement *source_pipeline;
         GstElement *source, *capsfilter = NULL, *tee;
         GstElement *queue, *fakesink;
         GEnumClass *media_enum_class, *source_enum_class;
@@ -439,6 +447,7 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
 
         g_signal_connect(tee, "pad-removed", G_CALLBACK(tee_pad_removed_cb), media_source);
     }
+    gst_object_unref(source_pipeline);
 
     source_element = OWR_MEDIA_SOURCE_CLASS(owr_local_media_source_parent_class)->request_source (media_source, caps);
 

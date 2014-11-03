@@ -128,6 +128,7 @@ OwrRemoteMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
     gst_bin_add(GST_BIN(transport_pipeline), source_bin);
     gst_element_sync_state_with_parent(source_bin);
     gst_object_unref(transport_pipeline);
+    gst_object_unref(source_bin);
 
     /* Link the transport bin to our tee */
     srcpad = gst_element_get_static_pad(transport_bin, pad_name);

@@ -128,12 +128,17 @@ static void owr_media_source_finalize(GObject *object)
     OwrMediaSourcePrivate *priv = source->priv;
 
     g_free(priv->name);
+    priv->name = NULL;
 
     if (priv->source_bin) {
         GstElement *source_bin = priv->source_bin;
         priv->source_bin = NULL;
         gst_element_set_state(source_bin, GST_STATE_NULL);
         gst_object_unref(source_bin);
+    }
+    if (priv->source_tee) {
+        gst_object_unref(priv->source_tee);
+        priv->source_tee = NULL;
     }
 
     g_mutex_clear(&source->lock);
@@ -260,8 +265,8 @@ static GstElement *owr_media_source_request_source_default(OwrMediaSource *media
     g_return_val_if_fail(media_source->priv->source_bin, NULL);
     g_return_val_if_fail(media_source->priv->source_tee, NULL);
 
-    source_pipeline = media_source->priv->source_bin;
-    tee = media_source->priv->source_tee;
+    source_pipeline = gst_object_ref(media_source->priv->source_bin);
+    tee = gst_object_ref(media_source->priv->source_tee);
 
     source_id = g_atomic_int_add(&unique_bin_id, 1);
 
@@ -351,6 +356,7 @@ static GstElement *owr_media_source_request_source_default(OwrMediaSource *media
     /* Add and link the inter*sink to the actual source pipeline */
     bin_name = g_strdup_printf("source-sink-bin-%u", source_id);
     sink_bin = gst_bin_new(bin_name);
+    g_free(bin_name);
     gst_bin_add_many(GST_BIN(sink_bin), sink, sink_queue, NULL);
     gst_element_sync_state_with_parent(sink);
     gst_element_sync_state_with_parent(sink_queue);
@@ -378,6 +384,9 @@ static GstElement *owr_media_source_request_source_default(OwrMediaSource *media
     LINK_ELEMENTS(source, queue_pre);
 
 done:
+
+    gst_object_unref(source_pipeline);
+    gst_object_unref(tee);
 
     return source_bin;
 }
@@ -431,6 +440,7 @@ static void owr_media_source_release_source_default(OwrMediaSource *media_source
     if (!source_name || sscanf(source_name, "source-bin-%u", &source_id) != 1) {
         GST_WARNING_OBJECT(media_source,
                 "Failed to get %s for clean up", source_name);
+        g_free(source_name);
         return;
     }
     g_free(source_name);
@@ -438,7 +448,7 @@ static void owr_media_source_release_source_default(OwrMediaSource *media_source
     GST_DEBUG_OBJECT(media_source, "Unlinking source %u", source_id);
 
     /* Unlink parts from the source pipeline */
-    source_pipeline = media_source->priv->source_bin;
+    source_pipeline = gst_object_ref(media_source->priv->source_bin);
     g_assert(source_pipeline);
     bin_name = g_strdup_printf("source-sink-bin-%u", source_id);
     sink_bin = gst_bin_get_by_name(GST_BIN(source_pipeline), bin_name);
@@ -446,9 +456,11 @@ static void owr_media_source_release_source_default(OwrMediaSource *media_source
         GST_WARNING_OBJECT(media_source,
                 "Failed to get %s from source pipeline", bin_name);
         g_free(bin_name);
+        gst_object_unref(source_pipeline);
         return;
     }
     g_free(bin_name);
+    gst_object_unref(source_pipeline);
 
     sinkpad = gst_element_get_static_pad(sink_bin, "sink");
     /* The pad on the tee */
@@ -460,45 +472,81 @@ static void owr_media_source_release_source_default(OwrMediaSource *media_source
     gst_object_unref(sink_bin);
 }
 
-/* call with the media_source lock
- * bin is transfer none */
+/* call with the media_source lock */
+/**
+ * _owr_media_source_get_source_bin:
+ * @media_source:
+ *
+ * Returns: (transfer full):
+ *
+ */
 GstElement *_owr_media_source_get_source_bin(OwrMediaSource *media_source)
 {
     g_return_val_if_fail(OWR_IS_MEDIA_SOURCE(media_source), NULL);
 
-    return media_source->priv->source_bin;
+    return media_source->priv->source_bin ? gst_object_ref(media_source->priv->source_bin) : NULL;
 }
 
-/* call with the media_source lock
- * bin is transfer full */
+/* call with the media_source lock */
+/**
+ * _owr_media_source_set_source_bin:
+ * @media_source:
+ * @bin: (transfer none):
+ *
+ */
 void _owr_media_source_set_source_bin(OwrMediaSource *media_source, GstElement *bin)
 {
     g_return_if_fail(OWR_IS_MEDIA_SOURCE(media_source));
     g_return_if_fail(!bin || GST_IS_ELEMENT(bin));
 
-    media_source->priv->source_bin = bin;
+    if (media_source->priv->source_bin) {
+        gst_element_set_state(media_source->priv->source_bin, GST_STATE_NULL);
+        gst_object_unref(media_source->priv->source_bin);
+    }
+    media_source->priv->source_bin = bin ? gst_object_ref(bin) : NULL;
 }
 
-/* call with the media_source lock
- * tee is transfer none */
+/* call with the media_source lock */
+/**
+ * _owr_media_source_get_source_tee:
+ * @media_source:
+ *
+ * Returns: (transfer full):
+ *
+ */
 GstElement *_owr_media_source_get_source_tee(OwrMediaSource *media_source)
 {
     g_return_val_if_fail(OWR_IS_MEDIA_SOURCE(media_source), NULL);
 
-    return media_source->priv->source_tee;
+    return media_source->priv->source_tee ? gst_object_ref(media_source->priv->source_tee) : NULL;
 }
 
-/* call with the media_source lock
- * tee is transfer full */
+/* call with the media_source lock */
+/**
+ * _owr_media_source_set_source_tee:
+ * @media_source:
+ * @tee: (transfer none):
+ *
+ */
 void _owr_media_source_set_source_tee(OwrMediaSource *media_source, GstElement *tee)
 {
     g_return_if_fail(OWR_IS_MEDIA_SOURCE(media_source));
     g_return_if_fail(!tee || GST_IS_ELEMENT(tee));
 
-    media_source->priv->source_tee = tee;
+    if (media_source->priv->source_tee) {
+        gst_object_unref(media_source->priv->source_tee);
+    }
+    media_source->priv->source_tee = tee ? gst_object_ref(tee) : NULL;
 }
 
-/* caps is transfer none */
+/**
+ * _owr_media_source_request_source:
+ * @media_source:
+ * @caps: (transfer none):
+ *
+ * Returns: (transfer full):
+ *
+ */
 GstElement *_owr_media_source_request_source(OwrMediaSource *media_source, GstCaps *caps)
 {
     GstElement *source;
@@ -512,6 +560,12 @@ GstElement *_owr_media_source_request_source(OwrMediaSource *media_source, GstCa
     return source;
 }
 
+/**
+ * _owr_media_source_release_source:
+ * @media_source:
+ * @source: (transfer none):
+ *
+ */
 void _owr_media_source_release_source(OwrMediaSource *media_source, GstElement *source)
 {
     g_return_if_fail(OWR_IS_MEDIA_SOURCE(media_source));
