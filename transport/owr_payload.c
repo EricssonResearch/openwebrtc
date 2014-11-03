@@ -641,5 +641,5 @@ GstCaps * _owr_payload_create_encoded_caps(OwrPayload *payload)
 static guint get_unique_id()
 {
     static guint id = 0;
-    return id++;
+    return g_atomic_int_add(&id, 1);
 }
