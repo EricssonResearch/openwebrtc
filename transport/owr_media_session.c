@@ -487,6 +487,8 @@ static gboolean set_send_source(GHashTable *args)
 
     priv = media_session->priv;
 
+    media_session->priv->send_source = source;
+
     if (priv->on_send_source) {
         g_value_init(&params[0], OWR_TYPE_MEDIA_SESSION);
         g_value_set_instance(&params[0], media_session);
