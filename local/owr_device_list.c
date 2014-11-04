@@ -222,6 +222,11 @@ static void source_info_iterator(pa_context *pa_context, const pa_source_info *i
     if (!eol) {
         OwrLocalMediaSource *source;
 
+        if (info->monitor_of_sink_name != NULL) {
+            /* We don't want to list monitor sources */
+            return;
+        }
+
         source = _owr_local_media_source_new(info->index, info->description,
             OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_CAPTURE);
 
