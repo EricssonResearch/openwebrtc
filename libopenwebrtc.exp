@@ -5,7 +5,6 @@ owr_audio_renderer_new
 owr_candidate_get_type
 owr_candidate_new
 owr_codec_type_get_type
-owr_dump_dot_file
 owr_get_capture_sources
 owr_image_renderer_get_type
 owr_image_renderer_new

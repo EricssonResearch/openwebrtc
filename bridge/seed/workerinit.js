@@ -37,7 +37,6 @@ worker_global.setInterval = setInterval;
 worker_global.clearTimeout =  clearTimeout;
 worker_global.clearInterval = clearInterval;
 worker_global.owr = imports.gi.Owr;
-worker_global.owr.dump_dot_file = null;
 if (!worker_global.ArrayBuffer || !worker_global.Uint8Array) {
     worker_global.ArrayBuffer = ArrayBuffer;
     worker_global.Uint8Array = Uint8Array;
