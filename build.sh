@@ -124,7 +124,7 @@ build(){
         export XML_CFLAGS="-I${src_dir}/openwebrtc-deps-${target}/include/libxml2"
         export XML_LIBS="-L${src_dir}/openwebrtc-deps-${target}/lib -lxml2 -lm"
         export GSTREAMER_CFLAGS="-isystem ${src_dir}/openwebrtc-deps-${target}/include/gstreamer-1.0 -isystem ${src_dir}/openwebrtc-deps-${target}/include/private-gstreamer"
-        export GSTREAMER_LIBS="-L${src_dir}/openwebrtc-deps-${target}/lib -L${src_dir}/openwebrtc-deps-${target}/lib/gstreamer-1.0 -lgstaudiotestsrc -lgstvideotestsrc -lgstcoreelements -lgstalaw -lgstmulaw -lgstopus -lopus -lgstapp -lgstaudioconvert -lgstaudioresample -lgstvolume -lgstvideoconvert -lgstvpx -lvpx -lgstopengl"
+        export GSTREAMER_LIBS="-L${src_dir}/openwebrtc-deps-${target}/lib -L${src_dir}/openwebrtc-deps-${target}/lib/gstreamer-1.0 -lgstaudiotestsrc -lgstvideotestsrc -lgstcoreelements -lgstalaw -lgstmulaw -lgstopus -lopus -lgstapp -lgstaudioconvert -lgstaudioresample -lgstvolume -lgstvideoconvert -lgstvpx -lvpx -lgstopengl -lgstinter"
         export GSTREAMER_LIBS="$GSTREAMER_LIBS $PLATFORM_GSTREAMER_LIBS -lgstrtpmanager -lgstrtp -lgstsrtp -lsrtp -lgstvideocrop -lgstvideofilter -lgstvideoparsersbad -lgstvideorate -lgstvideoscale -lgstnice -lgstcontroller-1.0 -lgstpbutils-1.0 -lgstnet-1.0 -lgstrtp-1.0 -lgstgl-1.0 -lgstbadvideo-1.0 -lgstbadbase-1.0"
         export GSTREAMER_LIBS="$GSTREAMER_LIBS -lgsttag-1.0 -lgstapp-1.0 -lgstaudio-1.0 -lgstvideo-1.0 -lgstcodecparsers-1.0 -lgstbase-1.0 -lgstreamer-1.0"
         export SEED_CFLAGS="-isystem ${src_dir}/openwebrtc-deps-${target}/include/seed-gtk3 -isystem ${src_dir}/openwebrtc-deps-${target}/include/gobject-introspection-1.0"
