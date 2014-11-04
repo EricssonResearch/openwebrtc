@@ -211,6 +211,9 @@ static void owr_media_session_finalize(GObject *object)
     if (priv->send_payload)
         g_object_unref(priv->send_payload);
     g_ptr_array_unref(priv->receive_payloads);
+
+    _owr_media_session_clear_closures(media_session);
+
     g_rw_lock_clear(&priv->rw_lock);
 
     G_OBJECT_CLASS(owr_media_session_parent_class)->finalize(object);
@@ -544,20 +547,36 @@ OwrMediaSource * _owr_media_session_get_send_source(OwrMediaSession *media_sessi
     return media_session->priv->send_source;
 }
 
+/**
+ * _owr_media_session_set_on_send_payload:
+ * @media_session:
+ * @on_send_payload: (transfer full):
+ *
+ */
 void _owr_media_session_set_on_send_payload(OwrMediaSession *media_session, GClosure *on_send_payload)
 {
     g_return_if_fail(media_session);
     g_return_if_fail(on_send_payload);
 
+    if (media_session->priv->on_send_payload)
+        g_closure_unref(media_session->priv->on_send_payload);
     media_session->priv->on_send_payload = on_send_payload;
     g_closure_set_marshal(media_session->priv->on_send_payload, g_cclosure_marshal_generic);
 }
 
+/**
+ * _owr_media_session_set_on_send_source:
+ * @media_session:
+ * @on_send_source: (transfer full):
+ *
+ */
 void _owr_media_session_set_on_send_source(OwrMediaSession *media_session, GClosure *on_send_source)
 {
     g_return_if_fail(OWR_IS_MEDIA_SESSION(media_session));
     g_return_if_fail(on_send_source);
 
+    if (media_session->priv->on_send_source)
+        g_closure_unref(media_session->priv->on_send_source);
     media_session->priv->on_send_source = on_send_source;
     g_closure_set_marshal(media_session->priv->on_send_source, g_cclosure_marshal_generic);
 }
