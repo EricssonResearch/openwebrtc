@@ -198,6 +198,8 @@ static void owr_session_finalize(GObject *object)
     g_slist_free_full(priv->remote_candidates, (GDestroyNotify)g_object_unref);
     g_slist_free_full(priv->forced_remote_candidates, (GDestroyNotify)g_object_unref);
 
+    _owr_session_clear_closures(session);
+
     G_OBJECT_CLASS(owr_session_parent_class)->finalize(object);
 }
 
@@ -281,7 +283,7 @@ static void owr_session_init(OwrSession *session)
 /**
  * owr_session_add_remote_candidate:
  * @session: the session on which the candidate will be added.
- * @candidate: the candidate to add
+ * @candidate: (transfer none): the candidate to add
  *
  * Adds a remote candidate for this session.
  *
@@ -311,7 +313,7 @@ void owr_session_add_remote_candidate(OwrSession *session, OwrCandidate *candida
 /**
  * owr_session_force_remote_candidate:
  * @session: The session on which the candidate will be forced.
- * @candidate: the candidate to forcibly set
+ * @candidate: (transfer none): the candidate to forcibly set
  *
  * Forces the transport agent to use the given candidate. Calling this function will disable all
  * further ICE processing. Keep-alives will continue to be sent.
@@ -396,6 +398,15 @@ void _owr_session_clear_closures(OwrSession *session)
 }
 
 /* Private methods */
+/**
+ * _owr_session_get_remote_candidates:
+ * @session:
+ *
+ * Must be called from the main thread
+ *
+ * Returns: (transfer none) (element-type OwrCandidate):
+ *
+ */
 GSList * _owr_session_get_remote_candidates(OwrSession *session)
 {
     g_return_val_if_fail(session, NULL);
@@ -403,6 +414,15 @@ GSList * _owr_session_get_remote_candidates(OwrSession *session)
     return session->priv->remote_candidates;
 }
 
+/**
+ * _owr_session_get_forced_remote_candidates:
+ * @session:
+ *
+ * Must be called from the main thread
+ *
+ * Returns: (transfer none) (element-type OwrCandidate):
+ *
+ */
 GSList * _owr_session_get_forced_remote_candidates(OwrSession *session)
 {
     g_return_val_if_fail(OWR_IS_SESSION(session), NULL);
@@ -410,15 +430,22 @@ GSList * _owr_session_get_forced_remote_candidates(OwrSession *session)
     return session->priv->forced_remote_candidates;
 }
 
+/**
+ * _owr_session_set_on_remote_candidate:
+ * @session:
+ * @on_remote_candidate: (transfer full):
+ *
+ */
 void _owr_session_set_on_remote_candidate(OwrSession *session, GClosure *on_remote_candidate)
 {
     g_return_if_fail(session);
     g_return_if_fail(on_remote_candidate);
 
+    if (session->priv->on_remote_candidate)
+        g_closure_unref(session->priv->on_remote_candidate);
     session->priv->on_remote_candidate = on_remote_candidate;
     g_closure_set_marshal(session->priv->on_remote_candidate, g_cclosure_marshal_generic);
 }
-
 
 void _owr_session_set_dtls_peer_certificate(OwrSession *session,
     const gchar *certificate)
