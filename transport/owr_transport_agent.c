@@ -385,8 +385,11 @@ void owr_transport_agent_add_helper_server(OwrTransportAgent *transport_agent,
 
     g_object_ref(transport_agent);
     resolver = g_resolver_get_default();
+    g_main_context_push_thread_default(_owr_get_main_context());
     g_resolver_lookup_by_name_async(resolver, address, NULL,
         (GAsyncReadyCallback)add_helper_server_info, helper_server_info);
+    g_main_context_pop_thread_default(_owr_get_main_context());
+    g_object_unref(resolver);
 }
 
 void owr_transport_agent_add_local_address(OwrTransportAgent *transport_agent, const gchar *local_address)
@@ -450,7 +453,6 @@ static void add_helper_server_info(GResolver *resolver, GAsyncResult *result, GH
     g_hash_table_remove(info, "transport_agent");
 
     address_list = g_resolver_lookup_by_name_finish(resolver, result, &error);
-    g_object_unref(resolver);
 
     if (!address_list) {
         g_printerr("Failed to resolve helper server address: %s\n", error->message);
