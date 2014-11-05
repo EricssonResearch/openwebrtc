@@ -156,8 +156,6 @@ static void owr_transport_agent_finalize(GObject *object)
     gst_object_unref(priv->pipeline);
     g_free(priv->transport_bin_name);
 
-    gst_object_unref(priv->rtpbin);
-
     for (item = priv->helper_server_infos; item; item = item->next) {
         g_free(g_hash_table_lookup(item->data, "address"));
         g_free(g_hash_table_lookup(item->data, "username"));
@@ -291,7 +289,6 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
     priv->transport_bin_name = g_strdup_printf("transport_bin_%u", priv->agent_id);
     priv->transport_bin = gst_bin_new(priv->transport_bin_name);
     priv->rtpbin = gst_element_factory_make("rtpbin", "rtpbin");
-    gst_object_ref(priv->rtpbin);
     g_object_set(priv->rtpbin, "do-lost", TRUE, NULL);
     g_signal_connect(priv->rtpbin, "pad-added", G_CALLBACK(on_rtpbin_pad_added), transport_agent);
     g_signal_connect(priv->rtpbin, "request-pt-map", G_CALLBACK(on_rtpbin_request_pt_map), transport_agent);
@@ -432,7 +429,6 @@ void owr_transport_agent_add_session(OwrTransportAgent *agent, OwrSession *sessi
     g_hash_table_insert(args, "session", session);
 
     g_object_ref(agent);
-    g_object_ref(session);
 
     _owr_schedule_with_hash_table((GSourceFunc)add_media_session, args);
 }
@@ -543,6 +539,7 @@ static gboolean link_source_to_transport_bin(GstPad *srcpad, GstElement *pipelin
     sinkpad = gst_element_get_static_pad(transport_bin, name);
 
     ret = gst_pad_link(srcpad, sinkpad) == GST_PAD_LINK_OK;
+    gst_object_unref(sinkpad);
     if (ret) {
         gst_element_post_message(pipeline,
             gst_message_new_latency(GST_OBJECT(pipeline)));
@@ -598,6 +595,7 @@ static void handle_new_send_source(OwrTransportAgent *transport_agent,
         g_object_get(send_source, "name", &name, NULL);
         GST_ERROR("Failed to link \"%s\" with transport bin", name);
     }
+    gst_object_unref(srcpad);
 
     gst_element_sync_state_with_parent(src);
 }
@@ -660,6 +658,7 @@ static void remove_existing_send_source_and_payload(OwrTransportAgent *transport
     gst_element_set_state(source_bin, GST_STATE_NULL);
     gst_bin_remove(GST_BIN(transport_agent->priv->pipeline), source_bin);
     gst_object_unref(bin_src_pad);
+    gst_object_unref(source_bin);
 
     /* Now the payload bin */
     bin_name = g_strdup_printf("send-input-bin-%u", stream_id);
@@ -758,6 +757,7 @@ static gboolean add_media_session(GHashTable *args)
     }
 
     g_hash_table_insert(sessions, GUINT_TO_POINTER(stream_id), media_session);
+    g_object_ref(media_session);
 
     update_helper_servers(transport_agent, stream_id);
 
@@ -1267,13 +1267,13 @@ static gboolean emit_new_candidate(GHashTable *args)
     }
 
     owr_candidate = _owr_candidate_new_from_nice_candidate(nice_candidate);
-    g_slist_free_full(lcands, (GDestroyNotify)nice_candidate_free);
     g_return_val_if_fail(owr_candidate, FALSE);
 
     g_signal_emit_by_name(media_session, "on-new-candidate", owr_candidate);
     g_object_unref(owr_candidate);
 
 out:
+    g_slist_free_full(lcands, (GDestroyNotify)nice_candidate_free);
     g_free(foundation);
     g_hash_table_destroy(args);
     g_object_unref(transport_agent);
@@ -1785,6 +1785,7 @@ static void setup_audio_receive_elements(GstPad *new_pad, guint32 session_id, Ow
 
     rtp_caps_sink_pad = gst_element_get_static_pad(rtp_capsfilter, "sink");
     ghost_pad = ghost_pad_and_add_to_bin(rtp_caps_sink_pad, receive_output_bin, "sink");
+    gst_object_unref(rtp_caps_sink_pad);
     if (!GST_PAD_LINK_SUCCESSFUL(gst_pad_link(new_pad, ghost_pad))) {
         GST_ERROR("Failed to link rtpbin with receive-output-bin-%u", session_id);
         return;
@@ -1899,10 +1900,11 @@ static gboolean emit_stats_signal(GHashTable *stats_hash)
     g_return_val_if_fail(stats_hash, FALSE);
     value = g_hash_table_lookup(stats_hash, "media_session");
     g_return_val_if_fail(G_VALUE_HOLDS_OBJECT(value), FALSE);
-    media_session = g_value_get_object(value);
+    media_session = g_value_dup_object(value);
     g_return_val_if_fail(OWR_IS_MEDIA_SESSION(media_session), FALSE);
     g_hash_table_remove(stats_hash, "media_session");
     g_signal_emit_by_name(media_session, "on-new-stats", stats_hash, NULL);
+    g_object_unref(media_session);
     g_hash_table_unref(stats_hash);
     return FALSE;
 }
