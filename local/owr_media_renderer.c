@@ -301,7 +301,6 @@ done:
 void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *source)
 {
     OwrMediaRendererPrivate *priv;
-    gboolean ret = TRUE;
     GstElement *src;
     GstPad *srcpad, *sinkpad;
     GstCaps *caps;
@@ -358,7 +357,6 @@ void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *s
     gst_object_unref(srcpad);
     if (pad_link_return != GST_PAD_LINK_OK) {
         GST_ERROR("Failed to link source with renderer (%d)", pad_link_return);
-        ret = FALSE;
         goto done;
     }
     gst_element_sync_state_with_parent(src);

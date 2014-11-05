@@ -168,12 +168,10 @@ static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer user_data)
 static gboolean shutdown_media_source(GHashTable *args)
 {
     OwrMediaSource *media_source;
-    OwrLocalMediaSource *local_media_source;
     GstElement *source_pipeline, *source_tee;
 
     media_source = g_hash_table_lookup(args, "media_source");
     g_assert(media_source);
-    local_media_source = OWR_LOCAL_MEDIA_SOURCE(media_source);
 
     source_pipeline = _owr_media_source_get_source_bin(media_source);
     if (!source_pipeline) {
