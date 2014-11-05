@@ -319,7 +319,7 @@ OwrMediaSession * owr_media_session_new(gboolean dtls_client_mode)
 /**
  * owr_media_session_add_receive_payload:
  * @media_session: the media session on which to add the receive payload.
- * @payload: the receive payload to add
+ * @payload: (transfer none): the receive payload to add
  *
  * The function adds support for receiving the given payload type.
  */
@@ -343,7 +343,7 @@ void owr_media_session_add_receive_payload(OwrMediaSession *media_session, OwrPa
 /**
  * owr_media_session_set_send_payload:
  * @media_session: The media session on which set the send payload.
- * @payload: the send payload to set
+ * @payload: (transfer none) (allow-none): the send payload to set
  *
  * Sets what payload that will be sent.
  */
@@ -352,13 +352,14 @@ void owr_media_session_set_send_payload(OwrMediaSession *media_session, OwrPaylo
     GHashTable *args;
 
     g_return_if_fail(media_session);
-    g_return_if_fail(payload);
+    g_return_if_fail(!payload || OWR_IS_PAYLOAD(payload));
 
     args = g_hash_table_new(g_str_hash, g_str_equal);
     g_hash_table_insert(args, "media_session", media_session);
     g_hash_table_insert(args, "payload", payload);
     g_object_ref(media_session);
-    g_object_ref(payload);
+    if (payload)
+        g_object_ref(payload);
 
     _owr_schedule_with_hash_table((GSourceFunc)set_send_payload, args);
 }
@@ -422,13 +423,15 @@ static gboolean add_receive_payload(GHashTable *args)
             break;
         }
     }
-    g_rw_lock_writer_unlock(&media_session->priv->rw_lock);
 
     if (!payload_found) {
         g_ptr_array_add(payloads, payload);
         g_object_ref(payload);
-    } else
+    } else {
         g_warning("An already existing payload was added to the media session. Action aborted.\n");
+    }
+
+    g_rw_lock_writer_unlock(&media_session->priv->rw_lock);
 
     g_object_unref(payload);
     g_object_unref(media_session);
@@ -440,8 +443,8 @@ static gboolean set_send_payload(GHashTable *args)
 {
     OwrMediaSession *media_session;
     OwrMediaSessionPrivate *priv;
-    OwrPayload *payload;
-    GValue params[1] = { G_VALUE_INIT };
+    OwrPayload *payload, *old_payload;
+    GValue params[3] = { G_VALUE_INIT };
 
     g_return_val_if_fail(args, FALSE);
 
@@ -449,20 +452,29 @@ static gboolean set_send_payload(GHashTable *args)
     payload = g_hash_table_lookup(args, "payload");
 
     g_return_val_if_fail(media_session, FALSE);
-    g_return_val_if_fail(payload, FALSE);
+    g_return_val_if_fail(!payload || OWR_IS_PAYLOAD(payload), FALSE);
 
     priv = media_session->priv;
 
+    g_rw_lock_writer_lock(&priv->rw_lock);
+    old_payload = priv->send_payload;
+    if (old_payload)
+        g_object_ref(old_payload);
     if (priv->send_payload)
         g_object_unref(priv->send_payload);
-
     priv->send_payload = payload;
+    g_rw_lock_writer_unlock(&priv->rw_lock);
 
     if (priv->on_send_payload) {
         g_value_init(&params[0], OWR_TYPE_MEDIA_SESSION);
         g_value_set_object(&params[0], media_session);
-        g_closure_invoke(priv->on_send_payload, NULL, 1, (const GValue *)&params, NULL);
+        g_value_init(&params[1], OWR_TYPE_PAYLOAD);
+        g_value_set_object(&params[1], old_payload);
+        g_value_init(&params[2], OWR_TYPE_PAYLOAD);
+        g_value_set_object(&params[2], payload);
+        g_closure_invoke(priv->on_send_payload, NULL, 3, (const GValue *)&params, NULL);
         g_value_unset(&params[0]);
+        g_value_unset(&params[1]);
     }
 
     g_object_unref(media_session);
@@ -474,8 +486,8 @@ static gboolean set_send_source(GHashTable *args)
 {
     OwrMediaSession *media_session;
     OwrMediaSessionPrivate *priv;
-    OwrMediaSource *source;
-    GValue params[2] = { G_VALUE_INIT, };
+    OwrMediaSource *source, *old_source;
+    GValue params[3] = { G_VALUE_INIT, };
 
     g_return_val_if_fail(args, FALSE);
 
@@ -487,17 +499,27 @@ static gboolean set_send_source(GHashTable *args)
 
     priv = media_session->priv;
 
+    g_rw_lock_writer_lock(&priv->rw_lock);
+    old_source = priv->send_source;
+    if (old_source)
+        g_object_ref(old_source);
+    if (priv->send_source)
+        g_object_unref(priv->send_source);
+    priv->send_source = source;
+    g_rw_lock_writer_unlock(&priv->rw_lock);
+
     if (priv->on_send_source) {
         g_value_init(&params[0], OWR_TYPE_MEDIA_SESSION);
         g_value_set_object(&params[0], media_session);
         g_value_init(&params[1], OWR_TYPE_MEDIA_SOURCE);
-        g_value_set_object(&params[1], source);
-        g_closure_invoke(priv->on_send_source, NULL, 2, (const GValue *)&params, NULL);
+        g_value_set_object(&params[1], old_source);
+        g_value_init(&params[2], OWR_TYPE_MEDIA_SOURCE);
+        g_value_set_object(&params[2], source);
+        g_closure_invoke(priv->on_send_source, NULL, 3, (const GValue *)&params, NULL);
         g_value_unset(&params[0]);
         g_value_unset(&params[1]);
+        g_value_unset(&params[2]);
     }
-
-    media_session->priv->send_source = source;
 
     g_object_unref(media_session);
     g_hash_table_unref(args);
@@ -507,7 +529,14 @@ static gboolean set_send_source(GHashTable *args)
 
 
 /* Private methods */
-
+/**
+ * _owr_media_session_get_receive_payload:
+ * @media_session:
+ * @payload_type:
+ *
+ * Returns: (transfer full):
+ *
+ */
 OwrPayload * _owr_media_session_get_receive_payload(OwrMediaSession *media_session, guint32 payload_type)
 {
     GPtrArray *receive_payloads = media_session->priv->receive_payloads;
@@ -533,18 +562,48 @@ OwrPayload * _owr_media_session_get_receive_payload(OwrMediaSession *media_sessi
     return NULL;
 }
 
+/**
+ * _owr_media_session_get_send_payload:
+ * @media_session:
+ *
+ * Returns: (transfer full):
+ *
+ */
 OwrPayload * _owr_media_session_get_send_payload(OwrMediaSession *media_session)
 {
+    OwrPayload *payload;
+
     g_return_val_if_fail(media_session, NULL);
 
-    return media_session->priv->send_payload;
+    g_rw_lock_reader_lock(&media_session->priv->rw_lock);
+    payload = media_session->priv->send_payload;
+    if (payload)
+        g_object_ref(payload);
+    g_rw_lock_reader_unlock(&media_session->priv->rw_lock);
+
+    return payload;
 }
 
+/**
+ * _owr_media_session_get_send_source:
+ * @media_session:
+ *
+ * Returns: (transfer full):
+ *
+ */
 OwrMediaSource * _owr_media_session_get_send_source(OwrMediaSession *media_session)
 {
+    OwrMediaSource *source;
+
     g_return_val_if_fail(OWR_IS_MEDIA_SESSION(media_session), NULL);
 
-    return media_session->priv->send_source;
+    g_rw_lock_reader_lock(&media_session->priv->rw_lock);
+    source = media_session->priv->send_source;
+    if (source)
+        g_object_ref(source);
+    g_rw_lock_reader_unlock(&media_session->priv->rw_lock);
+
+    return source;
 }
 
 /**

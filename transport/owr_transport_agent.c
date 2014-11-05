@@ -115,7 +115,7 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
 static void set_send_ssrc_and_cname(OwrTransportAgent *agent, OwrMediaSession *media_session);
 static void on_new_candidate(NiceAgent *nice_agent, guint stream_id, guint component_id, gchar *foundation, OwrTransportAgent *transport_agent);
 static void on_candidate_gathering_done(NiceAgent *nice_agent, guint stream_id, OwrTransportAgent *transport_agent);
-static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMediaSession *media_session);
+static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMediaSession *media_session, OwrPayload * payload);
 static void on_new_remote_candidate(OwrTransportAgent *transport_agent, gboolean forced, OwrSession *session);
 
 static void on_transport_bin_pad_added(GstElement *transport_bin, GstPad *new_pad, OwrTransportAgent *transport_agent);
@@ -545,10 +545,8 @@ static gboolean link_source_to_transport_bin(GstPad *srcpad, GstElement *pipelin
 }
 
 static void handle_new_send_source(OwrTransportAgent *transport_agent,
-    OwrMediaSession *media_session)
+    OwrMediaSession *media_session, OwrMediaSource * send_source, OwrPayload * send_payload)
 {
-    OwrMediaSource *send_source;
-    OwrPayload *send_payload;
     GstElement *transport_bin, *src;
     GstCaps *caps;
     OwrCodecType codec_type = OWR_CODEC_TYPE_NONE;
@@ -559,10 +557,7 @@ static void handle_new_send_source(OwrTransportAgent *transport_agent,
     g_return_if_fail(transport_agent);
     g_return_if_fail(media_session);
 
-    send_source = _owr_media_session_get_send_source(media_session);
     g_assert(send_source);
-
-    send_payload = _owr_media_session_get_send_payload(media_session);
     g_assert(send_payload);
 
     /* check that the source type matches the payload type */
@@ -603,79 +598,102 @@ static void handle_new_send_source(OwrTransportAgent *transport_agent,
 static void maybe_handle_new_send_source_with_payload(OwrTransportAgent *transport_agent,
     OwrMediaSession *media_session)
 {
-    if (_owr_media_session_get_send_payload(media_session) &&
-        _owr_media_session_get_send_source(media_session)) {
-        handle_new_send_payload(transport_agent, media_session);
-        handle_new_send_source(transport_agent, media_session);
+    OwrPayload *payload = NULL;
+    OwrMediaSource *media_source = NULL;
+
+    if ((payload = _owr_media_session_get_send_payload(media_session)) &&
+        (media_source = _owr_media_session_get_send_source(media_session))) {
+        handle_new_send_payload(transport_agent, media_session, payload);
+        handle_new_send_source(transport_agent, media_session, media_source, payload);
     }
+
+    if (payload)
+        g_object_unref(payload);
+    if (media_source)
+        g_object_unref(media_source);
+}
+
+static void remove_existing_send_source_and_payload(OwrTransportAgent *transport_agent, OwrMediaSource *media_source,
+    OwrMediaSession *media_session)
+{
+    guint stream_id;
+    gchar *pad_name = NULL, *bin_name;
+    GstPad *bin_src_pad, *sinkpad;
+    GstElement *send_input_bin, *source_bin;
+    OwrMediaType media_type = OWR_MEDIA_TYPE_UNKNOWN;
+
+    /* Setting a new, different source but have one already */
+
+    stream_id = get_stream_id(transport_agent, OWR_SESSION(media_session));
+
+    /* Unlink the source bin */
+    g_object_get(media_source, "media-type", &media_type, NULL);
+    g_warn_if_fail(media_type != OWR_MEDIA_TYPE_UNKNOWN);
+    if (media_type == OWR_MEDIA_TYPE_VIDEO) {
+        pad_name = g_strdup_printf("video_sink_%u_%u", OWR_CODEC_TYPE_NONE, stream_id);
+    } else {
+        pad_name = g_strdup_printf("audio_raw_sink_%u", stream_id);
+    }
+    sinkpad = gst_element_get_static_pad(transport_agent->priv->transport_bin, pad_name);
+    g_assert(sinkpad);
+    g_free(pad_name);
+
+    bin_src_pad = gst_pad_get_peer(sinkpad);
+    g_assert(bin_src_pad);
+    source_bin = GST_ELEMENT(gst_pad_get_parent(bin_src_pad));
+    g_assert(source_bin);
+
+    /* Shutting down will flush immediately */
+    _owr_media_source_release_source(media_source, source_bin);
+    gst_element_set_state(source_bin, GST_STATE_NULL);
+    gst_bin_remove(GST_BIN(transport_agent->priv->pipeline), source_bin);
+    gst_object_unref(bin_src_pad);
+
+    /* Now the payload bin */
+    bin_name = g_strdup_printf("send-input-bin-%u", stream_id);
+    send_input_bin = gst_bin_get_by_name(GST_BIN(transport_agent->priv->transport_bin), bin_name);
+    g_assert(send_input_bin);
+    g_free(bin_name);
+    gst_element_set_state(send_input_bin, GST_STATE_NULL);
+    gst_bin_remove(GST_BIN(transport_agent->priv->transport_bin), send_input_bin);
+    gst_object_unref(send_input_bin);
+
+    /* Remove the connecting ghostpad */
+    gst_pad_set_active(sinkpad, FALSE);
+    gst_element_remove_pad(transport_agent->priv->transport_bin, sinkpad);
+    gst_object_unref(sinkpad);
+}
+
+static void on_new_send_payload(OwrTransportAgent *transport_agent,
+    OwrPayload *old_payload, OwrPayload *new_payload,
+    OwrMediaSession *media_session)
+{
+    if (old_payload && old_payload != new_payload) {
+        OwrMediaSource *media_source = _owr_media_session_get_send_source(media_session);
+        remove_existing_send_source_and_payload(transport_agent, media_source, media_session);
+        g_object_unref(media_source);
+    }
+
+    if (new_payload && old_payload != new_payload)
+        maybe_handle_new_send_source_with_payload(transport_agent, media_session);
 }
 
 static void on_new_send_source(OwrTransportAgent *transport_agent,
-    OwrMediaSource *media_source, OwrMediaSession *media_session)
+    OwrMediaSource *old_media_source, OwrMediaSource *new_media_source,
+    OwrMediaSession *media_session)
 {
-    OwrMediaSource *existing_source;
-
     g_assert(OWR_IS_TRANSPORT_AGENT(transport_agent));
     g_assert(OWR_IS_MEDIA_SESSION(media_session));
-    g_assert(!media_source || OWR_IS_MEDIA_SOURCE(media_source));
+    g_assert(!new_media_source || OWR_IS_MEDIA_SOURCE(new_media_source));
 
-    existing_source = _owr_media_session_get_send_source(media_session);
-    g_assert(!existing_source || OWR_IS_MEDIA_SOURCE(existing_source));
+    g_assert(!old_media_source || OWR_IS_MEDIA_SOURCE(old_media_source));
 
-    if (existing_source && existing_source != media_source) {
-        guint stream_id;
-        gchar *pad_name = NULL, *bin_name;
-        GstPad *bin_src_pad, *sinkpad;
-        GstElement *send_input_bin, *source_bin;
-        OwrMediaType media_type = OWR_MEDIA_TYPE_UNKNOWN;
-
-        /* Setting a new, different source but have one already */
-
-        stream_id = get_stream_id(transport_agent, OWR_SESSION(media_session));
-
-        /* Unlink the source bin */
-        g_object_get(existing_source, "media-type", &media_type, NULL);
-        g_warn_if_fail(media_type != OWR_MEDIA_TYPE_UNKNOWN);
-        if (media_type == OWR_MEDIA_TYPE_VIDEO) {
-            pad_name = g_strdup_printf("video_sink_%u_%u", OWR_CODEC_TYPE_NONE, stream_id);
-        } else {
-            pad_name = g_strdup_printf("audio_raw_sink_%u", stream_id);
-        }
-        sinkpad = gst_element_get_static_pad(transport_agent->priv->transport_bin, pad_name);
-        g_assert(sinkpad);
-        g_free(pad_name);
-
-        bin_src_pad = gst_pad_get_peer(sinkpad);
-        g_assert(bin_src_pad);
-        source_bin = GST_ELEMENT(gst_pad_get_parent(bin_src_pad));
-        g_assert(source_bin);
-
-        /* Shutting down will flush immediately */
-        _owr_media_source_release_source(existing_source, source_bin);
-        gst_element_set_state(source_bin, GST_STATE_NULL);
-        gst_bin_remove(GST_BIN(transport_agent->priv->pipeline), source_bin);
-        gst_object_unref(bin_src_pad);
-
-        /* Now the payload bin */
-        bin_name = g_strdup_printf("send-input-bin-%u", stream_id);
-        send_input_bin = gst_bin_get_by_name(GST_BIN(transport_agent->priv->transport_bin), bin_name);
-        g_assert(send_input_bin);
-        g_free(bin_name);
-        gst_element_set_state(send_input_bin, GST_STATE_NULL);
-        gst_bin_remove(GST_BIN(transport_agent->priv->transport_bin), send_input_bin);
-        gst_object_unref(send_input_bin);
-
-        /* Remove the connecting ghostpad */
-        gst_pad_set_active(sinkpad, FALSE);
-        gst_element_remove_pad(transport_agent->priv->transport_bin, sinkpad);
-        gst_object_unref(sinkpad);
-    } else if (media_source && !existing_source) {
-        /* Have no existing source but a new one */
-        maybe_handle_new_send_source_with_payload(transport_agent, media_session);
-    } else {
-        /* media_source == existing_source */
-        return;
+    if (old_media_source && old_media_source != new_media_source) {
+        remove_existing_send_source_and_payload(transport_agent, old_media_source, media_session);
     }
+
+    if (new_media_source && old_media_source != new_media_source)
+        maybe_handle_new_send_source_with_payload(transport_agent, media_session);
 }
 
 static gboolean add_media_session(GHashTable *args)
@@ -731,7 +749,7 @@ static gboolean add_media_session(GHashTable *args)
         g_cclosure_new_object_swap(G_CALLBACK(on_new_send_source), G_OBJECT(transport_agent)));
 
     _owr_media_session_set_on_send_payload(media_session,
-        g_cclosure_new_object_swap(G_CALLBACK(maybe_handle_new_send_source_with_payload), G_OBJECT(transport_agent)));
+        g_cclosure_new_object_swap(G_CALLBACK(on_new_send_payload), G_OBJECT(transport_agent)));
 
     _owr_session_set_on_remote_candidate(OWR_SESSION(media_session),
         g_cclosure_new_object_swap(G_CALLBACK(on_new_remote_candidate), G_OBJECT(transport_agent)));
@@ -1340,10 +1358,9 @@ static void add_pads_to_bin_and_transport_bin(GstPad *pad, GstElement *bin, GstE
     ghost_pad_and_add_to_bin(bin_pad, transport_bin, pad_name);
 }
 
-static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMediaSession *media_session)
+static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMediaSession *media_session, OwrPayload * payload)
 {
     guint stream_id;
-    OwrPayload *payload = NULL;
     GstElement *send_input_bin = NULL;
     GstElement *encoder = NULL, *parser = NULL, *payloader = NULL,
         *rtp_capsfilter = NULL, *rtpbin = NULL;
@@ -1357,6 +1374,7 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
 
     g_return_if_fail(transport_agent);
     g_return_if_fail(media_session);
+    g_assert(payload);
 
     stream_id = get_stream_id(transport_agent, OWR_SESSION(media_session));
     g_return_if_fail(stream_id);
@@ -1376,7 +1394,6 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
     rtp_sink_pad = gst_element_get_static_pad(rtpbin, name);
     g_free(name);
 
-    payload = _owr_media_session_get_send_payload(media_session);
     g_object_get(payload, "media-type", &media_type, NULL);
 
     name = g_strdup_printf("send-rtp-capsfilter-%u", stream_id);
@@ -1634,6 +1651,8 @@ static void on_rtpbin_pad_added(GstElement *rtpbin, GstPad *new_pad, OwrTranspor
             setup_video_receive_elements(new_pad, session_id, payload, transport_agent);
         else
             setup_audio_receive_elements(new_pad, session_id, payload, transport_agent);
+
+        g_object_unref(payload);
     } else if (g_str_has_prefix(new_pad_name, "send_rtp_src")) {
         guint32 session_id = 0;
         sscanf(new_pad_name, "send_rtp_src_%u", &session_id);
@@ -1826,8 +1845,10 @@ static gboolean on_sending_rtcp(GObject *session, GstBuffer *buffer, gboolean ea
     media_session = get_media_session(agent, session_id);
     g_return_val_if_fail(OWR_IS_MEDIA_SESSION(media_session), do_not_suppress);
     send_payload = _owr_media_session_get_send_payload(media_session);
-    if (send_payload)
+    if (send_payload) {
         g_object_get(send_payload, "media-type", &media_type, NULL);
+        g_object_unref(send_payload);
+    }
 
     g_object_get(session, "sources", &sources, NULL);
     source = g_value_get_object(g_value_array_get_nth(sources, 0));
