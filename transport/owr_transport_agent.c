@@ -630,6 +630,8 @@ static void remove_existing_send_source_and_payload(OwrTransportAgent *transport
     GstElement *send_input_bin, *source_bin;
     OwrMediaType media_type = OWR_MEDIA_TYPE_UNKNOWN;
 
+    g_assert(media_source);
+
     /* Setting a new, different source but have one already */
 
     stream_id = get_stream_id(transport_agent, OWR_SESSION(media_session));
@@ -676,6 +678,11 @@ static void on_new_send_payload(OwrTransportAgent *transport_agent,
     OwrPayload *old_payload, OwrPayload *new_payload,
     OwrMediaSession *media_session)
 {
+    g_assert(OWR_IS_TRANSPORT_AGENT(transport_agent));
+    g_assert(OWR_IS_MEDIA_SESSION(media_session));
+    g_assert(!new_payload || OWR_IS_PAYLOAD(new_payload));
+    g_assert(!old_payload || OWR_IS_PAYLOAD(old_payload));
+
     if (old_payload && old_payload != new_payload) {
         OwrMediaSource *media_source = _owr_media_session_get_send_source(media_session);
         remove_existing_send_source_and_payload(transport_agent, media_source, media_session);
