@@ -31,6 +31,7 @@
 #include "config.h"
 #endif
 #include "owr_image_renderer.h"
+#include "owr_image_renderer_private.h"
 
 #include "owr_private.h"
 

@@ -39,9 +39,7 @@ G_BEGIN_DECLS
 /*< private >*/
 gboolean _owr_is_initialized(void);
 GMainContext * _owr_get_main_context(void);
-GMainLoop * _owr_get_main_loop();
 void _owr_schedule_with_hash_table(GSourceFunc func, GHashTable *hash_table);
-GstElement * _owr_get_pipeline(void);
 
 G_END_DECLS
 

@@ -31,6 +31,7 @@
 #include "config.h"
 #endif
 #include "owr_remote_media_source.h"
+#include "owr_remote_media_source_private.h"
 
 #include "owr_media_source.h"
 #include "owr_media_source_private.h"
@@ -64,9 +65,10 @@ static void owr_remote_media_source_init(OwrRemoteMediaSource *source)
     if (!gst_element_link(a, b)) \
         GST_ERROR("Failed to link " #a " -> " #b);
 
-OwrRemoteMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
-    guint stream_id, OwrCodecType codec_type, GstElement *transport_bin)
+OwrMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
+    guint stream_id, OwrCodecType codec_type, gpointer transport_bin_ptr)
 {
+    GstElement *transport_bin = GST_ELEMENT(transport_bin_ptr);
     OwrRemoteMediaSource *source;
     OwrRemoteMediaSourcePrivate *priv;
     GEnumClass *enum_class;
@@ -137,5 +139,5 @@ OwrRemoteMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
         GST_ERROR("Failed to link source bin to the outside");
     }
 
-    return source;
+    return OWR_MEDIA_SOURCE(source);
 }

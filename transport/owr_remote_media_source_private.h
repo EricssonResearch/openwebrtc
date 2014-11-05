@@ -38,7 +38,7 @@
 G_BEGIN_DECLS
 
 OwrMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
-    guint stream_id, OwrCodecType codec_type, GstElement *transport_bin);
+    guint stream_id, OwrCodecType codec_type, gpointer transport_bin);
 
 G_END_DECLS
 

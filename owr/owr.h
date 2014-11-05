@@ -30,7 +30,7 @@
 
 G_BEGIN_DECLS
 
-void owr_init();
+void owr_init(void);
 void owr_init_with_main_context(GMainContext *main_context);
 
 G_END_DECLS

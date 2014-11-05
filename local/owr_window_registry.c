@@ -32,6 +32,7 @@
 #endif
 
 #include "owr_window_registry.h"
+#include "owr_window_registry_private.h"
 
 #define OWR_WINDOW_REGISTRY_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), \
     OWR_TYPE_WINDOW_REGISTRY, OwrWindowRegistryPrivate))

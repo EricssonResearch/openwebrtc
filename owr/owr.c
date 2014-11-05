@@ -37,8 +37,8 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
-#include "owr.h"
 
+#include "owr.h"
 #include "owr_private.h"
 #include "owr_utils.h"
 
@@ -281,11 +281,6 @@ gboolean _owr_is_initialized()
 GMainContext * _owr_get_main_context()
 {
     return owr_main_context;
-}
-
-GMainLoop * _owr_get_main_loop()
-{
-    return owr_main_loop;
 }
 
 /**

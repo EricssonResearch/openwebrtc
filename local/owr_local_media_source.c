@@ -31,6 +31,7 @@
 #include "config.h"
 #endif
 #include "owr_local_media_source.h"
+#include "owr_local_media_source_private.h"
 
 #include "owr_media_source.h"
 #include "owr_media_source_private.h"
