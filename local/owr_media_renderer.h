@@ -59,7 +59,6 @@ struct _OwrMediaRendererClass {
     GObjectClass parent_class;
 
     /*< private >*/
-    void *(*get_element)(OwrMediaRenderer *renderer);
     void *(*get_caps)(OwrMediaRenderer *renderer);
 };
 

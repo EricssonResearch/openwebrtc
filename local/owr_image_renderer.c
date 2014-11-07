@@ -33,6 +33,8 @@
 #include "owr_image_renderer.h"
 #include "owr_image_renderer_private.h"
 
+#include "owr_media_renderer_private.h"
+
 #include "owr_private.h"
 
 #include <gst/app/gstappsink.h>
@@ -72,37 +74,18 @@ static void owr_image_renderer_set_property(GObject *object, guint property_id,
     const GValue *value, GParamSpec *pspec);
 static void owr_image_renderer_get_property(GObject *object, guint property_id,
     GValue *value, GParamSpec *pspec);
+static void owr_image_renderer_constructed(GObject *object);
 
 static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer);
 static GstCaps *owr_image_renderer_get_caps(OwrMediaRenderer *renderer);
 
 struct _OwrImageRendererPrivate {
-    GMutex image_renderer_lock;
-
     guint width;
     guint height;
     gdouble max_framerate;
 
-    GstElement *renderer_bin;
     GstElement *appsink;
 };
-
-static void owr_image_renderer_finalize(GObject *object)
-{
-    OwrImageRenderer *renderer = OWR_IMAGE_RENDERER(object);
-    OwrImageRendererPrivate *priv = renderer->priv;
-
-    if (priv->renderer_bin) {
-        gst_element_set_state(priv->renderer_bin, GST_STATE_NULL);
-        gst_object_unref(priv->renderer_bin);
-        priv->renderer_bin = NULL;
-        priv->appsink = NULL;
-    }
-
-    g_mutex_clear(&priv->image_renderer_lock);
-
-    G_OBJECT_CLASS(owr_image_renderer_parent_class)->finalize(object);
-}
 
 static void owr_image_renderer_class_init(OwrImageRendererClass *klass)
 {
@@ -125,10 +108,8 @@ static void owr_image_renderer_class_init(OwrImageRendererClass *klass)
 
     gobject_class->set_property = owr_image_renderer_set_property;
     gobject_class->get_property = owr_image_renderer_get_property;
+    gobject_class->constructed = owr_image_renderer_constructed;
 
-    gobject_class->finalize = owr_image_renderer_finalize;
-
-    media_renderer_class->get_element = (void *(*)(OwrMediaRenderer *))owr_image_renderer_get_element;
     media_renderer_class->get_caps = (void *(*)(OwrMediaRenderer *))owr_image_renderer_get_caps;
 
     g_object_class_install_properties(gobject_class, N_PROPERTIES, obj_properties);
@@ -142,10 +123,6 @@ static void owr_image_renderer_init(OwrImageRenderer *renderer)
     priv->width = DEFAULT_WIDTH;
     priv->height = DEFAULT_HEIGHT;
     priv->max_framerate = DEFAULT_MAX_FRAMERATE;
-
-    priv->renderer_bin = NULL;
-
-    g_mutex_init(&priv->image_renderer_lock);
 }
 
 static void owr_image_renderer_set_property(GObject *object, guint property_id,
@@ -219,6 +196,7 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
 {
     OwrImageRenderer *image_renderer;
     OwrImageRendererPrivate *priv;
+    GstElement *renderer_bin;
     GstElement *sink;
     GstElement *queue, *videorate;
     GstPad *ghostpad, *sinkpad;
@@ -228,14 +206,10 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
     g_assert(renderer);
     image_renderer = OWR_IMAGE_RENDERER(renderer);
     priv = image_renderer->priv;
-
-    g_mutex_lock(&priv->image_renderer_lock);
-
-    if (priv->renderer_bin)
-        goto done;
+    g_assert(!priv->appsink);
 
     bin_name = g_strdup_printf("image-renderer-bin-%u", g_atomic_int_add(&unique_bin_id, 1));
-    priv->renderer_bin = gst_bin_new(bin_name);
+    renderer_bin = gst_bin_new(bin_name);
     g_free(bin_name);
 
     queue = gst_element_factory_make("queue", "image-renderer-queue");
@@ -252,7 +226,7 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
 
     g_object_set(sink, "max-buffers", 1, "drop", TRUE, "qos", TRUE, NULL);
 
-    gst_bin_add_many(GST_BIN(priv->renderer_bin), queue, videorate, sink, NULL);
+    gst_bin_add_many(GST_BIN(renderer_bin), queue, videorate, sink, NULL);
 
     LINK_ELEMENTS(videorate, sink);
     LINK_ELEMENTS(queue, videorate);
@@ -261,12 +235,19 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
     g_assert(sinkpad);
     ghostpad = gst_ghost_pad_new("sink", sinkpad);
     gst_pad_set_active(ghostpad, TRUE);
-    gst_element_add_pad(priv->renderer_bin, ghostpad);
+    gst_element_add_pad(renderer_bin, ghostpad);
     gst_object_unref(sinkpad);
 
-done:
-    g_mutex_unlock(&priv->image_renderer_lock);
-    return gst_object_ref(priv->renderer_bin);
+    return renderer_bin;
+}
+
+static void owr_image_renderer_constructed(GObject *object)
+{
+    OwrMediaRenderer *renderer = OWR_MEDIA_RENDERER(object);
+
+    _owr_media_renderer_set_sink(renderer, owr_image_renderer_get_element(renderer));
+
+    G_OBJECT_CLASS(owr_image_renderer_parent_class)->constructed(object);
 }
 
 static GstCaps *owr_image_renderer_get_caps(OwrMediaRenderer *renderer)

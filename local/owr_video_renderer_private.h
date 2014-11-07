@@ -24,21 +24,18 @@
  */
 
 /*/
-\*\ OwrWindowRegistryPrivate
+\*\ OwrVideoRenderer
 /*/
 
-#ifndef _OWR_WINDOW_REGISTRY_PRIVATE_H_
-#define _OWR_WINDOW_REGISTRY_PRIVATE_H_
+#ifndef __OWR_VIDEO_RENDERER_PRIVATE_H__
+#define __OWR_VIDEO_RENDERER_PRIVATE_H__
 
-#include "owr_window_registry.h"
 #include "owr_video_renderer.h"
 
 G_BEGIN_DECLS
 
-guintptr _owr_window_registry_lookup(OwrWindowRegistry *registry, const gchar *tag);
-void _owr_window_registry_register_renderer(OwrWindowRegistry *window_registry, const gchar *tag, OwrVideoRenderer *video_renderer);
-void _owr_window_registry_unregister_renderer(OwrWindowRegistry *window_registry, const gchar *tag, OwrVideoRenderer *video_renderer);
+void _owr_video_renderer_notify_tag_changed(OwrVideoRenderer *video_renderer, const gchar *tag, gboolean have_handle, guintptr new_handle);
 
 G_END_DECLS
 
-#endif /* _OWR_WINDOW_REGISTRY_PRIVATE_H_ */
+#endif /* __OWR_VIDEO_RENDERER_PRIVATE_H__ */

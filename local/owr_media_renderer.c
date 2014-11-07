@@ -31,6 +31,7 @@
 #include "config.h"
 #endif
 #include "owr_media_renderer.h"
+#include "owr_media_renderer_private.h"
 
 #include "owr_media_source.h"
 #include "owr_media_source_private.h"
@@ -263,32 +264,39 @@ static void owr_media_renderer_get_property(GObject *object, guint property_id,
     }
 }
 
-
-static GstPad *_owr_media_renderer_get_pad(OwrMediaRenderer *renderer)
+static void maybe_start_renderer(OwrMediaRenderer *renderer)
 {
-    GstElement *sink = NULL;
     OwrMediaRendererPrivate *priv;
+    GstPad *sinkpad, *srcpad;
+    GstElement *src;
+    GstCaps *caps;
+    GstPadLinkReturn pad_link_return;
 
-    g_assert(renderer);
     priv = renderer->priv;
 
-    g_mutex_lock(&priv->media_renderer_lock);
+    if (!priv->sink || !priv->source)
+        return;
 
-    if (priv->sink) {
-        sink = priv->sink;
-        goto done;
+    sinkpad = gst_element_get_static_pad(priv->sink, "sink");
+    g_assert(sinkpad);
+    caps = OWR_MEDIA_RENDERER_GET_CLASS(renderer)->get_caps(renderer);
+    src = _owr_media_source_request_source(priv->source, caps);
+    gst_caps_unref(caps);
+    g_assert(src);
+    srcpad = gst_element_get_static_pad(src, "src");
+    g_assert(srcpad);
+    priv->src = src;
+
+    /* The sink is always inside the bin already */
+    gst_bin_add_many(GST_BIN(priv->pipeline), priv->src, NULL);
+    pad_link_return = gst_pad_link(srcpad, sinkpad);
+    gst_object_unref(sinkpad);
+    gst_object_unref(srcpad);
+    if (pad_link_return != GST_PAD_LINK_OK) {
+        GST_ERROR("Failed to link source with renderer (%d)", pad_link_return);
+        return;
     }
-
-    sink = OWR_MEDIA_RENDERER_GET_CLASS(renderer)->get_element(renderer);
-    g_assert(sink);
-
-    priv->sink = sink;
-    gst_bin_add(GST_BIN(priv->pipeline), sink);
     gst_element_set_state(priv->pipeline, GST_STATE_PLAYING);
-
-done:
-    g_mutex_unlock(&priv->media_renderer_lock);
-    return gst_element_get_static_pad(sink, "sink");
 }
 
 /**
@@ -301,10 +309,6 @@ done:
 void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *source)
 {
     OwrMediaRendererPrivate *priv;
-    GstElement *src;
-    GstPad *srcpad, *sinkpad;
-    GstCaps *caps;
-    GstPadLinkReturn pad_link_return;
 
     g_return_if_fail(renderer);
     g_return_if_fail(!source || OWR_IS_MEDIA_SOURCE(source));
@@ -327,46 +331,59 @@ void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *s
         priv->source = NULL;
     }
 
-    g_mutex_unlock(&priv->media_renderer_lock);
-    /* FIXME - too much locking/unlocking of the same lock across private API? */
-
     if (!source) {
-        /* Shut down sink if we have no source */
-        if (priv->sink) {
-            gst_element_set_state(priv->pipeline, GST_STATE_NULL);
-            gst_bin_remove(GST_BIN(priv->pipeline), priv->sink);
-            priv->sink = NULL;
-        }
+        /* Shut down the pipeline if we have no source */
+        gst_element_set_state(priv->pipeline, GST_STATE_NULL);
+        g_mutex_unlock(&priv->media_renderer_lock);
         return;
     }
 
-    sinkpad = _owr_media_renderer_get_pad(renderer);
-    g_assert(sinkpad);
-    caps = OWR_MEDIA_RENDERER_GET_CLASS(renderer)->get_caps(renderer);
-    src = _owr_media_source_request_source(source, caps);
-    gst_caps_unref(caps);
-    g_assert(src);
-    srcpad = gst_element_get_static_pad(src, "src");
-    g_assert(srcpad);
+    priv->source = g_object_ref(source);
+
+    maybe_start_renderer(renderer);
+
+    g_mutex_unlock(&priv->media_renderer_lock);
+}
+
+/**
+ * _owr_media_renderer_set_sink:
+ * @renderer:
+ * @sink: (transfer full) (allow-none):
+ *
+ * Returns:
+ */
+void _owr_media_renderer_set_sink(OwrMediaRenderer *renderer, gpointer sink_ptr)
+{
+    OwrMediaRendererPrivate *priv;
+    GstElement *sink = sink_ptr;
+
+    g_return_if_fail(renderer);
+    g_return_if_fail(!sink || GST_IS_ELEMENT(sink));
+
+    priv = renderer->priv;
 
     g_mutex_lock(&priv->media_renderer_lock);
 
-    gst_bin_add(GST_BIN(priv->pipeline), src);
-    pad_link_return = gst_pad_link(srcpad, sinkpad);
-    gst_object_unref(sinkpad);
-    gst_object_unref(srcpad);
-    if (pad_link_return != GST_PAD_LINK_OK) {
-        GST_ERROR("Failed to link source with renderer (%d)", pad_link_return);
-        goto done;
+    if (priv->sink) {
+        gst_element_set_state(priv->pipeline, GST_STATE_NULL);
+        gst_bin_remove(GST_BIN(priv->pipeline), priv->sink);
+        gst_object_unref(priv->sink);
+        priv->sink = NULL;
     }
-    gst_element_sync_state_with_parent(src);
 
-    gst_element_post_message(priv->pipeline, gst_message_new_latency(GST_OBJECT(priv->pipeline)));
+    if (!sink && priv->src) {
+        _owr_media_source_release_source(priv->source, priv->src);
+        gst_bin_remove(GST_BIN(priv->pipeline), priv->src);
+        priv->src = NULL;
+        g_mutex_unlock(&priv->media_renderer_lock);
+        return;
+    }
 
-    priv->source = g_object_ref(source);
-    priv->src = src;
+    gst_bin_add(GST_BIN(priv->pipeline), sink);
+    priv->sink = sink;
 
-done:
+    maybe_start_renderer(renderer);
+
     g_mutex_unlock(&priv->media_renderer_lock);
 }
 

@@ -31,6 +31,7 @@
 #include "config.h"
 #endif
 #include "owr_audio_renderer.h"
+#include "owr_media_renderer_private.h"
 #include "owr_utils.h"
 
 #include "owr_private.h"
@@ -72,28 +73,14 @@ G_DEFINE_TYPE(OwrAudioRenderer, owr_audio_renderer, OWR_TYPE_MEDIA_RENDERER)
 
 static guint unique_bin_id = 0;
 
+static void owr_audio_renderer_constructed(GObject *object);
+
 static GstElement *owr_audio_renderer_get_element(OwrMediaRenderer *renderer);
 static GstCaps *owr_audio_renderer_get_caps(OwrMediaRenderer *renderer);
 
 struct _OwrAudioRendererPrivate {
-    GMutex audio_renderer_lock;
-    GstElement *renderer_bin;
+    gint dummy;
 };
-
-static void owr_audio_renderer_finalize(GObject *object)
-{
-    OwrAudioRenderer *renderer = OWR_AUDIO_RENDERER(object);
-    OwrAudioRendererPrivate *priv = renderer->priv;
-
-    if (priv->renderer_bin) {
-        gst_element_set_state(priv->renderer_bin, GST_STATE_NULL);
-        gst_object_unref(priv->renderer_bin);
-    }
-
-    g_mutex_clear(&priv->audio_renderer_lock);
-
-    G_OBJECT_CLASS(owr_audio_renderer_parent_class)->finalize(object);
-}
 
 static void owr_audio_renderer_class_init(OwrAudioRendererClass *klass)
 {
@@ -102,9 +89,8 @@ static void owr_audio_renderer_class_init(OwrAudioRendererClass *klass)
 
     g_type_class_add_private(klass, sizeof(OwrAudioRendererPrivate));
 
-    gobject_class->finalize = owr_audio_renderer_finalize;
+    gobject_class->constructed = owr_audio_renderer_constructed;
 
-    media_renderer_class->get_element = (void *(*)(OwrMediaRenderer *))owr_audio_renderer_get_element;
     media_renderer_class->get_caps = (void *(*)(OwrMediaRenderer *))owr_audio_renderer_get_caps;
 
 }
@@ -113,10 +99,6 @@ static void owr_audio_renderer_init(OwrAudioRenderer *renderer)
 {
     OwrAudioRendererPrivate *priv;
     renderer->priv = priv = OWR_AUDIO_RENDERER_GET_PRIVATE(renderer);
-
-    priv->renderer_bin = NULL;
-
-    g_mutex_init(&priv->audio_renderer_lock);
 }
 
 /**
@@ -137,24 +119,16 @@ OwrAudioRenderer *owr_audio_renderer_new(void)
 
 static GstElement *owr_audio_renderer_get_element(OwrMediaRenderer *renderer)
 {
-    OwrAudioRenderer *audio_renderer;
-    OwrAudioRendererPrivate *priv;
+    GstElement *renderer_bin;
     GstElement *audioresample, *audioconvert, *capsfilter, *volume, *sink;
     GstCaps *filter_caps;
     GstPad *ghostpad, *sinkpad;
     gchar *bin_name;
 
     g_assert(renderer);
-    audio_renderer = OWR_AUDIO_RENDERER(renderer);
-    priv = audio_renderer->priv;
-
-    g_mutex_lock(&priv->audio_renderer_lock);
-
-    if (priv->renderer_bin)
-        goto done;
 
     bin_name = g_strdup_printf("audio-renderer-bin-%u", g_atomic_int_add(&unique_bin_id, 1));
-    priv->renderer_bin = gst_bin_new(bin_name);
+    renderer_bin = gst_bin_new(bin_name);
     g_free(bin_name);
 
     audioresample = gst_element_factory_make("audioresample", "audio-renderer-resample");
@@ -174,7 +148,7 @@ static GstElement *owr_audio_renderer_get_element(OwrMediaRenderer *renderer)
     g_object_set(sink, "buffer-time", SINK_BUFFER_TIME,
         "latency-time", G_GINT64_CONSTANT(10000), NULL);
 
-    gst_bin_add_many(GST_BIN(priv->renderer_bin), audioresample, audioconvert, capsfilter,
+    gst_bin_add_many(GST_BIN(renderer_bin), audioresample, audioconvert, capsfilter,
         volume, sink, NULL);
 
     LINK_ELEMENTS(volume, sink);
@@ -186,12 +160,19 @@ static GstElement *owr_audio_renderer_get_element(OwrMediaRenderer *renderer)
     g_assert(sinkpad);
     ghostpad = gst_ghost_pad_new("sink", sinkpad);
     gst_pad_set_active(ghostpad, TRUE);
-    gst_element_add_pad(priv->renderer_bin, ghostpad);
+    gst_element_add_pad(renderer_bin, ghostpad);
     gst_object_unref(sinkpad);
 
-done:
-    g_mutex_unlock(&priv->audio_renderer_lock);
-    return gst_object_ref (priv->renderer_bin);
+    return renderer_bin;
+}
+
+static void owr_audio_renderer_constructed(GObject *object)
+{
+    OwrMediaRenderer *renderer = OWR_MEDIA_RENDERER(object);
+
+    _owr_media_renderer_set_sink(renderer, owr_audio_renderer_get_element(renderer));
+
+    G_OBJECT_CLASS(owr_audio_renderer_parent_class)->constructed(object);
 }
 
 static GstCaps *owr_audio_renderer_get_caps(OwrMediaRenderer *renderer)

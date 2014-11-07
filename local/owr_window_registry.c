@@ -33,6 +33,8 @@
 
 #include "owr_window_registry.h"
 #include "owr_window_registry_private.h"
+#include "owr_video_renderer.h"
+#include "owr_video_renderer_private.h"
 
 #define OWR_WINDOW_REGISTRY_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), \
     OWR_TYPE_WINDOW_REGISTRY, OwrWindowRegistryPrivate))
@@ -48,9 +50,18 @@ struct _OwrWindowRegistryPrivate
     GHashTable *registry_hash_table;
 };
 
+typedef struct {
+    guintptr window_handle;
+    gboolean window_handle_set;
+
+    OwrVideoRenderer *renderer; /* weak reference */
+} WindowHandleData;
+
 static void owr_window_registry_finalize(GObject *object)
 {
     OwrWindowRegistry *window_registry = OWR_WINDOW_REGISTRY(object);
+
+    g_warn_if_reached();
 
     G_LOCK(owr_window_registry_mutex);
 
@@ -78,36 +89,114 @@ static void owr_window_registry_init(OwrWindowRegistry *window_registry)
     OwrWindowRegistryPrivate *priv = window_registry->priv =
         OWR_WINDOW_REGISTRY_GET_PRIVATE(window_registry);
 
-    priv->registry_hash_table = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
+    priv->registry_hash_table = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
 }
 
 void owr_window_registry_register(OwrWindowRegistry *window_registry,
     const gchar *tag, gpointer handle)
 {
     OwrWindowRegistryPrivate *priv;
+    WindowHandleData *data;
 
     g_return_if_fail(OWR_IS_WINDOW_REGISTRY(window_registry));
     g_return_if_fail(handle);
 
     priv = window_registry->priv;
 
-    g_return_if_fail(!g_hash_table_contains(priv->registry_hash_table, tag));
-    g_hash_table_insert(priv->registry_hash_table, g_strdup(tag), handle);
+    data = g_hash_table_lookup(priv->registry_hash_table, tag);
+    if (data) {
+        g_return_if_fail(!data->window_handle_set);
+
+        data->window_handle = (guintptr) handle;
+        data->window_handle_set = TRUE;
+
+        /* Notify the renderer */
+        if (data->renderer) {
+            _owr_video_renderer_notify_tag_changed(data->renderer, tag, TRUE, (guintptr) handle);
+        }
+    } else {
+        data = g_new0(WindowHandleData, 1);
+        data->window_handle = (guintptr) handle;
+        data->window_handle_set = TRUE;
+        data->renderer = NULL;
+
+        g_hash_table_insert(priv->registry_hash_table, g_strdup(tag), data);
+    }
 }
 
 void owr_window_registry_unregister(OwrWindowRegistry *window_registry,
     const gchar *tag)
 {
-    gboolean found;
+    OwrWindowRegistryPrivate *priv;
+    WindowHandleData *data;
+
     g_return_if_fail(OWR_IS_WINDOW_REGISTRY(window_registry));
 
-    found = g_hash_table_remove(window_registry->priv->registry_hash_table, tag);
-    g_warn_if_fail(found);
+    priv = window_registry->priv;
+
+    data = g_hash_table_lookup(priv->registry_hash_table, tag);
+    g_return_if_fail(data);
+
+    if (data->renderer) {
+        _owr_video_renderer_notify_tag_changed(data->renderer, tag, FALSE, 0);
+    } else {
+        g_hash_table_remove(priv->registry_hash_table, tag);
+    }
+}
+
+void _owr_window_registry_register_renderer(OwrWindowRegistry *window_registry,
+    const gchar *tag, OwrVideoRenderer *video_renderer)
+{
+    WindowHandleData *data;
+    OwrWindowRegistryPrivate *priv;
+
+    g_return_if_fail(OWR_IS_WINDOW_REGISTRY(window_registry));
+    g_return_if_fail(OWR_IS_VIDEO_RENDERER(video_renderer));
+
+    priv = window_registry->priv;
+
+    data = g_hash_table_lookup(priv->registry_hash_table, tag);
+    if (data) {
+        g_return_if_fail(!data->renderer);
+
+        data->renderer = video_renderer;
+
+        /* Notify the renderer */
+        if (data->window_handle_set) {
+            _owr_video_renderer_notify_tag_changed(video_renderer, tag, TRUE, data->window_handle);
+        }
+    } else {
+        data = g_new0(WindowHandleData, 1);
+        data->window_handle = 0;
+        data->window_handle_set = FALSE;
+        data->renderer = video_renderer;
+
+        g_hash_table_insert(priv->registry_hash_table, g_strdup(tag), data);
+    }
+}
+
+void _owr_window_registry_unregister_renderer(OwrWindowRegistry *window_registry,
+    const gchar *tag, OwrVideoRenderer *video_renderer)
+{
+    OwrWindowRegistryPrivate *priv;
+    WindowHandleData *data;
+
+    g_return_if_fail(OWR_IS_WINDOW_REGISTRY(window_registry));
+    g_return_if_fail(OWR_IS_VIDEO_RENDERER(video_renderer));
+
+    priv = window_registry->priv;
+
+    data = g_hash_table_lookup(priv->registry_hash_table, tag);
+    g_return_if_fail(data);
+    g_return_if_fail(data->renderer == video_renderer);
+
+    data->renderer = NULL;
+    if (!data->window_handle_set)
+        g_hash_table_remove(priv->registry_hash_table, tag);
 }
 
 guintptr _owr_window_registry_lookup(OwrWindowRegistry *window_registry,
-    const gchar *tag)
-{
+    const gchar *tag) {
     g_return_val_if_fail(OWR_IS_WINDOW_REGISTRY(window_registry), 0);
 
     return (guintptr)g_hash_table_lookup(window_registry->priv->registry_hash_table, tag);
