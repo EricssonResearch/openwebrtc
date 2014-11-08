@@ -15,6 +15,7 @@ owr_image_server_remove_image_renderer
 owr_init
 owr_init_with_main_context
 owr_local_media_source_get_type
+owr_media_renderer_dump_dot_file
 owr_media_renderer_get_type
 owr_media_renderer_set_source
 owr_media_session_add_receive_payload
@@ -22,6 +23,7 @@ owr_media_session_get_type
 owr_media_session_new
 owr_media_session_set_send_payload
 owr_media_session_set_send_source
+owr_media_source_dump_dot_file
 owr_media_source_get_type
 owr_media_type_get_type
 owr_payload_get_type
@@ -33,6 +35,7 @@ owr_source_type_get_type
 owr_transport_agent_add_helper_server
 owr_transport_agent_add_local_address
 owr_transport_agent_add_session
+owr_transport_agent_dump_dot_file
 owr_transport_agent_get_type
 owr_transport_agent_new
 owr_transport_agent_set_local_port_range
