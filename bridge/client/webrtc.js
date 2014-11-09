@@ -1178,6 +1178,8 @@
                     imgUrl = "http://127.0.0.1:" + renderInfo.port + "/__" + tag + "-";
 
                 img.onload = function () {
+                    if (img.oncomplete)
+                        img.oncomplete();
                     imgDiv.videoWidth = img.naturalWidth;
                     imgDiv.videoHeight = img.naturalHeight;
                     imgDiv.currentTime++;
@@ -1252,6 +1254,26 @@
             return origCreateObjectURL(obj);
        // this will always fail
        checkArguments("createObjectURL", "Blob", 1, arguments);
+    };
+
+    var origDrawImage = CanvasRenderingContext2D.prototype.drawImage;
+    CanvasRenderingContext2D.prototype.drawImage = function () {
+        var _this = this;
+        var args = Array.apply([], arguments);
+        if (args[0] instanceof HTMLDivElement) {
+            args[0] = args[0].firstChild;
+            if (args[0] && !args[0].complete) {
+                if (!args[0].oncomplete) {
+                    args[0].oncomplete = function () {
+                        args[0].oncomplete = null;
+                        origDrawImage.apply(_this, args);
+                    };
+                }
+                return;
+            }
+        }
+
+        return origDrawImage.apply(_this, args);
     };
 
 })(self);
