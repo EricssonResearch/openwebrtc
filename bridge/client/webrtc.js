@@ -1107,6 +1107,7 @@
             imgDiv.className = video.className + " owr-video " + styleClassName;
 
             var img = new Image();
+            img.crossOrigin = "anonymous";
             img.style.display = "inline-block";
             img.style.verticalAlign = "middle";
             imgDiv.appendChild(img);
