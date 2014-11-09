@@ -34,6 +34,7 @@ var nextImageServerPort = imageServerBasePort;
 var server = new WebSocketServer(10717, "127.0.0.1");
 server.onaccept = function (event) {
     var ws = event.socket;
+    var origin = event.origin;
     var channel = {
         "postMessage": function (message) {
             ws.send(btoa(message));
@@ -132,8 +133,13 @@ server.onaccept = function (event) {
                 nextImageServerPort = imageServerBasePort;
             imageServerPort = nextImageServerPort++;
             imageServer = imageServers[imageServerPort];
-            if (!imageServer)
-                imageServer = imageServers[imageServerPort] = new owr.ImageServer({ "port": imageServerPort });
+            if (!imageServer) {
+                imageServer = imageServers[imageServerPort] = new owr.ImageServer({
+                    "port": imageServerPort,
+                    "allow-origin": origin
+                });
+            } else if (imageServer.allow_origin.split(" ").indexOf(origin) == -1)
+                imageServer.allow_origin += " " + origin;
             imageServer.add_image_renderer(videoRenderer, tag);
         }
 
