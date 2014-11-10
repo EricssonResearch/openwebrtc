@@ -293,9 +293,14 @@ static gboolean on_incoming_connection(GThreadedSocketService *service,
 
         g_mutex_lock(&image_server->priv->image_renderers_mutex);
         image_renderer = tag ? g_hash_table_lookup(image_server->priv->image_renderers, tag) : NULL;
+        if (image_renderer)
+            g_object_ref(image_renderer);
         g_mutex_unlock(&image_server->priv->image_renderers_mutex);
 
         image = image_renderer ? _owr_image_renderer_pull_bmp_image(image_renderer) : NULL;
+
+        if (image_renderer)
+            g_object_unref(image_renderer);
 
         if (!image) {
             g_output_stream_write(bos, error_header, strlen(error_header), NULL, NULL);
