@@ -107,7 +107,7 @@ GST_PLUGIN_STATIC_DECLARE(pulseaudio);
 GST_PLUGIN_STATIC_DECLARE(video4linux2);
 #endif
 
-#if defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR && !defined(__arm64__))
+#if (defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR && !defined(__arm64__))
 GST_PLUGIN_STATIC_DECLARE(ercolorspace);
 #endif
 #endif
@@ -235,7 +235,7 @@ void owr_init()
     GST_PLUGIN_STATIC_REGISTER(pulseaudio);
     GST_PLUGIN_STATIC_REGISTER(video4linux2);
 #endif
-#if defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR && !defined(__arm64__))
+#if (defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR && !defined(__arm64__))
     GST_PLUGIN_STATIC_REGISTER(ercolorspace);
 #endif
 
