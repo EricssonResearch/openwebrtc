@@ -227,6 +227,17 @@ static void tee_pad_removed_cb(GstElement *tee, GstPad *old_pad, gpointer user_d
     }
 }
 
+static GstPadProbeReturn
+drop_reconfigure_event(GstPad *pad, GstPadProbeInfo *info, gpointer user_data)
+{
+    OWR_UNUSED(pad);
+    OWR_UNUSED(user_data);
+
+    if (GST_EVENT_TYPE(info->data) == GST_EVENT_RECONFIGURE)
+        return GST_PAD_PROBE_DROP;
+    return GST_PAD_PROBE_OK;
+}
+
 /*
  * owr_local_media_source_get_pad
  *
@@ -272,6 +283,7 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
         OwrSourceType source_type = OWR_SOURCE_TYPE_UNKNOWN;
         GstElement *source, *capsfilter = NULL, *tee;
         GstElement *queue, *fakesink;
+        GstPad *sinkpad;
         GEnumClass *media_enum_class, *source_enum_class;
         GEnumValue *media_enum_value, *source_enum_value;
         gchar *bin_name;
@@ -423,6 +435,16 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
         gst_element_sync_state_with_parent(fakesink);
         LINK_ELEMENTS(tee, queue);
         LINK_ELEMENTS(queue, fakesink);
+
+        /* Many sources don't like reconfiguration and it's pointless
+         * here anyway right now. No need to reconfigure whenever something
+         * is added to the tee or removed.
+         * We will have to implement reconfiguration differently later by
+         * selecting the best caps based on all consumers.
+         */
+        sinkpad = gst_element_get_static_pad(tee, "sink");
+        gst_pad_add_probe(sinkpad, GST_PAD_PROBE_TYPE_EVENT_UPSTREAM, drop_reconfigure_event, NULL, NULL);
+        gst_object_unref(sinkpad);
 
         if (!source)
             GST_ERROR_OBJECT(media_source, "Failed to create source element!");
