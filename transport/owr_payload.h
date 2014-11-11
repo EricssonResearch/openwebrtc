@@ -43,6 +43,8 @@ G_BEGIN_DECLS
 #define OWR_IS_PAYLOAD_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass), OWR_TYPE_PAYLOAD))
 #define OWR_PAYLOAD_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS((obj), OWR_TYPE_PAYLOAD, OwrPayloadClass))
 
+#define OWR_RTX_PAYLOAD_TYPE_DISABLED -1
+
 typedef struct _OwrPayload        OwrPayload;
 typedef struct _OwrPayloadClass   OwrPayloadClass;
 typedef struct _OwrPayloadPrivate OwrPayloadPrivate;
