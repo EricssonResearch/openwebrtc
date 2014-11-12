@@ -246,7 +246,7 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer, gu
     OwrVideoRenderer *video_renderer;
     OwrVideoRendererPrivate *priv;
     GstElement *renderer_bin;
-    GstElement *balance, *queue, *sink;
+    GstElement *balance, *sink;
     GstPad *ghostpad, *sinkpad;
     gchar *bin_name;
 
@@ -263,10 +263,6 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer, gu
         balance, 0);
     renderer_disabled(renderer, NULL, balance);
 
-    queue = gst_element_factory_make("queue", "video-renderer-queue");
-    g_assert(queue);
-    g_object_set(queue, "max-size-buffers", 3, "max-size-bytes", 0, "max-size-time", G_GUINT64_CONSTANT(0), NULL);
-
     sink = gst_element_factory_make(VIDEO_SINK, "video-renderer-sink");
     g_assert(sink);
     if (priv->tag) {
@@ -281,10 +277,9 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer, gu
             g_object_unref(sink_element);
     }
 
-    gst_bin_add_many(GST_BIN(renderer_bin), balance, queue, sink, NULL);
+    gst_bin_add_many(GST_BIN(renderer_bin), balance, sink, NULL);
 
-    LINK_ELEMENTS(queue, sink);
-    LINK_ELEMENTS(balance, queue);
+    LINK_ELEMENTS(balance, sink);
 
     sinkpad = gst_element_get_static_pad(balance, "sink");
     g_assert(sinkpad);

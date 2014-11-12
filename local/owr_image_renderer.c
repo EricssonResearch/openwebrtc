@@ -198,9 +198,7 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
     OwrImageRendererPrivate *priv;
     GstElement *renderer_bin;
     GstElement *sink;
-    GstElement *queue, *videorate;
     GstPad *ghostpad, *sinkpad;
-    gdouble max_framerate;
     gchar *bin_name;
 
     g_assert(renderer);
@@ -212,26 +210,15 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
     renderer_bin = gst_bin_new(bin_name);
     g_free(bin_name);
 
-    queue = gst_element_factory_make("queue", "image-renderer-queue");
-    g_object_set(queue, "max-size-buffers", 3, "max-size-bytes", 0,
-        "max-size-time", G_GUINT64_CONSTANT(0), NULL);
-
-    videorate = gst_element_factory_make("videorate", "image-renderer-rate");
-    max_framerate = priv->max_framerate > 0.0 ? priv->max_framerate : LIMITED_FRAMERATE;
-    g_object_set(videorate, "drop-only", TRUE, "max-rate", (gint)max_framerate, NULL);
-
     sink = gst_element_factory_make("appsink", "image-renderer-appsink");
     g_assert(sink);
     priv->appsink = sink;
 
     g_object_set(sink, "max-buffers", 1, "drop", TRUE, "qos", TRUE, NULL);
 
-    gst_bin_add_many(GST_BIN(renderer_bin), queue, videorate, sink, NULL);
+    gst_bin_add_many(GST_BIN(renderer_bin), sink, NULL);
 
-    LINK_ELEMENTS(videorate, sink);
-    LINK_ELEMENTS(queue, videorate);
-
-    sinkpad = gst_element_get_static_pad(queue, "sink");
+    sinkpad = gst_element_get_static_pad(sink, "sink");
     g_assert(sinkpad);
     ghostpad = gst_ghost_pad_new("sink", sinkpad);
     gst_pad_set_active(ghostpad, TRUE);
