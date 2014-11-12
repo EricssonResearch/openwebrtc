@@ -241,6 +241,20 @@ static void owr_media_source_get_property(GObject *object, guint property_id,
     }
 }
 
+static GstPadProbeReturn
+drop_gap_buffers(GstPad *pad, GstPadProbeInfo *info, gpointer user_data)
+{
+    OWR_UNUSED(pad);
+    OWR_UNUSED(user_data);
+
+    /* Drop GAP buffers, they're just duplicated buffers and we don't
+     * care about constant framerate here */
+    if (GST_BUFFER_FLAG_IS_SET (info->data, GST_BUFFER_FLAG_GAP)) {
+        return GST_PAD_PROBE_DROP;
+    }
+    return GST_PAD_PROBE_OK;
+}
+
 /*
  * The following chain is created after the tee for each output from the
  * source:
@@ -309,6 +323,10 @@ static GstElement *owr_media_source_request_source_default(OwrMediaSource *media
 
         CREATE_ELEMENT_WITH_ID(source, "intervideosrc", "source", source_id);
         CREATE_ELEMENT_WITH_ID(sink, "intervideosink", "sink", source_id);
+
+        srcpad = gst_element_get_static_pad(source, "src");
+        gst_pad_add_probe(srcpad, GST_PAD_PROBE_TYPE_BUFFER, drop_gap_buffers, NULL, NULL);
+        gst_object_unref(srcpad);
 
         g_object_set(capsfilter, "caps", caps, NULL);
 
