@@ -12,8 +12,8 @@ AM_SILENT_RULES([yes])
 
 AC_PROG_CC
 AC_PROG_CC_STDC
-dnl only needed for Apple, but can't be conditional
 AC_PROG_OBJC
+AC_CANONICAL_SYSTEM
 
 LT_INIT
 
@@ -75,6 +75,7 @@ if test "x$enable_owr_static" = xyes; then
   AC_DEFINE(OWR_STATIC, 1,
   [Define if building static])
 fi
+AC_SUBST(GST_STATIC_PLUGINS_DIR)
 AM_CONDITIONAL(OWR_STATIC, test x$enable_owr_static = xyes)
 
 dnl pick dependencies and build flags based on OS
@@ -108,10 +109,82 @@ AC_HELP_STRING(
 esac],[enable_owr_java=no])
 AC_MSG_RESULT([$enable_owr_java])
 if test "x$enable_owr_java" = xyes; then
+  if test "x$enable_shared" != xyes; then
+    AC_MSG_ERROR([--enable-owr-java needs --enabled-shared])
+  fi
+  AC_PATH_PROG(JAVAC, javac)
+  if test -z "$JAVAC"; then
+    AC_MSG_ERROR([You need 'javac' to build the Android bindings])
+  fi
+  AC_PATH_PROG(JAR, jar)
+  if test -z "$JAR"; then
+    AC_MSG_ERROR([You need 'jar' to build the Android bindings])
+  fi
   AC_DEFINE(OWR_JAVA, 1,
   [Define if generating bindings for java])
 fi
 AM_CONDITIONAL(OWR_JAVA, test x$enable_owr_java = xyes)
+
+dnl The Jar file installation path is needed as well
+AC_MSG_CHECKING([for jar installation path])
+AC_ARG_WITH(jardir,
+            AS_HELP_STRING([--with-jardir],
+                           [jar file installation path [LIBDIR/jni]]),
+            jardir=${withval}, jardir=${libdir}/jni)
+AC_MSG_RESULT([$jardir])
+AC_SUBST(jardir)
+
+dnl Android SDK path is needed when Java bindings are enabled
+AC_ARG_WITH(android-sdk,
+            AS_HELP_STRING([--with-android-sdk],
+                           [path to the Android SDK]),
+            androidsdkdir=${withval}, androidsdkdir=)
+if test "x$enable_owr_java" = xyes; then
+  AC_MSG_CHECKING([for android.jar])
+  if test -a "x$androidsdkdir" = x; then
+    AC_MSG_ERROR([Need path to the Android SDK when building Android bindings])
+  fi
+  ANDROID_CLASSPATH="$androidsdkdir/platforms/android-20/android.jar"
+  if ! test -f "$ANDROID_CLASSPATH"; then
+    ANDROID_CLASSPATH="$androidsdkdir/platforms/android-19/android.jar"
+    if ! test -f "$ANDROID_CLASSPATH"; then
+      AC_MSG_ERROR([Android SDK API level 19 or 20 not found])
+    fi
+  fi
+  AC_MSG_RESULT([$ANDROID_CLASSPATH])
+fi
+AC_SUBST(ANDROID_CLASSPATH)
+
+dnl Android NDK path is needed when Java bindings are enabled
+AC_ARG_WITH(android-ndk,
+            AS_HELP_STRING([--with-android-ndk],
+                           [path to the Android NDK]),
+            androidndkdir=${withval}, androidndkdir=)
+if test "x$enable_owr_java" = xyes; then
+  AC_MSG_CHECKING([for the Android NDK prefix])
+  if test -a "x$androidndkdir" = x; then
+    AC_MSG_ERROR([Need path to the Android NDK when building Android bindings])
+  fi
+  case "$target" in
+    i?86-*|x86_64-*)
+      ndk_arch=x86;;
+    arm-*)
+      ndk_arch=arm;;
+    mips-*)
+      ndk_arch=mips;;
+    *)
+      AC_MSG_ERROR([Unsupported Android target: $target]);;
+  esac
+  if ! test -d "$androidndkdir"; then
+    AC_MSG_ERROR([Android NDK path $androidndkdir is invalid])
+  fi
+  ANDROID_NDK_PREFIX="$androidndkdir/platforms/android-9/arch-$ndk_arch/usr"
+  if ! test -d "$ANDROID_NDK_PREFIX"; then
+    AC_MSG_ERROR([Android NDK level 9 not found for arch $ndk_arch])
+  fi
+  AC_MSG_RESULT([$ANDROID_NDK_PREFIX])
+fi
+AC_SUBST(ANDROID_NDK_PREFIX)
 
 AC_OUTPUT([
 Makefile
