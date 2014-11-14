@@ -429,7 +429,7 @@ if (typeof(SDP) == "undefined")
                     if (mediaDescription.mediaStreamId && mediaDescription.mediaStreamTrackId)
                         srcAttributeLines.msidLines += fillTemplate(templates.msid, srcAttributes);
                 });
-            } else {
+            } else if (mediaDescription.mediaStreamId && mediaDescription.mediaStreamTrackId) {
                 srcAttributes.ssrc = null;
                 srcAttributeLines.msidLines += fillTemplate(templates.msid, srcAttributes);
             }
