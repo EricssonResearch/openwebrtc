@@ -235,7 +235,7 @@ static void owr_media_session_class_init(OwrMediaSessionClass *klass)
     * Notify of a new incoming source for a #OwrMediaSession.
     */
     media_session_signals[SIGNAL_ON_INCOMING_SOURCE] = g_signal_new("on-incoming-source",
-        G_OBJECT_CLASS_TYPE(klass), G_SIGNAL_RUN_FIRST,
+        G_OBJECT_CLASS_TYPE(klass), G_SIGNAL_RUN_CLEANUP,
         G_STRUCT_OFFSET(OwrMediaSessionClass, on_incoming_source), NULL, NULL,
         g_cclosure_marshal_VOID__OBJECT, G_TYPE_NONE, 1, OWR_TYPE_REMOTE_MEDIA_SOURCE);
 
