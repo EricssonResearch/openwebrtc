@@ -36,13 +36,6 @@ libopenwebrtc_la_DEPENDENCIES = \
     $(top_builddir)/local/libopenwebrtc_local.la \
     $(top_builddir)/transport/libopenwebrtc_transport.la
 
-if OWR_JAVA
-libopenwebrtc_la_LIBADD += \
-    $(top_builddir)/gen_jni/libopenwebrtc_jni.la
-libopenwebrtc_la_DEPENDENCIES += \
-    $(top_builddir)/gen_jni/libopenwebrtc_jni.la
-endif
-
 libopenwebrtc_la_LDFLAGS = -export-dynamic -version-info 3601
 
 if OWR_STATIC
@@ -52,6 +45,16 @@ libopenwebrtc_la_SOURCES += \
 CLEANFILES += owr_require_symbols.c
 owr_require_symbols.c:
 	python ${srcdir}/symbols_to_source.py $(top_srcdir)/libopenwebrtc.exp $@
+endif
+
+# This is used to create a 'fat' libopenwebrtc_jni.so library which contains
+if OWR_JAVA
+noinst_LTLIBRARIES = libopenwebrtc_static.la
+libopenwebrtc_static_la_SOURCES = $(libopenwebrtc_la_SOURCES)
+libopenwebrtc_static_la_LIBADD = $(libopenwebrtc_la_LIBADD)
+libopenwebrtc_static_la_DEPENDENCIES = $(libopenwebrtc_la_DEPENDENCIES)
+libopenwebrtc_static_la_LDFLAGS = $(libopenwebrtc_la_LDFLAGS)
+libopenwebrtc_static_la_CFLAGS = $(libopenwebrtc_la_CFLAGS)
 endif
 
 includedir = $(prefix)/include/owr

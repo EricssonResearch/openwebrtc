@@ -88,8 +88,9 @@ build(){
             export PLATFORM_GSTREAMER_LIBS="-framework CoreMedia -framework CoreVideo -framework AVFoundation -framework Foundation -framework OpenGLES -lgstosxaudio -lgstapplemedia -framework AssetsLibrary -framework CoreAudio -framework AudioToolbox -weak_framework VideoToolbox"
             export PLATFORM_CXX_LIBS="-lc++"
         elif [[ $target_triple == "arm-linux-androideabi" ]]; then
+            local android_sdk="$(dirname $(which adb))/.."
             local platform_ldflags="-llog -Wl,--allow-multiple-definition -landroid "
-            local configure_flags="--disable-static --enable-owr-static --enable-shared --disable-introspection --enable-owr-java"
+            local configure_flags="--disable-static --enable-owr-static --enable-shared --disable-introspection --enable-owr-java --with-jardir=${installdir}/jar --with-android-ndk=$ANDROID_NDK --with-android-sdk=${android_sdk}"
             local seed_platform_libs="-ljavascriptcoregtk-3.0 -licui18n -licuuc -licudata"
             export PLATFORM_GLIB_LIBS="-lffi -liconv -lintl "
             export PLATFORM_GSTREAMER_LIBS="-lgstopensles -lOpenSLES -lGLESv2 -lEGL"
@@ -140,34 +141,7 @@ build(){
             --host=${target_triple} \
             --enable-debug=$debug ${configure_flags} &&
         patch -p0 < $REPO_ROOT/libtool.diff &&
-        make && make install &&
-        if [[ $target_triple == "arm-linux-androideabi" ]]; then
-            local android_jar="$(find $(dirname $(which adb))/../platforms/*/android.jar | tail -n 1)"
-            local jni_dir="$builddir/gen_jni"
-            mkdir -p "$installdir/jar" &&
-            (
-                local jar_name="openwebrtc.jar"
-                local java_build_dir="$jni_dir/owr"
-                mkdir -p $java_build_dir &&
-                cd $java_build_dir &&
-                javac $jni_dir/java/com/ericsson/research/owr/* -d "./" -classpath $android_jar &&
-                mkdir -p lib/armeabi/ &&
-                cp -f "$installdir/lib/libopenwebrtc.so" lib/armeabi/ &&
-                jar cvf $jar_name . &&
-                cp -f $jar_name "$installdir/jar/$jar_name"
-                ) &&
-            (
-                local jar_name="openwebrtc_bridge.jar"
-                local java_build_dir="$jni_dir/bridge"
-                mkdir -p $java_build_dir &&
-                cd $java_build_dir &&
-                javac $REPO_ROOT/gen_jni/com/ericsson/research/owr/* -d "./" &&
-                mkdir -p lib/armeabi/ &&
-                cp -f "$installdir/lib/libopenwebrtc_bridge.so" lib/armeabi/ &&
-                jar cvf $jar_name . &&
-                cp -f $jar_name "$installdir/jar/$jar_name"
-                )
-        fi
+        make && make install
     )
 }
 
