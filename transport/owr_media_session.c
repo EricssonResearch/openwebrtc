@@ -104,7 +104,6 @@ static gboolean set_send_source(GHashTable *args);
 static void owr_media_session_set_property(GObject *object, guint property_id, const GValue *value, GParamSpec *pspec)
 {
     OwrMediaSessionPrivate *priv = OWR_MEDIA_SESSION(object)->priv;
-    GObjectClass *parent_class;
     gboolean rtcp_mux;
 
     switch (property_id) {
@@ -128,8 +127,7 @@ static void owr_media_session_set_property(GObject *object, guint property_id, c
         break;
 
     default:
-        parent_class = g_type_class_peek_parent(OWR_MEDIA_SESSION_GET_CLASS(object));
-        parent_class->set_property(object, property_id, value, pspec);
+        G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
         break;
     }
 }
@@ -137,7 +135,6 @@ static void owr_media_session_set_property(GObject *object, guint property_id, c
 static void owr_media_session_get_property(GObject *object, guint property_id, GValue *value, GParamSpec *pspec)
 {
     OwrMediaSessionPrivate *priv = OWR_MEDIA_SESSION(object)->priv;
-    GObjectClass *parent_class;
 
     switch (property_id) {
     case PROP_RTCP_MUX:
@@ -161,8 +158,7 @@ static void owr_media_session_get_property(GObject *object, guint property_id, G
         break;
 
     default:
-        parent_class = g_type_class_peek_parent(OWR_MEDIA_SESSION_GET_CLASS(object));
-        parent_class->get_property(object, property_id, value, pspec);
+        G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
         break;
     }
 }
