@@ -1,5 +1,7 @@
 ## Process this file with automake to produce Makefile.in
 
+CLEANFILES =
+
 AM_CPPFLAGS = \
     -DPACKAGE_LOCALE_DIR=\""$(localedir)"\" \
     -DPACKAGE_SRC_DIR=\""$(srcdir)"\" \
@@ -47,6 +49,7 @@ if OWR_STATIC
 libopenwebrtc_la_LDFLAGS += -export-symbols $(top_srcdir)/libopenwebrtc.exp
 libopenwebrtc_la_SOURCES += \
     owr_require_symbols.c
+CLEANFILES += owr_require_symbols.c
 owr_require_symbols.c:
 	python ${srcdir}/symbols_to_source.py $(top_srcdir)/libopenwebrtc.exp $@
 endif
@@ -144,8 +147,9 @@ Owr-0.1.gir.h: Owr-0.1.gir
 	xxd -i $< > $@
 	shasum -a 1 -b < $< | head -c 40 > $<.sha1
 	xxd -i $<.sha1 >> $@
+	rm -f $<.sha1
 
-CLEANFILES = $(gir_DATA) $(typelib_DATA)
+CLEANFILES += $(gir_DATA) $(typelib_DATA) Owr-0.1.gir.h
 else
 Owr-0.1.gir.h:
 	cp -f `find $(top_srcdir) -name Owr-0.1.gir.h || echo "Owr-0.1.gir.h"` .
