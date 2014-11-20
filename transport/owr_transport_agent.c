@@ -123,10 +123,12 @@ static void on_rtpbin_pad_added(GstElement *rtpbin, GstPad *new_pad, OwrTranspor
 static void setup_video_receive_elements(GstPad *new_pad, guint32 session_id, OwrPayload *payload, OwrTransportAgent *transport_agent);
 static void setup_audio_receive_elements(GstPad *new_pad, guint32 session_id, OwrPayload *payload, OwrTransportAgent *transport_agent);
 static GstCaps * on_rtpbin_request_pt_map(GstElement *rtpbin, guint session_id, guint pt, OwrTransportAgent *agent);
+static GstElement * on_rtpbin_request_aux_sender(GstElement *rtpbin, guint session_id, OwrTransportAgent *transport_agent);
+static GstElement * on_rtpbin_request_aux_receiver(GstElement *rtpbin, guint session_id, OwrTransportAgent *transport_agent);
 
 static gboolean on_sending_rtcp(GObject *session, GstBuffer *buffer, gboolean early, OwrTransportAgent *agent);
-static void on_feedback_rtcp(GObject *session, guint type, guint fbtype, guint sender_ssrc, guint media_ssrc, GstBuffer *fci, OwrTransportAgent *transport_agent);
 static void on_ssrc_active(GstElement *rtpbin, guint session_id, guint ssrc, OwrTransportAgent *transport_agent);
+static void on_new_jitterbuffer(GstElement *rtpbin, GstElement *jitterbuffer, guint session_id, guint ssrc, OwrTransportAgent *transport_agent);
 static void prepare_rtcp_stats(OwrMediaSession *media_session, GObject *rtp_source);
 
 static void owr_transport_agent_finalize(GObject *object)
@@ -292,7 +294,10 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
     g_object_set(priv->rtpbin, "do-lost", TRUE, NULL);
     g_signal_connect(priv->rtpbin, "pad-added", G_CALLBACK(on_rtpbin_pad_added), transport_agent);
     g_signal_connect(priv->rtpbin, "request-pt-map", G_CALLBACK(on_rtpbin_request_pt_map), transport_agent);
+    g_signal_connect(priv->rtpbin, "request-aux-sender", G_CALLBACK(on_rtpbin_request_aux_sender), transport_agent);
+    g_signal_connect(priv->rtpbin, "request-aux-receiver", G_CALLBACK(on_rtpbin_request_aux_receiver), transport_agent);
     g_signal_connect(priv->rtpbin, "on-ssrc-active", G_CALLBACK(on_ssrc_active), transport_agent);
+    g_signal_connect(priv->rtpbin, "new-jitterbuffer", G_CALLBACK(on_new_jitterbuffer), transport_agent);
 
     g_signal_connect(priv->transport_bin, "pad-added", G_CALLBACK(on_transport_bin_pad_added), transport_agent);
 
@@ -796,7 +801,6 @@ static gboolean add_media_session(GHashTable *args)
     g_signal_emit_by_name(transport_agent->priv->rtpbin, "get-internal-session", stream_id, &session);
     g_object_set_data(session, "session_id", GUINT_TO_POINTER(stream_id));
     g_signal_connect_after(session, "on-sending-rtcp", G_CALLBACK(on_sending_rtcp), transport_agent);
-    g_signal_connect(session, "on-feedback-rtcp", G_CALLBACK(on_feedback_rtcp), transport_agent);
     g_object_unref(session);
 
     maybe_handle_new_send_source_with_payload(transport_agent, media_session);
@@ -1828,6 +1832,108 @@ static GstCaps * on_rtpbin_request_pt_map(GstElement *rtpbin, guint session_id, 
     return caps;
 }
 
+static GstElement * create_aux_bin(gchar *prefix, GstElement *rtx, guint session_id)
+{
+    GstElement *bin;
+    GstPad *pad;
+    gchar *tmp;
+
+    tmp = g_strdup_printf("%s_%u", prefix, session_id);
+    bin = gst_bin_new(tmp);
+    g_free(tmp);
+
+    gst_bin_add(GST_BIN(bin), rtx);
+
+    tmp = g_strdup_printf("src_%u", session_id);
+    pad = gst_element_get_static_pad(rtx, "src");
+
+    gst_element_add_pad(bin, gst_ghost_pad_new(tmp, pad));
+
+    gst_object_unref(pad);
+    g_free(tmp);
+
+    tmp = g_strdup_printf("sink_%u", session_id);
+    pad = gst_element_get_static_pad(rtx, "sink");
+
+    gst_element_add_pad(bin, gst_ghost_pad_new(tmp, pad));
+
+    gst_object_unref(pad);
+    g_free(tmp);
+
+    return bin;
+}
+
+static GstElement * on_rtpbin_request_aux_sender(G_GNUC_UNUSED GstElement *rtpbin, guint session_id, OwrTransportAgent *transport_agent)
+{
+    OwrMediaSession *media_session;
+    OwrPayload *payload;
+    GstElement *rtxsend;
+    GstStructure *pt_map;
+    gint rtx_pt;
+    guint pt, rtx_time;
+    gchar *tmp;
+
+    media_session = OWR_MEDIA_SESSION(g_hash_table_lookup(transport_agent->priv->sessions, GUINT_TO_POINTER(session_id)));
+    g_return_val_if_fail(media_session, NULL);
+
+    payload = _owr_media_session_get_send_payload(media_session);
+    if (!payload)
+        goto no_retransmission;
+
+    g_object_get(payload, "rtx-payload-type", &rtx_pt, NULL);
+    if (rtx_pt < 0)
+        goto no_retransmission;
+
+    rtxsend = gst_element_factory_make("rtprtxsend", NULL);
+    g_return_val_if_fail(rtxsend != NULL, NULL);
+
+    /* Create and set the pt map */
+    g_object_get(payload, "payload-type", &pt, NULL);
+
+    pt_map = gst_structure_new_empty("application/x-rtp-pt-map");
+    tmp = g_strdup_printf("%u", pt);
+    gst_structure_set(pt_map, tmp, G_TYPE_UINT, (guint) rtx_pt, NULL);
+    g_free(tmp);
+
+    g_object_set(rtxsend, "payload-type-map", pt_map, NULL);
+    gst_structure_free(pt_map);
+
+    g_object_get(payload, "rtx-time", &rtx_time, NULL);
+    if (rtx_time)
+        g_object_set(rtxsend, "max-size-time", rtx_time, NULL);
+
+    return create_aux_bin("rtprtxsend", rtxsend, session_id);
+
+no_retransmission:
+    return NULL;
+}
+
+static GstElement * on_rtpbin_request_aux_receiver(G_GNUC_UNUSED GstElement *rtpbin, G_GNUC_UNUSED guint session_id, OwrTransportAgent *transport_agent)
+{
+    OwrMediaSession *media_session;
+    GstElement *rtxrecv;
+    GstStructure *pt_map;
+
+    media_session = OWR_MEDIA_SESSION(g_hash_table_lookup(transport_agent->priv->sessions, GUINT_TO_POINTER(session_id)));
+    g_return_val_if_fail(media_session, NULL);
+
+    pt_map = _owr_media_session_get_receive_rtx_pt_map(media_session);
+    if (!pt_map)
+        goto no_retransmission;
+
+    rtxrecv = gst_element_factory_make("rtprtxreceive", NULL);
+    g_return_val_if_fail(rtxrecv != NULL, NULL);
+
+    g_object_set(rtxrecv, "payload-type-map", pt_map, NULL);
+    gst_structure_free(pt_map);
+    /* FIXME: how do we get rtx-time? */
+
+    return create_aux_bin("rtprtxrecv", rtxrecv, session_id);
+
+no_retransmission:
+    return NULL;
+}
+
 static gboolean on_sending_rtcp(GObject *session, GstBuffer *buffer, gboolean early,
     OwrTransportAgent *agent)
 {
@@ -1950,28 +2056,16 @@ static void on_ssrc_active(GstElement *rtpbin, guint session_id, guint ssrc,
     g_object_unref(rtp_session);
 }
 
-static void on_feedback_rtcp(GObject *session, guint fbtype, guint type, guint sender_ssrc, guint media_ssrc, GstBuffer *fci, OwrTransportAgent *transport_agent)
+static void on_new_jitterbuffer(G_GNUC_UNUSED GstElement *rtpbin, GstElement *jitterbuffer, guint session_id, G_GNUC_UNUSED guint ssrc, OwrTransportAgent *transport_agent)
 {
-    g_return_if_fail(session);
-    g_return_if_fail(transport_agent);
+    OwrMediaSession *media_session;
 
-    OWR_UNUSED(sender_ssrc);
-    OWR_UNUSED(media_ssrc);
-    OWR_UNUSED(fci);
+    g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
+    media_session = get_media_session(transport_agent, session_id);
+    g_return_if_fail(OWR_IS_MEDIA_SESSION(media_session));
 
-    /* FIXME: temporary solution until everyone supports RTP retransmission properly */
-    if (fbtype == GST_RTCP_TYPE_RTPFB && type == GST_RTCP_RTPFB_TYPE_NACK) {
-        GstPad *rtp_sink_pad;
-        guint session_id = GPOINTER_TO_UINT(g_object_get_data(session, "session_id"));
-        gchar *name = g_strdup_printf("send_rtp_sink_%u", session_id);
-        g_warn_if_fail(session_id);
-        rtp_sink_pad = gst_element_get_static_pad(transport_agent->priv->rtpbin, name);
-        g_free(name);
-        g_warn_if_fail(GST_IS_PAD(rtp_sink_pad));
-        gst_pad_push_event(rtp_sink_pad, gst_event_new_custom(GST_EVENT_CUSTOM_UPSTREAM,
-            gst_structure_new("GstForceKeyUnit", "all-headers", G_TYPE_BOOLEAN, FALSE, NULL)));
-        gst_object_unref(rtp_sink_pad);
-    }
+    if (_owr_media_session_want_receive_rtx(media_session))
+        g_object_set(jitterbuffer, "do-retransmission", TRUE, NULL);
 }
 
 void owr_transport_agent_dump_dot_file(OwrTransportAgent *transport_agent, const gchar *base_file_name, gboolean with_ts)
