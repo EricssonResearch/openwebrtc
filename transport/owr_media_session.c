@@ -558,6 +558,78 @@ OwrPayload * _owr_media_session_get_receive_payload(OwrMediaSession *media_sessi
     return NULL;
 }
 
+static void append_to_pt_map(GstStructure *pt_map, guint pt, guint rtx_pt)
+{
+    gchar *tmp;
+
+    tmp = g_strdup_printf("%u", pt);
+    gst_structure_set(pt_map, tmp, G_TYPE_UINT, rtx_pt, NULL);
+    g_free(tmp);
+}
+
+gboolean _owr_media_session_want_receive_rtx(OwrMediaSession *media_session)
+{
+    GPtrArray *receive_payloads = media_session->priv->receive_payloads;
+    OwrPayload *payload;
+    guint i;
+    gint rtx_pt;
+    gboolean ret = FALSE;
+
+    g_return_val_if_fail(media_session, FALSE);
+    g_return_val_if_fail(receive_payloads, FALSE);
+
+    g_rw_lock_reader_lock(&media_session->priv->rw_lock);
+
+    for (i = 0; i < receive_payloads->len; i++) {
+        payload = g_ptr_array_index(receive_payloads, i);
+
+        g_object_get(payload, "rtx-payload-type", &rtx_pt, NULL);
+
+        if (rtx_pt >= 0) {
+            ret = TRUE;
+            break;
+        }
+    }
+
+    g_rw_lock_reader_unlock(&media_session->priv->rw_lock);
+
+    return ret;
+}
+
+GstStructure * _owr_media_session_get_receive_rtx_pt_map(OwrMediaSession *media_session)
+{
+    GPtrArray *receive_payloads = media_session->priv->receive_payloads;
+    OwrPayload *payload;
+    GstStructure *pt_map;
+    guint i, pt;
+    gint rtx_pt;
+
+    g_return_val_if_fail(media_session, NULL);
+    g_return_val_if_fail(receive_payloads, NULL);
+
+    pt_map = gst_structure_new_empty("application/x-rtp-pt-map");
+
+    g_rw_lock_reader_lock(&media_session->priv->rw_lock);
+
+    for (i = 0; i < receive_payloads->len; i++) {
+        payload = g_ptr_array_index(receive_payloads, i);
+
+        g_object_get(payload, "payload-type", &pt, "rtx-payload-type", &rtx_pt, NULL);
+
+        if (rtx_pt >= 0)
+            append_to_pt_map(pt_map, pt, rtx_pt);
+    }
+
+    g_rw_lock_reader_unlock(&media_session->priv->rw_lock);
+
+    if (gst_structure_n_fields(pt_map) == 0) {
+        gst_structure_free(pt_map);
+        return NULL;
+    }
+
+    return pt_map;
+}
+
 /**
  * _owr_media_session_get_send_payload:
  * @media_session:
