@@ -83,8 +83,6 @@ struct _OwrTransportAgentPrivate {
     GstElement *pipeline, *transport_bin;
     GstElement *rtpbin;
 
-    GHashTable *streams;
-
 
     guint local_min_port;
     guint local_max_port;
