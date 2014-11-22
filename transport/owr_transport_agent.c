@@ -1158,6 +1158,7 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
     g_hash_table_insert(transport_agent->priv->send_bins, GINT_TO_POINTER(stream_id), send_bin_info);
 }
 
+/* #define TEST_RTX 1 */
 static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_agent,
     guint stream_id, gboolean rtcp_mux)
 {
@@ -1166,6 +1167,9 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
     gchar *rtpbin_pad_name;
     gboolean linked_ok, synced_ok;
     GstElement *receive_input_bin;
+#ifdef TEST_RTX
+    GstElement *identity;
+#endif
     gchar *bin_name;
 
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
@@ -1191,8 +1195,18 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
     gst_object_unref(rtp_src_pad);
 
     rtpbin_pad_name = g_strdup_printf("recv_rtp_sink_%u", stream_id);
+#ifndef TEST_RTX
     linked_ok = gst_element_link_pads(receive_input_bin, "rtp_src", transport_agent->priv->rtpbin,
         rtpbin_pad_name);
+#else
+    identity = gst_element_factory_make("identity", NULL);
+    g_object_set(identity, "drop-probability", 0.01, NULL);
+    gst_bin_add(GST_BIN(transport_agent->priv->transport_bin), identity);
+    gst_element_link_pads(receive_input_bin, "rtp_src", identity, "sink");
+    linked_ok = gst_element_link_pads(identity, "src", transport_agent->priv->rtpbin,
+        rtpbin_pad_name);
+    gst_element_sync_state_with_parent(identity);
+#endif
     g_warn_if_fail(linked_ok);
     g_free(rtpbin_pad_name);
     synced_ok = gst_element_sync_state_with_parent(dtls_srtp_bin);
