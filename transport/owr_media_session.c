@@ -567,6 +567,13 @@ static void append_to_pt_map(GstStructure *pt_map, guint pt, guint rtx_pt)
     g_free(tmp);
 }
 
+/**
+ * _owr_media_session_want_receive_rtx:
+ * @media_session:
+ *
+ * Returns:
+ *
+ */
 gboolean _owr_media_session_want_receive_rtx(OwrMediaSession *media_session)
 {
     GPtrArray *receive_payloads = media_session->priv->receive_payloads;
@@ -596,6 +603,13 @@ gboolean _owr_media_session_want_receive_rtx(OwrMediaSession *media_session)
     return ret;
 }
 
+/**
+ * _owr_media_session_get_receive_rtx_pt_map:
+ * @media_session:
+ *
+ * Returns: (transfer full):
+ *
+ */
 GstStructure * _owr_media_session_get_receive_rtx_pt_map(OwrMediaSession *media_session)
 {
     GPtrArray *receive_payloads = media_session->priv->receive_payloads;
