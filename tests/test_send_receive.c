@@ -82,9 +82,13 @@ static void got_remote_source(OwrMediaSession *session, OwrMediaSource *source, 
 
     g_free(name);
 
-    owr_media_source_dump_dot_file(source, "test_receive-got_remote_source-source", TRUE);
-    owr_media_renderer_dump_dot_file(owr_renderer, "test_receive-got_remote_source-renderer", TRUE);
-    owr_transport_agent_dump_dot_file(recv_transport_agent, "test_receive-got_remote_source-transport_agent", TRUE);
+    if (media_type == OWR_MEDIA_TYPE_VIDEO) {
+        owr_media_source_dump_dot_file(source, "test_receive-got_remote_source-video-source", TRUE);
+        owr_media_renderer_dump_dot_file(owr_renderer, "test_receive-got_remote_source-video-renderer", TRUE);
+    } else {
+        owr_media_source_dump_dot_file(source, "test_receive-got_remote_source-audio-source", TRUE);
+        owr_media_renderer_dump_dot_file(owr_renderer, "test_receive-got_remote_source-audio-renderer", TRUE);
+    }
 }
 
 static void got_candidate(OwrMediaSession *session_a, OwrCandidate *candidate, OwrMediaSession *session_b)
@@ -154,13 +158,23 @@ static void got_sources(GList *sources, gpointer user_data)
     }
 
     if (audio_source)
-        owr_media_source_dump_dot_file(audio_source, "test_send-got_source-audio_source", TRUE);
+        owr_media_source_dump_dot_file(audio_source, "test_send-got_source-audio-source", TRUE);
     if (video_source)
-        owr_media_source_dump_dot_file(video_source, "test_send-got_source-video_source", TRUE);
+        owr_media_source_dump_dot_file(video_source, "test_send-got_source-video-source", TRUE);
     if (video_renderer)
-        owr_media_renderer_dump_dot_file(video_renderer, "test_send-got_source-video_renderer", TRUE);
-    owr_transport_agent_dump_dot_file(send_transport_agent, "test_send-got_source-transport_agent", TRUE);
+        owr_media_renderer_dump_dot_file(video_renderer, "test_send-got_source-video-renderer", TRUE);
 }
+
+static gboolean dump_cb(gpointer *user_data)
+{
+    g_print("Dumping send transport agent pipeline!\n");
+
+    owr_transport_agent_dump_dot_file(send_transport_agent, "test_send-got_source-transport_agent", TRUE);
+    owr_transport_agent_dump_dot_file(recv_transport_agent, "test_receive-got_remote_source-transport_agent", TRUE);
+
+    return G_SOURCE_REMOVE;
+}
+
 
 int main() {
     GMainContext *ctx = g_main_context_default();
@@ -218,6 +232,8 @@ int main() {
     /* PREPARE FOR SENDING */
 
     owr_get_capture_sources(OWR_MEDIA_TYPE_AUDIO|OWR_MEDIA_TYPE_VIDEO, got_sources, NULL);
+
+    g_timeout_add_seconds(5, (GSourceFunc)dump_cb, NULL);
 
     g_main_loop_run(loop);
 
