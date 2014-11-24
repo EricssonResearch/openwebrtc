@@ -548,6 +548,9 @@ OwrPayload * _owr_media_session_get_receive_payload(OwrMediaSession *media_sessi
         g_object_get(payload, "payload-type", &pt, NULL);
         if (pt == payload_type)
             break;
+        g_object_get(payload, "rtx-payload-type", &pt, NULL);
+        if (pt == payload_type)
+            break;
     }
     if (pt == payload_type)
         g_object_ref(payload);
