@@ -388,10 +388,27 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
                 }
 #endif
                 break;
-            case OWR_SOURCE_TYPE_TEST:
-                CREATE_ELEMENT(source, "videotestsrc", "video-source");
-                g_object_set(source, "is-live", TRUE, NULL);
+            case OWR_SOURCE_TYPE_TEST: {
+                GstElement *src, *time;
+                GstPad *srcpad;
+
+                source = gst_bin_new("video-source");
+
+                CREATE_ELEMENT(src, "videotestsrc", "videotestsrc");
+                g_object_set(src, "is-live", TRUE, NULL);
+
+                CREATE_ELEMENT(time, "timeoverlay", "timeoverlay");
+                g_object_set(time, "font-desc", "Sans 60", NULL);
+
+                gst_bin_add_many(GST_BIN(source), src, time, NULL);
+                gst_element_link(src, time);
+
+                srcpad = gst_element_get_static_pad(time, "src");
+                gst_element_add_pad(source, gst_ghost_pad_new("src", srcpad));
+                gst_object_unref(srcpad);
+
                 break;
+            }
             case OWR_SOURCE_TYPE_UNKNOWN:
             default:
                 g_assert_not_reached();
