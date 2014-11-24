@@ -65,6 +65,7 @@ void got_sources(GList *sources, gpointer user_data)
             renderer = owr_video_renderer_new(NULL);
             g_assert(renderer);
 
+            g_object_set(renderer, "width", 1280, "height", 720, "max-framerate", 30.0, NULL);
             owr_media_renderer_set_source(OWR_MEDIA_RENDERER(renderer), source);
         } else if (!have_audio && media_type == OWR_MEDIA_TYPE_AUDIO && source_type == OWR_SOURCE_TYPE_CAPTURE) {
             OwrAudioRenderer *renderer;
