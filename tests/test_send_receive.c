@@ -117,6 +117,7 @@ void got_sources(GList *sources, gpointer user_data)
             have_video = TRUE;
 
             payload = owr_video_payload_new(OWR_CODEC_TYPE_VP8, 103, 90000, TRUE, FALSE);
+            g_object_set(payload, "width", 1280, "height", 720, "framerate", 30.0, NULL);
 
             owr_media_session_set_send_payload(send_session_video, payload);
 
@@ -128,6 +129,7 @@ void got_sources(GList *sources, gpointer user_data)
 
             renderer = owr_video_renderer_new(NULL);
             g_assert(renderer);
+            g_object_set(renderer, "width", 1280, "height", 720, "max-framerate", 30.0, NULL);
             owr_media_renderer_set_source(OWR_MEDIA_RENDERER(renderer), source);
         } else if (!have_audio && media_type == OWR_MEDIA_TYPE_AUDIO && source_type == OWR_SOURCE_TYPE_CAPTURE) {
             OwrPayload *payload;
