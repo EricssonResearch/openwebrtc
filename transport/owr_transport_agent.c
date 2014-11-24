@@ -1871,7 +1871,7 @@ static GstCaps * on_rtpbin_request_pt_map(GstElement *rtpbin, guint session_id, 
     payload = _owr_media_session_get_receive_payload(media_session, pt);
 
     g_return_val_if_fail(OWR_IS_MEDIA_SESSION(media_session), NULL);
-    g_return_val_if_fail(OWR_IS_PAYLOAD(payload), NULL);
+
     caps = _owr_payload_create_rtp_caps(payload);
     g_object_unref(payload);
 
