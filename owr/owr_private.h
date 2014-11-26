@@ -39,6 +39,7 @@ G_BEGIN_DECLS
 /*< private >*/
 gboolean _owr_is_initialized(void);
 GMainContext * _owr_get_main_context(void);
+void _owr_schedule_with_user_data(GSourceFunc func, gpointer user_data);
 void _owr_schedule_with_hash_table(GSourceFunc func, GHashTable *hash_table);
 
 G_END_DECLS

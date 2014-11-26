@@ -283,6 +283,14 @@ GMainContext * _owr_get_main_context()
     return owr_main_context;
 }
 
+void _owr_schedule_with_user_data(GSourceFunc func, gpointer user_data)
+{
+    GSource *source = g_idle_source_new();
+
+    g_source_set_callback(source, func, user_data, NULL);
+    g_source_attach(source, owr_main_context);
+}
+
 /**
  * _owr_schedule_with_hash_table:
  * @func:
@@ -291,9 +299,6 @@ GMainContext * _owr_get_main_context()
  */
 void _owr_schedule_with_hash_table(GSourceFunc func, GHashTable *hash_table)
 {
-    GSource *source = g_idle_source_new();
-
-    g_source_set_callback(source, func, hash_table, NULL);
-    g_source_attach(source, owr_main_context);
+    _owr_schedule_with_user_data(func, hash_table);
 }
 
