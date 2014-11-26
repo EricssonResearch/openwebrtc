@@ -379,8 +379,8 @@ typedef jint (*JNI_GetCreatedJavaVMs)(JavaVM **vmBuf, jsize bufLen, jsize *nVMs)
 static void cache_java_classes(JNIEnv *);
 
 static const char *const android_runtime_libs[] = {
-    ANDROID_RUNTIME_ART_LIB,
     ANDROID_RUNTIME_DALVIK_LIB,
+    ANDROID_RUNTIME_ART_LIB,
     NULL
 };
 
