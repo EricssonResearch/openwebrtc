@@ -65,6 +65,7 @@ typedef struct {
     GList *list;
 } CallbackAndList;
 
+#if defined(__linux__) && !defined(__ANDROID__)
 static gboolean cb_call_closure_with_list_later(CallbackAndList *cal)
 {
     _owr_utils_call_closure_with_list(cal->callback, cal->list);
@@ -84,6 +85,7 @@ static void call_closure_with_list_later(GClosure *callback, GList *list)
 
     _owr_schedule_with_user_data((GSourceFunc) cb_call_closure_with_list_later, cal);
 }
+#endif
 
 void _owr_get_capture_devices(OwrMediaType types, GClosure *callback)
 {

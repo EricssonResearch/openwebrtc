@@ -324,6 +324,9 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
     OwrLocalMediaSourcePrivate *priv;
     GstElement *source_element = NULL;
     GstElement *source_pipeline;
+#if defined(__linux__) && !defined(__ANDROID__)
+    gchar *tmp;
+#endif
 
     g_assert(media_source);
     local_source = OWR_LOCAL_MEDIA_SOURCE(media_source);
@@ -391,9 +394,15 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
 #if !defined(__APPLE__) || !TARGET_IPHONE_SIMULATOR
                 g_object_set(source, "buffer-time", G_GINT64_CONSTANT(40000),
                     "latency-time", G_GINT64_CONSTANT(10000), NULL);
+                if (priv->device_index > -1) {
 #ifdef __APPLE__
-                g_object_set(source, "device", priv->device_index, NULL);
+                    g_object_set(source, "device", priv->device_index, NULL);
+#elif defined(__linux__) && !defined(__ANDROID__)
+                    tmp = g_strdup_printf("%d", priv->device_index);
+                    g_object_set(source, "device", tmp, NULL);
+                    g_free(tmp);
 #endif
+                }
 #endif
                 break;
             case OWR_SOURCE_TYPE_TEST:
@@ -430,17 +439,17 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
             switch (source_type) {
             case OWR_SOURCE_TYPE_CAPTURE:
                 CREATE_ELEMENT(source, VIDEO_SRC, "video-source");
+                if (priv->device_index > -1) {
 #if defined(__APPLE__) && !TARGET_IPHONE_SIMULATOR
-                g_object_set(source, "device-index", priv->device_index, NULL);
+                    g_object_set(source, "device-index", priv->device_index, NULL);
 #elif defined(__ANDROID__)
-                g_object_set(source, "cam-index", priv->device_index, NULL);
+                    g_object_set(source, "cam-index", priv->device_index, NULL);
 #elif defined(__linux__)
-                {
-                    gchar *device = g_strdup_printf("/dev/video%u", priv->device_index);
-                    g_object_set(source, "device", device, NULL);
-                    g_free(device);
-                }
+                    tmp = g_strdup_printf("/dev/video%d", priv->device_index);
+                    g_object_set(source, "device", tmp, NULL);
+                    g_free(tmp);
 #endif
+                }
                 break;
             case OWR_SOURCE_TYPE_TEST: {
                 GstElement *src, *time;
