@@ -38,6 +38,7 @@
 #include "owr_media_source.h"
 #include "owr_types.h"
 #include "owr_utils.h"
+#include "owr_private.h"
 
 #ifdef __APPLE__
 #include <TargetConditionals.h>
@@ -56,8 +57,8 @@
 
 #endif /* defined(__linux__) */
 
-static void enumerate_video_source_devices(GClosure *);
-static void enumerate_audio_source_devices(GClosure *);
+static gboolean enumerate_video_source_devices(GClosure *);
+static gboolean enumerate_audio_source_devices(GClosure *);
 
 typedef struct {
     GClosure *callback;
@@ -81,7 +82,7 @@ static void call_closure_with_list_later(GClosure *callback, GList *list)
     cal->callback = callback;
     cal->list = list;
 
-    g_idle_add((GSourceFunc) cb_call_closure_with_list_later, cal);
+    _owr_schedule_with_user_data((GSourceFunc) cb_call_closure_with_list_later, cal);
 }
 
 void _owr_get_capture_devices(OwrMediaType types, GClosure *callback)
@@ -98,12 +99,12 @@ void _owr_get_capture_devices(OwrMediaType types, GClosure *callback)
 
     if (types & OWR_MEDIA_TYPE_VIDEO) {
         g_closure_ref(merger);
-        enumerate_video_source_devices(merger);
+        _owr_schedule_with_user_data((GSourceFunc) enumerate_video_source_devices, merger);
     }
 
     if (types & OWR_MEDIA_TYPE_AUDIO) {
         g_closure_ref(merger);
-        enumerate_audio_source_devices(merger);
+        _owr_schedule_with_user_data((GSourceFunc) enumerate_audio_source_devices, merger);
     }
 
     g_closure_unref(merger);
@@ -113,14 +114,16 @@ void _owr_get_capture_devices(OwrMediaType types, GClosure *callback)
 
 #if defined(__APPLE__)
 
-static void enumerate_video_source_devices(GClosure *callback)
+static gboolean enumerate_video_source_devices(GClosure *callback)
 {
-    call_closure_with_list_later(callback, _get_avf_video_sources());
+    _owr_utils_call_closure_with_list(callback, _get_avf_video_sources());
+    return FALSE;
 }
 
-static void enumerate_audio_source_devices(GClosure *callback)
+static gboolean enumerate_audio_source_devices(GClosure *callback)
 {
-    call_closure_with_list_later(callback, _get_avf_audio_sources());
+    _owr_utils_call_closure_with_list(callback, _get_avf_audio_sources());
+    return FALSE;
 }
 
 #endif /*defined(__APPLE__)*/
@@ -145,12 +148,13 @@ static void source_info_iterator(pa_context *, const pa_source_info *, int eol, 
 
 static void finish_pa_list(AudioListContext *context)
 {
+    /* Schedule the callback in Owr mainloop context */
     call_closure_with_list_later(context->callback, context->list);
 
     g_slice_free(AudioListContext, context);
 }
 
-static void enumerate_audio_source_devices(GClosure *callback)
+static gboolean enumerate_audio_source_devices(GClosure *callback)
 {
     AudioListContext *context;
 
@@ -176,13 +180,16 @@ static void enumerate_audio_source_devices(GClosure *callback)
         (pa_context_notify_cb_t) on_pulse_context_state_change, context);
     pa_context_connect(context->pa_context, NULL, 0, NULL);
 
-    return;
+done:
+    return FALSE;
 
 cleanup_mainloop:
     pa_glib_mainloop_free(context->mainloop);
 
 cleanup:
     finish_pa_list(context);
+
+    goto done;
 }
 
 static void on_pulse_context_state_change(pa_context *pa_context, AudioListContext *context)
@@ -242,13 +249,15 @@ static void source_info_iterator(pa_context *pa_context, const pa_source_info *i
 
 #if defined(__ANDROID__)
 
-static void enumerate_audio_source_devices(GClosure *callback)
+static gboolean enumerate_audio_source_devices(GClosure *callback)
 {
     OwrLocalMediaSource *source;
 
     source = _owr_local_media_source_new(-1,
         "Default audio input", OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_CAPTURE);
-    call_closure_with_list_later(callback, g_list_append(NULL, source));
+    _owr_utils_call_closure_with_list(callback, g_list_append(NULL, source));
+
+    return FALSE;
 }
 
 #endif /*defined(__ANDROID__)*/
@@ -326,7 +335,7 @@ static OwrLocalMediaSource *maybe_create_source_from_filename(const gchar *name)
     return source;
 }
 
-static void enumerate_video_source_devices(GClosure *callback)
+static gboolean enumerate_video_source_devices(GClosure *callback)
 {
     OwrLocalMediaSource *source;
     GList *sources = NULL;
@@ -346,7 +355,9 @@ static void enumerate_video_source_devices(GClosure *callback)
 
     g_dir_close(dev_dir);
 
-    call_closure_with_list_later(callback, sources);
+    _owr_utils_call_closure_with_list(callback, sources);
+
+    return FALSE;
 }
 
 #endif /*(defined(__linux__) && !defined(__ANDROID__))*/
@@ -626,7 +637,7 @@ static gchar *get_camera_name(gint camera_index)
     }
 }
 
-static void enumerate_video_source_devices(GClosure *callback)
+static gboolean enumerate_video_source_devices(GClosure *callback)
 {
     gint num;
     gint i;
@@ -642,7 +653,9 @@ static void enumerate_video_source_devices(GClosure *callback)
         sources = g_list_append(sources, source);
     }
 
-    call_closure_with_list_later(callback, sources);
+    _owr_utils_call_closure_with_list(callback, sources);
+
+    return FALSE;
 }
 
 #endif /*defined(__ANDROID__)*/
