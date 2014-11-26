@@ -72,26 +72,80 @@ static guint unique_bin_id = 0;
 
 G_DEFINE_TYPE(OwrLocalMediaSource, owr_local_media_source, OWR_TYPE_MEDIA_SOURCE)
 
+struct _OwrLocalMediaSourcePrivate {
+    gint device_index;
+};
+
 static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_source, GstCaps *caps);
 
-struct _OwrLocalMediaSourcePrivate {
-    guint device_index;
+static void owr_local_media_source_set_property(GObject *object, guint property_id,
+    const GValue *value, GParamSpec *pspec);
+static void owr_local_media_source_get_property(GObject *object, guint property_id,
+    GValue *value, GParamSpec *pspec);
+
+enum {
+    PROP_0,
+    PROP_DEVICE_INDEX,
+    N_PROPERTIES
 };
+
 
 static void owr_local_media_source_class_init(OwrLocalMediaSourceClass *klass)
 {
+    GObjectClass *gobject_class = G_OBJECT_CLASS(klass);
     OwrMediaSourceClass *media_source_class = OWR_MEDIA_SOURCE_CLASS(klass);
+
+    gobject_class->get_property = owr_local_media_source_get_property;
+    gobject_class->set_property = owr_local_media_source_set_property;
 
     g_type_class_add_private(klass, sizeof(OwrLocalMediaSourcePrivate));
 
     media_source_class->request_source = (void *(*)(OwrMediaSource *, void *))owr_local_media_source_request_source;
+
+    g_object_class_install_property(gobject_class, PROP_DEVICE_INDEX,
+            g_param_spec_int("device-index", "Device index",
+                "Index of the device to be used for this source (-1 => auto)",
+                -1, G_MAXINT16, -1,
+                G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 }
 
 static void owr_local_media_source_init(OwrLocalMediaSource *source)
 {
     OwrLocalMediaSourcePrivate *priv;
     source->priv = priv = OWR_LOCAL_MEDIA_SOURCE_GET_PRIVATE(source);
-    priv->device_index = 0;
+    priv->device_index = -1;
+}
+
+static void owr_local_media_source_set_property(GObject *object, guint property_id,
+    const GValue *value, GParamSpec *pspec)
+{
+    OwrLocalMediaSource *source = OWR_LOCAL_MEDIA_SOURCE(object);
+
+    switch (property_id) {
+        case PROP_DEVICE_INDEX:
+            source->priv->device_index = g_value_get_int(value);
+            break;
+
+        default:
+            G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
+            break;
+    }
+}
+
+static void owr_local_media_source_get_property(GObject *object, guint property_id,
+    GValue *value, GParamSpec *pspec)
+{
+    OwrLocalMediaSource *source = OWR_LOCAL_MEDIA_SOURCE(object);
+
+    switch (property_id) {
+        case PROP_DEVICE_INDEX:
+            g_value_set_int(value, source->priv->device_index);
+            break;
+
+        default:
+            G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
+            break;
+    }
 }
 
 #define LINK_ELEMENTS(a, b) \
@@ -505,19 +559,10 @@ OwrLocalMediaSource *_owr_local_media_source_new(gint device_index, const gchar 
     source = g_object_new(OWR_TYPE_LOCAL_MEDIA_SOURCE,
         "name", name,
         "media-type", media_type,
+        "device-index", device_index,
         NULL);
 
-    _owr_media_source_set_device_index(OWR_MEDIA_SOURCE(source), device_index);
     _owr_media_source_set_type(OWR_MEDIA_SOURCE(source), source_type);
 
     return source;
-}
-
-void _owr_local_media_source_set_capture_device_index(OwrLocalMediaSource *source, guint index)
-{
-    OwrSourceType source_type = -1;
-    g_return_if_fail(OWR_IS_MEDIA_SOURCE(source));
-    g_object_get(source, "type", &source_type, NULL);
-    g_return_if_fail(source_type == OWR_SOURCE_TYPE_CAPTURE);
-    source->priv->device_index = index;
 }
