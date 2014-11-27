@@ -239,8 +239,9 @@ static void source_info_iterator(pa_context *pa_context, const pa_source_info *i
         source = _owr_local_media_source_new(info->index, info->description,
             OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_CAPTURE);
 
-        context->list = g_list_append(context->list, source);
+        context->list = g_list_prepend(context->list, source);
     } else {
+        context->list = g_list_reverse(context->list);
         finish_pa_list(context);
     }
 }
@@ -257,7 +258,7 @@ static gboolean enumerate_audio_source_devices(GClosure *callback)
 
     source = _owr_local_media_source_new(-1,
         "Default audio input", OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_CAPTURE);
-    _owr_utils_call_closure_with_list(callback, g_list_append(NULL, source));
+    _owr_utils_call_closure_with_list(callback, g_list_prepend(NULL, source));
 
     return FALSE;
 }
@@ -356,12 +357,13 @@ static gboolean enumerate_video_source_devices(GClosure *callback)
         source = maybe_create_source_from_filename(filename);
 
         if (source) {
-            sources = g_list_append(sources, source);
+            sources = g_list_prepend(sources, source);
         }
     }
 
     g_dir_close(dev_dir);
 
+    sources = g_list_reverse(sources);
     _owr_utils_call_closure_with_list(callback, sources);
 
     return FALSE;
@@ -660,9 +662,10 @@ static gboolean enumerate_video_source_devices(GClosure *callback)
         source = _owr_local_media_source_new(i, get_camera_name(i),
             OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE);
 
-        sources = g_list_append(sources, source);
+        sources = g_list_prepend(sources, source);
     }
 
+    sources = g_list_reverse(sources);
     _owr_utils_call_closure_with_list(callback, sources);
 
     return FALSE;
