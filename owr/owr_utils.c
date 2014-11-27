@@ -101,9 +101,11 @@ static void callback_merger(GList *list, CallbackMergeContext *context)
 }
 
 /*
+ * @final_callback: (transfer full):
+ *
  * Returns a closure which should be called with a single GList argument.
  * When the refcount of the closure reaches 0, final_callback is called
- *  with a concatenation of all the lists that were sent to the closure.
+ * with a concatenation of all the lists that were sent to the closure.
  */
 GClosure *_owr_utils_list_closure_merger_new(GClosure *final_callback)
 {
