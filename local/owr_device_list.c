@@ -476,7 +476,7 @@ static void init_jni(JavaVM *jvm)
     cache_java_classes(env);
 }
 
-static JavaVM *get_java_vm()
+static JavaVM *get_java_vm(void)
 {
     JNI_GetCreatedJavaVMs get_created_java_vms;
     gpointer handle = NULL;
@@ -532,7 +532,7 @@ static JavaVM *get_java_vm()
 }
 
 /* jvm needs to be fetched once, jni env needs to be fetched once per thread */
-static JNIEnv* get_jni_env()
+static JNIEnv* get_jni_env(void)
 {
     static JavaVM *jvm = NULL;
 
@@ -612,7 +612,7 @@ static void cache_java_classes(JNIEnv *env)
     cache_class_camera_info(env);
 }
 
-static gint get_number_of_cameras()
+static gint get_number_of_cameras(void)
 {
     JNIEnv *env = get_jni_env();
     return (*env)->CallStaticIntMethod(env, Camera.class, Camera.getNumberOfCameras);
