@@ -167,14 +167,14 @@ static gboolean enumerate_audio_source_devices(GClosure *callback)
     context->mainloop = pa_glib_mainloop_new(NULL);
 
     if (!context->mainloop) {
-        g_error("PulseAudio: failed to create glib mainloop");
+        g_warning("PulseAudio: failed to create glib mainloop");
         goto cleanup;
     }
 
     context->pa_context = pa_context_new(pa_glib_mainloop_get_api(context->mainloop), "Owr");
 
     if (!context->pa_context) {
-        g_error("PulseAudio: failed to create context");
+        g_warning("PulseAudio: failed to create context");
         goto cleanup_mainloop;
     }
 
@@ -434,7 +434,8 @@ static JNIEnv* get_jni_env_from_jvm(JavaVM *jvm)
         err = (*jvm)->AttachCurrentThread(jvm, &env, NULL);
 
         if (err) {
-            g_error("android device list: failed to attach current thread");
+            g_warning("android device list: failed to attach current thread");
+            return NULL;
         }
 
         g_print("attached thread (%ld) to jvm\n", pthread_self());
@@ -445,7 +446,7 @@ static JNIEnv* get_jni_env_from_jvm(JavaVM *jvm)
 
         pthread_setspecific(detach_key, env);
     } else if (JNI_OK != err) {
-        g_error("jvm->GetEnv() failed");
+        g_warning("jvm->GetEnv() failed");
     }
 
     return env;
@@ -461,7 +462,7 @@ static void init_jni(JavaVM *jvm)
     sdk_version = get_android_sdk_version(env);
 
     if (sdk_version < OWR_DEVICE_LIST_MIN_SDK_VERSION) {
-        g_error("android version is %d, owr_device_list needs > %d",
+        g_warning("android version is %d, owr_device_list needs > %d",
             sdk_version, OWR_DEVICE_LIST_MIN_SDK_VERSION);
     }
 
@@ -500,7 +501,8 @@ static JavaVM *get_java_vm()
         error_string = dlerror();
 
         if (error_string) {
-            g_error("dlsym(\"JNI_GetCreatedJavaVMs\") failed: %s", error_string);
+            g_warning("dlsym(\"JNI_GetCreatedJavaVMs\") failed: %s", error_string);
+            return NULL;
         }
 
         get_created_java_vms(&jvm, 1, &num_jvms);
@@ -516,7 +518,7 @@ static JavaVM *get_java_vm()
             g_warning("dlclose() of android runtime handle failed");
         }
     } else {
-        g_error("Failed to get jvm");
+        g_warning("Failed to get jvm");
     }
 
     return jvm;
@@ -620,7 +622,8 @@ static gchar *get_camera_name(gint camera_index)
 
     camera_info_instance = (*env)->NewObject(env, CameraInfo.class, CameraInfo.constructor);
     if ((*env)->ExceptionCheck(env)) {
-        g_error("android device list: failed to create CameraInfo object");
+        g_warning("android device list: failed to create CameraInfo object");
+        return NULL;
     }
 
     (*env)->CallStaticVoidMethod(env, Camera.class, Camera.getCameraInfo, camera_index, camera_info_instance);
