@@ -629,11 +629,18 @@ static gchar *get_camera_name(gint camera_index)
 
     camera_info_instance = (*env)->NewObject(env, CameraInfo.class, CameraInfo.constructor);
     if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionClear(env);
         g_warning("android device list: failed to create CameraInfo object");
         return NULL;
     }
 
     (*env)->CallStaticVoidMethod(env, Camera.class, Camera.getCameraInfo, camera_index, camera_info_instance);
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionClear(env);
+        g_warning("android device list: could not get camera info");
+        return NULL;
+    }
+
     facing = (*env)->GetIntField(env, camera_info_instance, CameraInfo.facing);
     (*env)->DeleteLocalRef(env, camera_info_instance);
 
