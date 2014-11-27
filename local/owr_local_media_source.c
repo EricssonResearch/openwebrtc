@@ -48,7 +48,7 @@
 #define AUDIO_SRC "osxaudiosrc"
 #define VIDEO_SRC "avfvideosrc"
 
-#if TARGET_OS_IPHONE
+#if TARGET_OS_IPHONE && !defined(__arm64__)
 #define VIDEO_CONVERT "ercolorspace"
 #else
 #define VIDEO_CONVERT "videoconvert"

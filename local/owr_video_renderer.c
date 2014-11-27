@@ -44,7 +44,7 @@
 
 #define VIDEO_SINK "glimagesink"
 
-#if defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR)
+#if defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR && !defined(__arm64__))
 #define VIDEO_CONVERT "ercolorspace"
 #else
 #define VIDEO_CONVERT "videoconvert"
