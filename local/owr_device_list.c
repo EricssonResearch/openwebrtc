@@ -279,6 +279,8 @@ static gchar *get_v4l2_device_name(gchar *filename)
         g_print("v4l: failed to open %s", filename);
 
         device_name = g_strdup(filename);
+
+	return NULL;
     } else {
         struct v4l2_capability vcap;
 
@@ -323,6 +325,9 @@ static OwrLocalMediaSource *maybe_create_source_from_filename(const gchar *name)
         device_name = get_v4l2_device_name(filename);
         g_free(filename);
         filename = NULL;
+
+	if (!device_name)
+            return NULL;
 
         source = _owr_local_media_source_new(index, device_name,
             OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE);
