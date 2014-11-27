@@ -164,7 +164,7 @@ static gboolean enumerate_audio_source_devices(GClosure *callback)
 
     context->callback = callback;
 
-    context->mainloop = pa_glib_mainloop_new(NULL);
+    context->mainloop = pa_glib_mainloop_new(_owr_get_main_context());
 
     if (!context->mainloop) {
         g_warning("PulseAudio: failed to create glib mainloop");
