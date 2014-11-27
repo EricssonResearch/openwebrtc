@@ -58,7 +58,7 @@ static GList *generate_source_device_list(NSString *mediaType, DeviceMapFunc map
     return g_list_reverse(list);
 }
 
-GList *_get_avf_video_sources()
+GList *_owr_get_avf_video_sources()
 {
     return generate_source_device_list(AVMediaTypeVideo,
             ^(AVCaptureDevice *av_device, gint index) {
@@ -74,7 +74,7 @@ GList *_get_avf_video_sources()
     });
 }
 
-GList *_get_avf_audio_sources()
+GList *_owr_get_avf_audio_sources()
 {
     return generate_source_device_list(AVMediaTypeAudio,
             ^(AVCaptureDevice *av_device, gint index) {
