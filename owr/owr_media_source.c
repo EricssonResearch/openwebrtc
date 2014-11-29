@@ -44,7 +44,7 @@
 #include <TargetConditionals.h>
 #endif
 
-#if defined(__APPLE__) && !TARGET_IPHONE_SIMULATOR
+#if defined(__APPLE__) && !TARGET_IPHONE_SIMULATOR && !defined(__arm64__)
 #if TARGET_OS_IPHONE
 #define VIDEO_CONVERT "ercolorspace"
 #else
