@@ -396,14 +396,18 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
 
                 CREATE_ELEMENT(src, "videotestsrc", "videotestsrc");
                 g_object_set(src, "is-live", TRUE, NULL);
+                gst_bin_add(GST_BIN(source), src);
 
-                CREATE_ELEMENT(time, "timeoverlay", "timeoverlay");
-                g_object_set(time, "font-desc", "Sans 60", NULL);
+                time = gst_element_factory_make("timeoverlay", "timeoverlay");
+                if (time) {
+                    g_object_set(time, "font-desc", "Sans 60", NULL);
+                    gst_bin_add(GST_BIN(source), time);
+                    gst_element_link(src, time);
+                    srcpad = gst_element_get_static_pad(time, "src");
+                } else {
+                    srcpad = gst_element_get_static_pad(src, "src");
+                }
 
-                gst_bin_add_many(GST_BIN(source), src, time, NULL);
-                gst_element_link(src, time);
-
-                srcpad = gst_element_get_static_pad(time, "src");
                 gst_element_add_pad(source, gst_ghost_pad_new("src", srcpad));
                 gst_object_unref(srcpad);
 
