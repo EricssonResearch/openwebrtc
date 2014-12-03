@@ -183,7 +183,10 @@ void owr_init()
 
 #ifdef OWR_STATIC
     /* Hack to make sure that all symbols that we need are included in the resulting library/binary */
-    _owr_require_symbols();
+    if (!_owr_require_symbols()) {
+      g_warning("Not all symbols found\n");
+      abort();
+    }
 #endif
 
     gst_init(NULL, NULL);
