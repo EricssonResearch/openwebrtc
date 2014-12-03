@@ -1610,7 +1610,6 @@ g_io_extension_point_register
 g_io_extension_point_set_required_type
 g_io_extension_ref_class
 g_io_module_get_type
-g_io_module_load_static_module
 g_io_module_new
 g_io_module_scope_block
 g_io_module_scope_flags_get_type
