@@ -81,6 +81,7 @@ dnl pick dependencies and build flags based on OS
 case "$host_os" in
   darwin*)
     is_apple=yes
+    OWR_DEVICE_LIST_EXT_LIBS="-framework AVFoundation"
     ;;
   linux-android*)
     ;;
