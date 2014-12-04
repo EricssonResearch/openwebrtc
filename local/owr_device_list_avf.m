@@ -39,6 +39,7 @@
 
 #import <Foundation/Foundation.h>
 #import <AVFoundation/AVFoundation.h>
+#import <CoreFoundation/CFString.h>
 
 typedef OwrLocalMediaSource *(^DeviceMapFunc)(AVCaptureDevice *, gint);
 
@@ -74,18 +75,124 @@ GList *_owr_get_avf_video_sources()
     });
 }
 
-GList *_owr_get_avf_audio_sources()
+#if !TARGET_OS_IPHONE
+static OwrLocalMediaSource * make_source_from_device(AudioObjectID device)
 {
-    return generate_source_device_list(AVMediaTypeAudio,
-            ^(AVCaptureDevice *av_device, gint index) {
-        OwrLocalMediaSource *source;
-        const gchar *name;
+    OwrLocalMediaSource *source = NULL;
+    gchar name[1024];
+    CFStringRef cf_name;
+    UInt32 psize;
+    OSStatus status;
 
-        name = [av_device.localizedName UTF8String];
+    AudioObjectPropertyAddress streams_prop_addr = {
+        kAudioDevicePropertyStreams,
+        kAudioObjectPropertyScopeInput,
+        kAudioObjectPropertyElementMaster,
+    };
 
-        source = _owr_local_media_source_new(index, name,
+    AudioObjectPropertyAddress name_prop_addr = {
+        kAudioObjectPropertyName,
+        kAudioObjectPropertyScopeInput,
+        kAudioObjectPropertyElementMaster,
+    };
+
+    status = AudioObjectGetPropertyDataSize(device, &streams_prop_addr, 0,
+            NULL, &psize);
+    if (status != noErr) {
+        g_warning("Could not get 'device streams' property");
+        goto out;
+    }
+
+    if (psize == 0) {
+        /* No input streams, skip this device */
+        goto out;
+    }
+
+    status = AudioObjectGetPropertyDataSize(device, &name_prop_addr, 0, NULL,
+            &psize);
+    if (status != noErr) {
+        g_warning("Could not get 'device name' property size");
+        goto out;
+    }
+
+    status = AudioObjectGetPropertyData(device, &name_prop_addr, 0, NULL,
+            &psize, &cf_name);
+    if (status != noErr) {
+        g_warning("Could not get 'device name' property");
+        goto out;
+    }
+
+    if (!CFStringGetCString(cf_name, name, sizeof(name),
+                CFStringGetSystemEncoding())) {
+        g_warning("Could not get device name as a string");
+        CFRelease(cf_name);
+        goto out;
+    }
+    CFRelease(cf_name);
+
+    source = _owr_local_media_source_new(device, name,
             OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_CAPTURE);
 
-        return source;
-    });
+out:
+    return source;
 }
+
+GList *_owr_get_core_audio_sources()
+{
+    OwrLocalMediaSource *source;
+    GList *ret = NULL;
+    gint i, n;
+    AudioObjectID *devices;
+    UInt32 psize;
+    OSStatus status;
+
+    AudioObjectPropertyAddress devices_prop_addr = {
+        kAudioHardwarePropertyDevices,
+        kAudioObjectPropertyScopeGlobal,
+        kAudioObjectPropertyElementMaster,
+    };
+
+    status = AudioObjectGetPropertyDataSize(kAudioObjectSystemObject,
+            &devices_prop_addr, 0, NULL, &psize);
+    if (status != noErr) {
+        g_warning("Could not get 'audio devices' property size");
+        goto error;
+    }
+
+    n = psize / sizeof(AudioObjectID);
+    devices = g_new(AudioObjectID, n);
+
+    status = AudioObjectGetPropertyData(kAudioObjectSystemObject,
+            &devices_prop_addr, 0, NULL, &psize, devices);
+    if (status != noErr) {
+        g_warning("Could not get 'audio devices' property");
+        goto error;
+    }
+
+    for (i = 0; i < n; i++) {
+        source = make_source_from_device(devices[i]);
+        if (source)
+            ret = g_list_prepend(ret, source);
+    }
+
+    g_free(devices);
+
+    return g_list_reverse(ret);
+
+error:
+    return NULL;
+}
+
+#else /* TARGET_OS_IPHONE */
+
+GList *_owr_get_core_audio_sources()
+{
+    OwrLocalMediaSource *source;
+
+    source = _owr_local_media_source_new(-1, "Default audio input",
+            OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_CAPTURE);
+
+    return g_list_prepend(NULL, source);
+}
+
+#endif /* TARGET_OS_IPHONE */

@@ -36,7 +36,7 @@ G_BEGIN_DECLS
 
 GList *_owr_get_avf_video_sources();
 
-GList *_owr_get_avf_audio_sources();
+GList *_owr_get_core_audio_sources();
 
 G_END_DECLS
 

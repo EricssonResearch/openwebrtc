@@ -124,7 +124,7 @@ static gboolean enumerate_video_source_devices(GClosure *callback)
 
 static gboolean enumerate_audio_source_devices(GClosure *callback)
 {
-    _owr_utils_call_closure_with_list(callback, _owr_get_avf_audio_sources());
+    _owr_utils_call_closure_with_list(callback, _owr_get_core_audio_sources());
     return FALSE;
 }
 
