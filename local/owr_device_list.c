@@ -97,7 +97,7 @@ void _owr_get_capture_devices(OwrMediaType types, GClosure *callback)
         g_closure_set_marshal(callback, g_cclosure_marshal_generic);
     }
 
-    merger = _owr_utils_list_closure_merger_new(callback);
+    merger = _owr_utils_list_closure_merger_new(callback, (GDestroyNotify) g_object_unref);
 
     if (types & OWR_MEDIA_TYPE_VIDEO) {
         g_closure_ref(merger);

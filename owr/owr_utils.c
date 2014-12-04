@@ -60,6 +60,7 @@ OwrCodecType _owr_caps_to_codec_type(GstCaps *caps)
 typedef struct {
     GClosure *callback;
     GList *list;
+    GDestroyNotify item_destroy;
     GMutex mutex;
 } CallbackMergeContext;
 
@@ -90,6 +91,11 @@ static void callback_merger_on_destroy_data(CallbackMergeContext *context, GClos
     _owr_utils_call_closure_with_list(context->callback, context->list);
 
     g_mutex_clear(&context->mutex);
+
+    if (context->item_destroy)
+        g_list_free_full(context->list, context->item_destroy);
+    else
+        g_list_free(context->list);
     g_free(context);
 }
 
@@ -102,12 +108,13 @@ static void callback_merger(GList *list, CallbackMergeContext *context)
 
 /*
  * @final_callback: (transfer full):
+ * @list_item_destroy: (allow none): used to free the list items after calling @final_callback
  *
  * Returns a closure which should be called with a single GList argument.
  * When the refcount of the closure reaches 0, final_callback is called
  * with a concatenation of all the lists that were sent to the closure.
  */
-GClosure *_owr_utils_list_closure_merger_new(GClosure *final_callback)
+GClosure *_owr_utils_list_closure_merger_new(GClosure *final_callback, GDestroyNotify list_item_destroy)
 {
     CallbackMergeContext *context;
     GClosure *merger;
@@ -115,6 +122,7 @@ GClosure *_owr_utils_list_closure_merger_new(GClosure *final_callback)
     context = g_new0(CallbackMergeContext, 1);
 
     context->callback = final_callback;
+    context->item_destroy = list_item_destroy;
     context->list = NULL;
     g_mutex_init(&context->mutex);
 
