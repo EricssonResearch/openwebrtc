@@ -45,9 +45,12 @@ typedef OwrLocalMediaSource *(^DeviceMapFunc)(AVCaptureDevice *, gint);
 
 static GList *generate_source_device_list(NSString *mediaType, DeviceMapFunc map_func)
 {
+    NSAutoreleasePool *pool = nil;
     NSArray *devices;
     GList *list = NULL;
     gint index = 0;
+
+    pool = [[NSAutoreleasePool alloc] init];
 
     devices = [AVCaptureDevice devicesWithMediaType:mediaType];
 
@@ -56,7 +59,11 @@ static GList *generate_source_device_list(NSString *mediaType, DeviceMapFunc map
         ++index;
     }
 
-    return g_list_reverse(list);
+    list = g_list_reverse(list);
+
+    [pool release];
+
+    return list;
 }
 
 GList *_owr_get_avf_video_sources()
