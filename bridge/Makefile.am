@@ -38,8 +38,10 @@ libopenwebrtc_bridge_la_LDFLAGS = -export-dynamic
 if OWR_JAVA
 noinst_LTLIBRARIES = libopenwebrtc_bridge_static.la
 libopenwebrtc_bridge_static_la_SOURCES = $(libopenwebrtc_bridge_la_SOURCES)
-libopenwebrtc_bridge_static_la_LIBADD = $(libopenwebrtc_bridge_la_LIBADD)
-libopenwebrtc_bridge_static_la_DEPENDENCIES = $(libopenwebrtc_bridge_la_DEPENDENCIES)
+libopenwebrtc_bridge_static_la_LIBADD = \
+    $(libopenwebrtc_bridge_la_LIBADD:libopenwebrtc.la=libopenwebrtc_static.la)
+libopenwebrtc_bridge_static_la_DEPENDENCIES = \
+    $(libopenwebrtc_bridge_la_DEPENDENCIES:libopenwebrtc.la=libopenwebrtc_static.la)
 libopenwebrtc_bridge_static_la_LDFLAGS = $(libopenwebrtc_bridge_la_LDFLAGS)
 libopenwebrtc_bridge_static_la_CFLAGS = $(libopenwebrtc_bridge_la_CFLAGS)
 endif
