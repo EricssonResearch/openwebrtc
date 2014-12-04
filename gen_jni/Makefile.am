@@ -35,7 +35,7 @@ if HAVE_INTROSPECTION
 OWR_GIR = $(top_builddir)/owr/Owr-0.1.gir
 else
 # You need to provide this externally
-OWR_GIR = $(top_builddir)/Owr-0.1.gir
+OWR_GIR = Owr-0.1.gir
 endif
 
 owr_jni.c: $(OWR_GIR)
@@ -43,6 +43,9 @@ owr_jni.c: $(OWR_GIR)
 	--gir=$< \
 	--c-out=$(top_builddir)/gen_jni \
 	--j-out=$(top_builddir)/gen_jni/owr
+
+Owr-0.1.gir:
+	cp -f `find $(top_srcdir)/out -name Owr-0.1.gir || echo "Owr-0.1.gir"` .
 
 gen/bridge/%: bridge/%
 	mkdir -p gen/bridge
