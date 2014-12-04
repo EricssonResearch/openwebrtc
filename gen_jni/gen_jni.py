@@ -721,19 +721,17 @@ class CWriter(Writer):
         if obj['transfer'] == skip_transfer:
             return
 
-        if jni_type == 'jobjectArray':
-            if c_type == 'GList*':
-                self.call('g_list_free_full', c_name, 'g_object_unref')
-            else:
-                self.line('NOT IMPLEMENTED: cleanup {}'.format(c_type))
-        elif jni_type == 'jstring':
+        if jni_type == 'jstring':
             if c_type in ['gchar*', 'const gchar*', 'char*', 'const char*']:
                 self.call('g_free', '(void*) {}'.format(c_name))
             else:
                 self.line('NOT IMPLEMENTED: cleanup {}'.format(c_type))
         elif jni_type == 'jobject':
             if java_type not in self.enums:
-                self.g_object_unref(c_name)
+                if c_type == 'GList*':
+                    self.call('g_list_free_full', c_name, 'g_object_unref')
+                else:
+                    self.g_object_unref(c_name)
 
     def c_return_declare(self, obj):
         self.declare(self.str_c_type(obj), 'ret')
