@@ -1716,6 +1716,12 @@ def javify_functions(namespace, functions, package):
 
     w.class_declaration()
 
+    # TODO: proper solution
+    w.line('static')
+    w.push()
+    w.call('System.loadLibrary', quot("openwebrtc_jni"))
+    w.pop()
+
     for function in functions:
         w.method(function, static = True)
         w.line()
