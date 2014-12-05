@@ -321,6 +321,7 @@ static OwrLocalMediaSource *maybe_create_source_from_filename(const gchar *name)
     if (g_regex_match(regex, name, 0, &match_info)) {
         index_str = g_match_info_fetch(match_info, 1);
         index = g_ascii_strtoll(index_str, NULL, 10);
+        g_free(index_str);
 
         filename = g_strdup_printf("/dev/%s", name);
         device_name = get_v4l2_device_name(filename);
