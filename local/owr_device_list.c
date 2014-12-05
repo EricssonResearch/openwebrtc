@@ -148,12 +148,25 @@ typedef struct {
 static void on_pulse_context_state_change(pa_context *, AudioListContext *);
 static void source_info_iterator(pa_context *, const pa_source_info *, int eol, AudioListContext *);
 
+static gboolean free_pa_context(AudioListContext *context)
+{
+    pa_context_disconnect(context->pa_context);
+    pa_context_unref(context->pa_context);
+
+    pa_glib_mainloop_free(context->mainloop);
+
+    g_slice_free(AudioListContext, context);
+
+    return FALSE;
+}
+
 static void finish_pa_list(AudioListContext *context)
 {
     /* Schedule the callback in Owr mainloop context */
     call_closure_with_list_later(context->callback, context->list);
 
-    g_slice_free(AudioListContext, context);
+    /* Also schedule freeing of PA resources */
+    _owr_schedule_with_user_data((GSourceFunc) free_pa_context, context);
 }
 
 static gboolean enumerate_audio_source_devices(GClosure *callback)
