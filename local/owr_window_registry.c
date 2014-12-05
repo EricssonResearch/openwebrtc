@@ -138,6 +138,9 @@ void owr_window_registry_unregister(OwrWindowRegistry *window_registry,
     g_return_if_fail(data);
 
     if (data->renderer) {
+        data->window_handle = (guintptr) NULL;
+        data->window_handle_set = FALSE;
+
         _owr_video_renderer_notify_tag_changed(data->renderer, tag, FALSE, 0);
     } else {
         g_hash_table_remove(priv->registry_hash_table, tag);
