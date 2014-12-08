@@ -47,7 +47,7 @@
 #define LIMITED_HEIGHT 480
 #define LIMITED_FRAMERATE 30.0
 
-#define TARGET_BITS_PER_PIXEL 0.2 /* 640x360 15fps @ 768kbps =~ 0.2bpp */
+#define TARGET_BITS_PER_PIXEL 0.1 /* 640x360 15fps @ 768kbps =~ 0.2bpp */
 
 #define OWR_PAYLOAD_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_PAYLOAD, OwrPayloadPrivate))
 
