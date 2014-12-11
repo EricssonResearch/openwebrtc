@@ -34,18 +34,6 @@ libopenwebrtc_bridge_la_DEPENDENCIES = \
 libopenwebrtc_bridge_la_CFLAGS = $(AM_CFLAGS) -ansi
 libopenwebrtc_bridge_la_LDFLAGS = -export-dynamic
 
-# This is used to create a 'fat' libopenwebrtc_jni.so library which contains
-if OWR_JAVA
-noinst_LTLIBRARIES = libopenwebrtc_bridge_static.la
-libopenwebrtc_bridge_static_la_SOURCES = $(libopenwebrtc_bridge_la_SOURCES)
-libopenwebrtc_bridge_static_la_LIBADD = \
-    $(libopenwebrtc_bridge_la_LIBADD:libopenwebrtc.la=libopenwebrtc_static.la)
-libopenwebrtc_bridge_static_la_DEPENDENCIES = \
-    $(libopenwebrtc_bridge_la_DEPENDENCIES:libopenwebrtc.la=libopenwebrtc_static.la)
-libopenwebrtc_bridge_static_la_LDFLAGS = $(libopenwebrtc_bridge_la_LDFLAGS)
-libopenwebrtc_bridge_static_la_CFLAGS = $(libopenwebrtc_bridge_la_CFLAGS)
-endif
-
 bin_PROGRAMS = openwebrtc-daemon
 openwebrtc_daemon_SOURCES = daemon.c
 openwebrtc_daemon_LDFLAGS =

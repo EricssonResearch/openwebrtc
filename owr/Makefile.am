@@ -47,16 +47,6 @@ owr_require_symbols.c:
 	python ${srcdir}/symbols_to_source.py $(top_srcdir)/libopenwebrtc.exp $@
 endif
 
-# This is used to create a 'fat' libopenwebrtc_jni.so library which contains
-if OWR_JAVA
-noinst_LTLIBRARIES = libopenwebrtc_static.la
-libopenwebrtc_static_la_SOURCES = $(libopenwebrtc_la_SOURCES)
-libopenwebrtc_static_la_LIBADD = $(libopenwebrtc_la_LIBADD)
-libopenwebrtc_static_la_DEPENDENCIES = $(libopenwebrtc_la_DEPENDENCIES)
-libopenwebrtc_static_la_LDFLAGS = $(libopenwebrtc_la_LDFLAGS)
-libopenwebrtc_static_la_CFLAGS = $(libopenwebrtc_la_CFLAGS)
-endif
-
 includedir = $(prefix)/include/owr
 include_HEADERS = \
     owr.h \

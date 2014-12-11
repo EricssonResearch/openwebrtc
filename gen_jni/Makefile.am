@@ -17,14 +17,12 @@ lib_LTLIBRARIES = libopenwebrtc_jni.la libopenwebrtc_bridge_jni.la
 
 libopenwebrtc_jni_la_SOURCES = owr_jni.c
 libopenwebrtc_jni_la_LIBADD = \
-	$(OPENWEBRTC_GST_PLUGINS_LIBS) \
-	$(top_builddir)/owr/libopenwebrtc_static.la
+	$(top_builddir)/owr/libopenwebrtc.la
 
 libopenwebrtc_bridge_jni_la_SOURCES = owr_bridge_jni.c
 libopenwebrtc_bridge_jni_la_LIBADD = \
-	$(SEED_LIBS) \
 	$(top_builddir)/gen_jni/libopenwebrtc_jni.la \
-	$(top_builddir)/bridge/libopenwebrtc_bridge_static.la
+	$(top_builddir)/bridge/libopenwebrtc_bridge.la
 
 BUILT_SOURCES = owr_jni.c
 noinst_DATA = \
@@ -61,14 +59,16 @@ gen/owr/%: owr/%
 install-data-local: install-exec
 	mkdir -p '$(DESTDIR)/$(jardir)'
 	rm -rf jar-build && mkdir -p jar-build/lib/armeabi
-	for eachlib in '$(DESTDIR)/$(libdir)'/libopenwebrtc{,_bridge}_jni.so; do \
+	for eachlib in '$(DESTDIR)/$(libdir)'/libopenwebrtc{,_bridge}{,_jni}.so; do \
 		cp -L $$eachlib jar-build/lib/armeabi; \
 	done
 	$(JAR) cvf '$(DESTDIR)/$(jardir)/openwebrtc.jar' \
 		-C gen/owr com/ericsson/research/owr \
+		-C jar-build lib/armeabi/libopenwebrtc.so \
 		-C jar-build lib/armeabi/libopenwebrtc_jni.so
 	$(JAR) cvf '$(DESTDIR)/$(jardir)/openwebrtc_bridge.jar' \
 		-C gen/bridge com/ericsson/research/owr \
+		-C jar-build lib/armeabi/libopenwebrtc_bridge.so \
 		-C jar-build lib/armeabi/libopenwebrtc_bridge_jni.so
 	rm -rf jar-build
 
