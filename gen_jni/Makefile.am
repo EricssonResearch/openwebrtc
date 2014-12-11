@@ -23,6 +23,7 @@ libopenwebrtc_jni_la_LIBADD = \
 libopenwebrtc_bridge_jni_la_SOURCES = owr_bridge_jni.c
 libopenwebrtc_bridge_jni_la_LIBADD = \
 	$(SEED_LIBS) \
+	$(top_builddir)/gen_jni/libopenwebrtc_jni.la \
 	$(top_builddir)/bridge/libopenwebrtc_bridge_static.la
 
 BUILT_SOURCES = owr_jni.c
