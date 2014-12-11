@@ -21,7 +21,7 @@ libopenwebrtc_jni_la_LIBADD = \
 
 libopenwebrtc_bridge_jni_la_SOURCES = owr_bridge_jni.c
 libopenwebrtc_bridge_jni_la_LIBADD = \
-	$(top_builddir)/gen_jni/libopenwebrtc_jni.la \
+	$(top_builddir)/bindings/java/libopenwebrtc_jni.la \
 	$(top_builddir)/bridge/libopenwebrtc_bridge.la
 
 BUILT_SOURCES = owr_jni.c
@@ -38,10 +38,10 @@ OWR_GIR = Owr-0.1.gir
 endif
 
 owr_jni.c: $(OWR_GIR)
-	$(top_srcdir)/gen_jni/gen_jni.py \
+	$(top_srcdir)/bindings/java/gen_jni.py \
 	--gir=$< \
-	--c-out=$(top_builddir)/gen_jni \
-	--j-out=$(top_builddir)/gen_jni/owr
+	--c-out=$(top_builddir)/bindings/java \
+	--j-out=$(top_builddir)/bindings/java/owr
 
 Owr-0.1.gir:
 	cp -f `find $(top_srcdir)/out -name Owr-0.1.gir || echo "Owr-0.1.gir"` .

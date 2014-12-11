@@ -198,7 +198,8 @@ owr/openwebrtc-0.1.pc
 transport/Makefile
 local/Makefile
 tests/Makefile
-gen_jni/Makefile
+bindings/Makefile
+bindings/java/Makefile
 docs/Makefile
 docs/reference/Makefile
 docs/reference/owr/Makefile
