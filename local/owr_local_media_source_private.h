@@ -40,7 +40,7 @@
 
 G_BEGIN_DECLS
 
-OwrLocalMediaSource *_owr_local_media_source_new(gint device_index,
+OwrLocalMediaSource *_owr_local_media_source_new_cached(gint device_index,
     const gchar *name, OwrMediaType media_type, OwrSourceType source_type);
 void _owr_local_media_source_set_capture_device_index(OwrLocalMediaSource *source, guint index);
 

@@ -75,7 +75,7 @@ GList *_owr_get_avf_video_sources()
 
         name = [av_device.localizedName UTF8String];
 
-        source = _owr_local_media_source_new(index, name,
+        source = _owr_local_media_source_new_cached(index, name,
             OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE);
 
         return source;
@@ -137,7 +137,7 @@ static OwrLocalMediaSource * make_source_from_device(AudioObjectID device)
     }
     CFRelease(cf_name);
 
-    source = _owr_local_media_source_new(device, name,
+    source = _owr_local_media_source_new_cached(device, name,
             OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_CAPTURE);
 
 out:
@@ -196,7 +196,7 @@ GList *_owr_get_core_audio_sources()
 {
     OwrLocalMediaSource *source;
 
-    source = _owr_local_media_source_new(-1, "Default audio input",
+    source = _owr_local_media_source_new_cached(-1, "Default audio input",
             OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_CAPTURE);
 
     return g_list_prepend(NULL, source);

@@ -560,7 +560,7 @@ done:
     return source_element;
 }
 
-OwrLocalMediaSource *_owr_local_media_source_new(gint device_index, const gchar *name,
+static OwrLocalMediaSource *_owr_local_media_source_new(gint device_index, const gchar *name,
     OwrMediaType media_type, OwrSourceType source_type)
 {
     OwrLocalMediaSource *source;
@@ -574,4 +574,58 @@ OwrLocalMediaSource *_owr_local_media_source_new(gint device_index, const gchar 
     _owr_media_source_set_type(OWR_MEDIA_SOURCE(source), source_type);
 
     return source;
+}
+
+OwrLocalMediaSource *_owr_local_media_source_new_cached(gint device_index, const gchar *name,
+    OwrMediaType media_type, OwrSourceType source_type)
+{
+    static OwrLocalMediaSource *test_sources[2] = { NULL, };
+    static GHashTable *sources[2] = { NULL, };
+    G_LOCK_DEFINE_STATIC(source_cache);
+
+    OwrLocalMediaSource *ret = NULL;
+    gchar *cached_name;
+    int i;
+
+    G_LOCK(source_cache);
+
+    if (G_UNLIKELY(sources[0] == NULL)) {
+        sources[0] = g_hash_table_new(NULL, NULL);
+        sources[1] = g_hash_table_new(NULL, NULL);
+    }
+
+    i = media_type == OWR_MEDIA_TYPE_AUDIO ? 0 : 1;
+
+    if (source_type == OWR_SOURCE_TYPE_TEST) {
+        if (test_sources[i] == NULL)
+            test_sources[i] = _owr_local_media_source_new(device_index, name, media_type, source_type);
+
+        ret = test_sources[i];
+
+    } else if (source_type == OWR_SOURCE_TYPE_CAPTURE) {
+        ret = g_hash_table_lookup(sources[i], GINT_TO_POINTER(device_index));
+
+        if (ret) {
+            g_object_get(ret, "name", &cached_name, NULL);
+
+            if (!g_str_equal(name, cached_name)) {
+                /* Device at this index seems to have changed, throw the old one away */
+                g_object_unref(ret);
+                ret = NULL;
+            }
+
+            g_free(cached_name);
+        }
+
+        if (!ret) {
+            ret = _owr_local_media_source_new(device_index, name, media_type, source_type);
+            g_hash_table_insert(sources[i], GINT_TO_POINTER(device_index), ret);
+        }
+
+    } else
+        g_assert_not_reached();
+
+    G_UNLOCK (source_cache);
+
+    return g_object_ref(ret);
 }
