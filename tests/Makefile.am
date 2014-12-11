@@ -17,8 +17,20 @@ AM_CFLAGS = \
     -pedantic
 
 bin_PROGRAMS = \
+    list-devices \
     test-self-view \
     test-send-receive
+
+list_devices_SOURCES = list_devices.c
+
+list_devices_CFLAGS = \
+    -I$(top_srcdir)/local \
+    -I$(top_srcdir)/owr
+
+list_devices_LDADD = \
+    $(GSTREAMER_LIBS) \
+    $(GLIB_LIBS) \
+    $(top_builddir)/owr/libopenwebrtc.la
 
 test_self_view_SOURCES = test_self_view.c
 
