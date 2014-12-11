@@ -249,7 +249,7 @@ static void source_info_iterator(pa_context *pa_context, const pa_source_info *i
             return;
         }
 
-        source = _owr_local_media_source_new(info->index, info->description,
+        source = _owr_local_media_source_new_cached(info->index, info->description,
             OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_CAPTURE);
 
         context->list = g_list_prepend(context->list, source);
@@ -269,7 +269,7 @@ static gboolean enumerate_audio_source_devices(GClosure *callback)
 {
     OwrLocalMediaSource *source;
 
-    source = _owr_local_media_source_new(-1,
+    source = _owr_local_media_source_new_cached(-1,
         "Default audio input", OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_CAPTURE);
     _owr_utils_call_closure_with_list(callback, g_list_prepend(NULL, source));
 
@@ -344,7 +344,7 @@ static OwrLocalMediaSource *maybe_create_source_from_filename(const gchar *name)
 	if (!device_name)
             return NULL;
 
-        source = _owr_local_media_source_new(index, device_name,
+        source = _owr_local_media_source_new_cached(index, device_name,
             OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE);
 
         g_print("v4l: filename match: %s\n", device_name);
@@ -680,7 +680,7 @@ static gboolean enumerate_video_source_devices(GClosure *callback)
     num = get_number_of_cameras();
 
     for (i = 0; i < num; ++i) {
-        source = _owr_local_media_source_new(i, get_camera_name(i),
+        source = _owr_local_media_source_new_cached(i, get_camera_name(i),
             OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE);
 
         sources = g_list_prepend(sources, source);
