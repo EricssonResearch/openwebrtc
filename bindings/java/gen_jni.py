@@ -522,7 +522,9 @@ class CWriter(Writer):
         self.call('jobject_to_GObject', 'env', 'jself')
 
     def g_object_unref(self, name):
+        self.line('if (%s)' % name, push = True)
         self.state('g_object_unref({})'.format(name))
+        self.pop()
 
     def env(self, name, *args):
         self.indent()
