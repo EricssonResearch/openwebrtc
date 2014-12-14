@@ -99,7 +99,7 @@ static void owr_payload_set_property(GObject *object, guint property_id, const G
 
     switch (property_id) {
     case PROP_CODEC_TYPE:
-        priv->codec_type = g_value_get_uint(value);
+        priv->codec_type = g_value_get_enum(value);
         break;
     case PROP_PAYLOAD_TYPE:
         pt = g_value_get_uint(value);
@@ -142,7 +142,7 @@ static void owr_payload_get_property(GObject *object, guint property_id, GValue 
         g_assert_not_reached();
         break;
     case PROP_CODEC_TYPE:
-        g_value_set_uint(value, priv->codec_type);
+        g_value_set_enum(value, priv->codec_type);
         break;
     case PROP_PAYLOAD_TYPE:
         g_value_set_uint(value, priv->payload_type);
@@ -219,14 +219,14 @@ static void owr_payload_class_init(OwrPayloadClass *klass)
     gobject_class->set_property = owr_payload_set_property;
     gobject_class->get_property = owr_payload_get_property;
 
-    obj_properties[PROP_MEDIA_TYPE] = g_param_spec_uint("media-type", "Media type",
+    obj_properties[PROP_MEDIA_TYPE] = g_param_spec_enum("media-type", "Media type",
         "The type of media",
-        OWR_MEDIA_TYPE_AUDIO, OWR_MEDIA_TYPE_VIDEO, OWR_MEDIA_TYPE_AUDIO,
+        OWR_TYPE_MEDIA_TYPE, OWR_MEDIA_TYPE_AUDIO,
         G_PARAM_READABLE | G_PARAM_STATIC_STRINGS);
 
-    obj_properties[PROP_CODEC_TYPE] = g_param_spec_uint("codec-type", "Codec Type",
+    obj_properties[PROP_CODEC_TYPE] = g_param_spec_enum("codec-type", "Codec Type",
         "The type of codec",
-        OWR_CODEC_TYPE_PCMU, OWR_CODEC_TYPE_VP8, OWR_CODEC_TYPE_PCMU,
+        OWR_TYPE_CODEC_TYPE, OWR_CODEC_TYPE_PCMU,
         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS);
 
     obj_properties[PROP_PAYLOAD_TYPE] = g_param_spec_uint("payload-type", "Payload type number",

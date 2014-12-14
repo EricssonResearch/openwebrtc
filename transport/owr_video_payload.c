@@ -141,7 +141,7 @@ static void owr_video_payload_get_property(GObject *object, guint property_id, G
         break;
 
     case PROP_MEDIA_TYPE:
-        g_value_set_uint(value, OWR_MEDIA_TYPE_VIDEO);
+        g_value_set_enum(value, OWR_MEDIA_TYPE_VIDEO);
         break;
 
     default:

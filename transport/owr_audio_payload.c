@@ -107,7 +107,7 @@ static void owr_audio_payload_get_property(GObject *object, guint property_id, G
         break;
 
     case PROP_MEDIA_TYPE:
-        g_value_set_uint(value, OWR_MEDIA_TYPE_AUDIO);
+        g_value_set_enum(value, OWR_MEDIA_TYPE_AUDIO);
         break;
 
     default:

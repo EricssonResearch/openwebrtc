@@ -55,6 +55,15 @@ typedef enum {
     OWR_TRANSPORT_TYPE_TCP_SO
 } OwrTransportType;
 
+#define OWR_TYPE_CANDIDATE_TYPE (owr_candidate_type_get_type())
+GType owr_candidate_type_get_type(void);
+
+#define OWR_TYPE_COMPONENT_TYPE (owr_component_type_get_type())
+GType owr_component_type_get_type(void);
+
+#define OWR_TYPE_TRANSPORT_TYPE (owr_transport_type_get_type())
+GType owr_transport_type_get_type(void);
+
 #define OWR_TYPE_CANDIDATE            (owr_candidate_get_type())
 #define OWR_CANDIDATE(obj)            (G_TYPE_CHECK_INSTANCE_CAST((obj), OWR_TYPE_CANDIDATE, OwrCandidate))
 #define OWR_CANDIDATE_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST((klass), OWR_TYPE_CANDIDATE, OwrCandidateClass))
