@@ -212,14 +212,14 @@ static void on_pulse_context_state_change(pa_context *pa_context, AudioListConte
     gint error;
     error = pa_context_errno(pa_context);
     if (error) {
-        g_print("PulseAudio: error: %s", pa_strerror(error));
+        g_warning("PulseAudio: error: %s", pa_strerror(error));
     }
     switch (pa_context_get_state(pa_context)) {
     case PA_CONTEXT_READY:
         pa_context_get_source_info_list(pa_context, (pa_source_info_cb_t) source_info_iterator, context);
         break;
     case PA_CONTEXT_FAILED:
-        g_print("PulseAudio: failed to connect to daemon");
+        g_warning("PulseAudio: failed to connect to daemon");
         finish_pa_list(context);
         break;
     case PA_CONTEXT_TERMINATED:
@@ -290,16 +290,16 @@ static gchar *get_v4l2_device_name(gchar *filename)
     fd = open(filename, O_RDWR);
 
     if (fd <= 0) {
-        g_print("v4l: failed to open %s", filename);
+        g_warning("v4l: failed to open %s", filename);
 
         device_name = g_strdup(filename);
 
-	return NULL;
+        return NULL;
     } else {
         struct v4l2_capability vcap;
 
         if (v4l2_ioctl(fd, VIDIOC_QUERYCAP, &vcap) < 0) {
-            g_print("v4l: failed to query %s", filename);
+            g_warning("v4l: failed to query %s", filename);
 
             device_name = g_strdup(filename);
         } else {
@@ -307,7 +307,7 @@ static gchar *get_v4l2_device_name(gchar *filename)
         }
     }
 
-    g_print("v4l: found device: %s\n", device_name);
+    g_warning("v4l: found device: %s", device_name);
 
     close(fd);
 
@@ -347,7 +347,7 @@ static OwrLocalMediaSource *maybe_create_source_from_filename(const gchar *name)
         source = _owr_local_media_source_new_cached(index, device_name,
             OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE);
 
-        g_print("v4l: filename match: %s\n", device_name);
+        g_debug("v4l: filename match: %s", device_name);
 
         g_free(device_name);
     }
@@ -411,7 +411,7 @@ static void on_java_detach(JavaVM *jvm)
 {
     g_return_if_fail(jvm);
 
-    g_print("%s detached thread(%ld) from Java VM", __FUNCTION__, pthread_self());
+    g_debug("%s detached thread(%ld) from Java VM", __FUNCTION__, pthread_self());
     (*jvm)->DetachCurrentThread(jvm);
     pthread_setspecific(detach_key, NULL);
 }
@@ -435,7 +435,7 @@ static int get_android_sdk_version(JNIEnv *env)
     }
 
     version = (*env)->GetStaticIntField(env, ref, field_id);
-    g_print("android device list: android sdk version is: %d\n", version);
+    g_debug("android device list: android sdk version is: %d", version);
 
     (*env)->DeleteLocalRef(env, ref);
 
@@ -459,7 +459,7 @@ static JNIEnv* get_jni_env_from_jvm(JavaVM *jvm)
             return NULL;
         }
 
-        g_print("attached thread (%ld) to jvm\n", pthread_self());
+        g_debug("attached thread (%ld) to jvm", pthread_self());
 
         if (pthread_key_create(&detach_key, (void (*)(void *)) on_java_detach)) {
             g_warning("android device list: failed to set on_java_detach");
@@ -506,11 +506,11 @@ static JavaVM *get_java_vm(void)
         error_string = dlerror();
 
         if (error_string) {
-            g_print("failed to load %s: %s\n", android_runtime_libs[lib_index], error_string);
+            g_debug("failed to load %s: %s", android_runtime_libs[lib_index], error_string);
         }
 
         if (handle) {
-            g_print("Android runtime loaded from %s\n", android_runtime_libs[lib_index]);
+            g_debug("Android runtime loaded from %s", android_runtime_libs[lib_index]);
         } else {
             ++lib_index;
         }
@@ -529,9 +529,9 @@ static JavaVM *get_java_vm(void)
         get_created_java_vms(&jvm, 1, &num_jvms);
 
         if (num_jvms < 1) {
-            g_print("get_created_java_vms returned %d jvms", num_jvms);
+            g_debug("get_created_java_vms returned %d jvms", num_jvms);
         } else {
-            g_print("found existing jvm");
+            g_debug("found existing jvm");
         }
 
         err = dlclose(handle);
@@ -539,7 +539,7 @@ static JavaVM *get_java_vm(void)
             g_warning("dlclose() of android runtime handle failed");
         }
     } else {
-        g_warning("Failed to get jvm");
+        g_error("Failed to get jvm");
     }
 
     return jvm;
