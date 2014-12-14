@@ -37,15 +37,14 @@ server.onaccept = function (event) {
     var origin = event.origin;
     var channel = {
         "postMessage": function (message) {
-            ws.send(btoa(message));
+            ws.send(message);
         },
         "onmessage": null
     };
 
     ws.onmessage = function (event) {
-        var message = atob(event.data);
         if (channel.onmessage)
-            channel.onmessage({"data": message});
+            channel.onmessage(event);
     };
 
     var rpcScope = {};

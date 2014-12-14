@@ -70,10 +70,9 @@
 
             ws = new WebSocket("ws://localhost:10717/bridge");
             ws.onopen = processSendQueue;
-            ws.onmessage = function (evt) {
-                if (_this.onmessage instanceof Function) {
-                    _this.onmessage({"data": atob(evt.data)});
-                }
+            ws.onmessage = function (event) {
+                if (_this.onmessage instanceof Function)
+                    _this.onmessage(event);
             };
             ws.onclose = ws.onerror = function () {
                 ws = null;
@@ -89,7 +88,7 @@
         }
 
         this.postMessage = function (message) {
-            sendQueue.push(btoa(message));
+            sendQueue.push(message);
             ensureWebSocket();
             processSendQueue();
         };
