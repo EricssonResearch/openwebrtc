@@ -223,12 +223,13 @@ function WebSocket() {
                     if (fillSize < payloadLen)
                         return closeCallback();
 
+                    var i;
                     var payload = [];
                     if (mask.length)
-                        for (var i = 0; i < payloadLen; i++)
+                        for (i = 0; i < payloadLen; i++)
                             payload[i] = inputStream.read_byte() ^ mask[i % 4];
                     else
-                        for (var i = 0; i < payloadLen; i++)
+                        for (i = 0; i < payloadLen; i++)
                             payload[i] = inputStream.read_byte();
 
                     if (isCloseFrame) {
@@ -240,8 +241,12 @@ function WebSocket() {
                             reason = String.fromCharCode.apply(this, payload);
                         }
                         closeFrameCallback(statusCode, reason);
-                    } else
-                        frameCallback(String.fromCharCode.apply(this, payload));
+                    } else {
+                        var data = "";
+                        for (i = 0; i < payload.length; i++)
+                            data += String.fromCharCode(payload[i]);
+                        frameCallback(data);
+                    }
                 });
             }
         });
