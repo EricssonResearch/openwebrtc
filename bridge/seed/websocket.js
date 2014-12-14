@@ -245,7 +245,7 @@ function WebSocket() {
                         var data = "";
                         for (i = 0; i < payload.length; i++)
                             data += String.fromCharCode(payload[i]);
-                        frameCallback(data);
+                        frameCallback(decodeURIComponent(escape(data)));
                     }
                 });
             }
@@ -278,7 +278,7 @@ function WebSocket() {
     function processSendQueue() {
         var i;
         var buf = [129];
-        var message = sendQueue[0];
+        var message = unescape(encodeURIComponent(sendQueue[0]));
         var messageLen = message.length;
         if (messageLen < 126)
             buf[1] = messageLen & 0x7f;
@@ -499,7 +499,7 @@ function WebSocketServer(port, bindAddress) {
         for (var key in headers)
             if (headers.hasOwnProperty(key))
                 responseText += key + ": " + headers[key] + "\r\n";
-        responseText += "\r\n" + body;
+        responseText += "\r\n" + unescape(encodeURIComponent(body));
         var buf = [];
         for (var i = 0; i < responseText.length; i++)
             buf.push(responseText.charCodeAt(i));
