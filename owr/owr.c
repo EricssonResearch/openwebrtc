@@ -124,8 +124,10 @@ static void g_printerr_android_handler(const gchar *message)
 static void g_log_android_handler(const gchar *log_domain, GLogLevelFlags log_level,
     const gchar *message, gpointer unused_data)
 {
-    __android_log_write(ANDROID_LOG_INFO, "g_log", message);
-    g_log_default_handler(log_domain, log_level, message, unused_data);
+    if ((log_level & G_LOG_LEVEL_MASK) <= G_LOG_LEVEL_WARNING) {
+        __android_log_write(ANDROID_LOG_INFO, "g_log", message);
+        g_log_default_handler(log_domain, log_level, message, unused_data);
+    }
 }
 
 static void gst_log_android_handler(GstDebugCategory *category,
