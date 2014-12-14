@@ -635,7 +635,7 @@ static gint get_number_of_cameras(void)
     return (*env)->CallStaticIntMethod(env, Camera.class, Camera.getNumberOfCameras);
 }
 
-static gchar *get_camera_name(gint camera_index)
+static jint get_camera_facing(gint camera_index)
 {
     jint facing;
     jobject camera_info_instance;
@@ -648,29 +648,20 @@ static gchar *get_camera_name(gint camera_index)
     if ((*env)->ExceptionCheck(env)) {
         (*env)->ExceptionClear(env);
         g_warning("android device list: failed to create CameraInfo object");
-        return NULL;
+        return -1;
     }
 
     (*env)->CallStaticVoidMethod(env, Camera.class, Camera.getCameraInfo, camera_index, camera_info_instance);
     if ((*env)->ExceptionCheck(env)) {
         (*env)->ExceptionClear(env);
         g_warning("android device list: could not get camera info");
-        return NULL;
+        return -1;
     }
 
     facing = (*env)->GetIntField(env, camera_info_instance, CameraInfo.facing);
     (*env)->DeleteLocalRef(env, camera_info_instance);
 
-    if (facing == CameraInfo.CAMERA_FACING_FRONT) {
-        g_print("found front facing camera\n");
-        return g_strdup("Front facing Camera");
-    } else if (facing == CameraInfo.CAMERA_FACING_BACK) {
-        g_print("found back facing camera\n");
-        return g_strdup("Back facing Camera");
-    } else {
-        g_print("found camera with unknown position\n");
-        return g_strdup("Unknown Camera");
-    }
+    return facing;
 }
 
 static gboolean enumerate_video_source_devices(GClosure *callback)
@@ -683,13 +674,20 @@ static gboolean enumerate_video_source_devices(GClosure *callback)
     num = get_number_of_cameras();
 
     for (i = 0; i < num; ++i) {
-        source = _owr_local_media_source_new_cached(i, get_camera_name(i),
-            OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE);
+        jint facing = get_camera_facing(i);
 
-        sources = g_list_prepend(sources, source);
+        if (facing == CameraInfo.CAMERA_FACING_FRONT) {
+            source = _owr_local_media_source_new_cached(i, "Front facing Camera",
+                OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE);
+            sources = g_list_prepend(sources, source);
+        } else if (facing == CameraInfo.CAMERA_FACING_BACK) {
+            source = _owr_local_media_source_new_cached(i, "Back facing Camera",
+                OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE);
+            sources = g_list_append(sources, source);
+        }
+
     }
 
-    sources = g_list_reverse(sources);
     _owr_utils_call_closure_with_list(callback, sources);
 
     return FALSE;
