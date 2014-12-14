@@ -604,7 +604,7 @@ class CWriter(Writer):
         elif java_type in self.enums:
             self.lval(camel_name)
             self.cast(c_type)
-            self.call('jobject_to_enum_value', 'env', jni_name)
+            self.call('{}_to_c_enum'.format(c_type), 'env', jni_name)
         elif jni_type == 'jobject':
             self.lval(camel_name)
             self.cast(c_type)
@@ -871,6 +871,7 @@ CACHE_METHOD = 'method_{}_{}'.format
 CACHE_STATIC_METHOD = 'method_static_{}_{}'.format
 
 TEMPL_TO_JAVA_ENUM = '{c_name}_to_java_enum'.format
+TEMPL_TO_C_ENUM = '{c_name}_to_c_enum'.format
 
 STATIC_HELPER_METHODS = """\
 
@@ -1007,24 +1008,6 @@ static gpointer jobject_to_GObject(JNIEnv* env, jobject jself)
     log_debug("got GObject[%p] from jobject[%p]", self, jself);
 
     return self;
-}
-
-static guint jobject_to_enum_value(JNIEnv* env, jobject jself)
-{
-    jclass clazz;
-    jfieldID fieldId;
-    guint value;
-
-    clazz = (*env)->GetObjectClass(env, jself);
-    if ((*env)->ExceptionCheck(env)) return 0;
-    fieldId = (*env)->GetFieldID(env, clazz, "nativeInstance", "I");
-    if ((*env)->ExceptionCheck(env)) return 0;
-
-    value = (guint) (*env)->GetLongField(env, jself, fieldId);
-
-    if ((*env)->ExceptionCheck(env)) return 0;
-
-    return value;
 }
 
 static jobject create_jList(JNIEnv* env)
@@ -1236,6 +1219,18 @@ def cify_namespace(namespace):
         w.check_exception()
 
         w.pop()
+        w.line()
+
+        name = TEMPL_TO_C_ENUM(**enum)
+        w.set_return_type('guint')
+        w.line('static guint %s(JNIEnv* env, jobject jenum)' % name)
+        w.push()
+        w.declare('guint', 'value')
+        w.lval('value')
+        w.cast('guint')
+        w.env('GetIntField', 'jenum', 'field_%s_value' % enum['name'])
+        w.check_exception()
+        w.ret('value')
         w.line()
 
 
