@@ -4,7 +4,9 @@ owr_audio_renderer_get_type
 owr_audio_renderer_new
 owr_candidate_get_type
 owr_candidate_new
+owr_candidate_type_get_type
 owr_codec_type_get_type
+owr_component_type_get_type
 owr_get_capture_sources
 owr_image_renderer_get_type
 owr_image_renderer_new
@@ -39,6 +41,7 @@ owr_transport_agent_dump_dot_file
 owr_transport_agent_get_type
 owr_transport_agent_new
 owr_transport_agent_set_local_port_range
+owr_transport_type_get_type
 owr_video_payload_get_type
 owr_video_payload_new
 owr_video_renderer_get_type
