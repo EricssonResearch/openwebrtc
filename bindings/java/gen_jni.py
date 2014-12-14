@@ -946,6 +946,11 @@ static jobject GObject_to_jobject(JNIEnv* env, gpointer self_pointer)
     GObject* self = G_OBJECT(self_pointer);
     UserData* data;
 
+    if (!self) {
+        log_debug("got jobject[null] from GObject data[NULL]");
+        return NULL;
+    }
+
     g_object_ref(self);
     data = (UserData*) g_object_get_data(self, "java_instance");
 
@@ -995,6 +1000,11 @@ static gpointer jobject_to_GObject(JNIEnv* env, jobject jself)
     jclass clazz;
     jfieldID fieldId;
     gpointer self;
+
+    if (!jself) {
+        log_debug("got GObject[NULL] from jobject[null]");
+        return NULL;
+    }
 
     clazz = (*env)->GetObjectClass(env, jself);
     if ((*env)->ExceptionCheck(env)) return NULL;
