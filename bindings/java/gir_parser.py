@@ -203,14 +203,12 @@ def parse_class(top, enums):
         parent = None
 
     for tag in top.findall(TAG_PROPERTY):
-        readable = tag.get(ATTR_READABLE)
-        writable = tag.get(ATTR_WRITABLE)
         properties.append(dict(
             title_name = title_case(tag.get(ATTR_NAME)),
             camel_name = camel_case(tag.get(ATTR_NAME)),
             c_name = tag.get(ATTR_NAME),
-            readable = bool(readable if readable is not None else True),
-            writable = bool(writable if writable is not None else True),
+            readable = str(tag.get(ATTR_READABLE)) != '0',
+            writable = str(tag.get(ATTR_WRITABLE)) == '1',
             construct_only = bool(tag.get(ATTR_CONSTRUCT_ONLY)),
             transfer = tag.get(ATTR_TRANSFER_ONWERSHIP),
             types = parse_type_tag(tag.find(TAG_TYPE), enums)
