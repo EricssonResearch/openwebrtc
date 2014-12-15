@@ -598,15 +598,12 @@ void _owr_media_source_set_codec(OwrMediaSource *media_source, OwrCodecType code
     g_atomic_int_set(&media_source->priv->codec_type, codec_type);
 }
 
-void owr_media_source_dump_dot_file(OwrMediaSource *source, const gchar *base_file_name, gboolean with_ts)
+gchar * owr_media_source_get_dot_data(OwrMediaSource *source)
 {
-    g_return_if_fail(OWR_IS_MEDIA_SOURCE(source));
-    g_return_if_fail(base_file_name != NULL);
-    g_return_if_fail(source->priv->source_bin);
+    g_return_val_if_fail(OWR_IS_MEDIA_SOURCE(source), NULL);
 
-    if (with_ts) {
-        GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(source->priv->source_bin), GST_DEBUG_GRAPH_SHOW_ALL, base_file_name);
-    } else {
-        GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(source->priv->source_bin), GST_DEBUG_GRAPH_SHOW_ALL, base_file_name);
-    }
+    if (!source->priv->source_bin)
+        return g_strdup("");
+
+    return gst_debug_bin_to_dot_data(GST_BIN(source->priv->source_bin), GST_DEBUG_GRAPH_SHOW_ALL);
 }

@@ -389,15 +389,10 @@ void _owr_media_renderer_set_sink(OwrMediaRenderer *renderer, gpointer sink_ptr)
     g_mutex_unlock(&priv->media_renderer_lock);
 }
 
-void owr_media_renderer_dump_dot_file(OwrMediaRenderer *renderer, const gchar *base_file_name, gboolean with_ts)
+gchar * owr_media_renderer_get_dot_data(OwrMediaRenderer *renderer)
 {
-    g_return_if_fail(OWR_IS_MEDIA_RENDERER(renderer));
-    g_return_if_fail(base_file_name != NULL);
-    g_return_if_fail(renderer->priv->pipeline);
+    g_return_val_if_fail(OWR_IS_MEDIA_RENDERER(renderer), NULL);
+    g_return_val_if_fail(renderer->priv->pipeline, NULL);
 
-    if (with_ts) {
-        GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(renderer->priv->pipeline), GST_DEBUG_GRAPH_SHOW_ALL, base_file_name);
-    } else {
-        GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(renderer->priv->pipeline), GST_DEBUG_GRAPH_SHOW_ALL, base_file_name);
-    }
+    return gst_debug_bin_to_dot_data(GST_BIN(renderer->priv->pipeline), GST_DEBUG_GRAPH_SHOW_ALL);
 }
