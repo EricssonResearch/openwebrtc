@@ -1657,7 +1657,8 @@ def javify_class(clazz, package):
     # properties
     for prop in clazz['properties']:
         w.line()
-        w.method(prop, name = 'get' + prop['title_name'])
+        if prop['readable']:
+            w.method(prop, name = 'get' + prop['title_name'])
 
         if prop['writable']:
             w.method(name = 'set' + prop['title_name'], parameters = [prop])
