@@ -40,6 +40,7 @@
 #include "owr_session.h"
 #include "owr_media_session.h"
 #include "owr_transport_agent.h"
+#include "test_utils.h"
 
 static OwrTransportAgent *recv_transport_agent = NULL;
 static OwrMediaSession *recv_session_audio = NULL;
@@ -85,11 +86,11 @@ static void got_remote_source(OwrMediaSession *session, OwrMediaSource *source, 
     g_free(name);
 
     if (media_type == OWR_MEDIA_TYPE_VIDEO) {
-        owr_media_source_dump_dot_file(source, "test_receive-got_remote_source-video-source", TRUE);
-        owr_media_renderer_dump_dot_file(owr_renderer, "test_receive-got_remote_source-video-renderer", TRUE);
+        write_dot_file("test_receive-got_remote_source-video-source", owr_media_source_get_dot_data(source), TRUE);
+        write_dot_file("test_receive-got_remote_source-video-renderer", owr_media_renderer_get_dot_data(owr_renderer), TRUE);
     } else {
-        owr_media_source_dump_dot_file(source, "test_receive-got_remote_source-audio-source", TRUE);
-        owr_media_renderer_dump_dot_file(owr_renderer, "test_receive-got_remote_source-audio-renderer", TRUE);
+        write_dot_file("test_receive-got_remote_source-audio-source", owr_media_source_get_dot_data(source), TRUE);
+        write_dot_file("test_receive-got_remote_source-audio-renderer", owr_media_renderer_get_dot_data(owr_renderer), TRUE);
     }
 }
 
@@ -160,19 +161,19 @@ static void got_sources(GList *sources, gpointer user_data)
     }
 
     if (audio_source)
-        owr_media_source_dump_dot_file(audio_source, "test_send-got_source-audio-source", TRUE);
+        write_dot_file("test_send-got_source-audio-source", owr_media_source_get_dot_data(audio_source), TRUE);
     if (video_source)
-        owr_media_source_dump_dot_file(video_source, "test_send-got_source-video-source", TRUE);
+        write_dot_file("test_send-got_source-video-source", owr_media_source_get_dot_data(video_source), TRUE);
     if (video_renderer)
-        owr_media_renderer_dump_dot_file(video_renderer, "test_send-got_source-video-renderer", TRUE);
+        write_dot_file("test_send-got_source-video-renderer", owr_media_renderer_get_dot_data(video_renderer), TRUE);
 }
 
 static gboolean dump_cb(gpointer *user_data)
 {
     g_print("Dumping send transport agent pipeline!\n");
 
-    owr_transport_agent_dump_dot_file(send_transport_agent, "test_send-got_source-transport_agent", TRUE);
-    owr_transport_agent_dump_dot_file(recv_transport_agent, "test_receive-got_remote_source-transport_agent", TRUE);
+    write_dot_file("test_send-got_source-transport_agent", owr_transport_agent_get_dot_data(send_transport_agent), TRUE);
+    write_dot_file("test_receive-got_remote_source-transport_agent", owr_transport_agent_get_dot_data(recv_transport_agent), TRUE);
 
     return G_SOURCE_REMOVE;
 }

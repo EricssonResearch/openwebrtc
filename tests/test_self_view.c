@@ -36,6 +36,7 @@
 #include "owr_media_renderer.h"
 #include "owr_audio_renderer.h"
 #include "owr_video_renderer.h"
+#include "test_utils.h"
 
 static OwrMediaSource *audio_source = NULL, *video_source = NULL;
 static OwrMediaRenderer *audio_renderer = NULL, *video_renderer = NULL;
@@ -50,14 +51,15 @@ gboolean dump_pipeline(gpointer user_data)
     g_print("Dumping pipelines\n");
 
     if (audio_source)
-        owr_media_source_dump_dot_file(audio_source, "test_self_view-audio_source", FALSE);
+        write_dot_file("test_self_view-audio_source", owr_media_source_get_dot_data(audio_source), FALSE);
     if (audio_renderer)
-        owr_media_renderer_dump_dot_file(audio_renderer, "test_self_view-audio_renderer", FALSE);
+        write_dot_file("test_self_view-audio_renderer", owr_media_renderer_get_dot_data(audio_renderer), FALSE);
 
     if (video_source)
-        owr_media_source_dump_dot_file(video_source, "test_self_view-video_source", FALSE);
+        write_dot_file("test_self_view-video_source", owr_media_source_get_dot_data(video_source), FALSE);
     if (video_renderer)
-        owr_media_renderer_dump_dot_file(video_renderer, "test_self_view-video_renderer", FALSE);
+        write_dot_file("test_self_view-video_renderer", owr_media_renderer_get_dot_data(video_renderer), FALSE);
+
     return FALSE;
 }
 

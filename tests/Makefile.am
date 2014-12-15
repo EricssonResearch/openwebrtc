@@ -32,7 +32,7 @@ list_devices_LDADD = \
     $(GLIB_LIBS) \
     $(top_builddir)/owr/libopenwebrtc.la
 
-test_self_view_SOURCES = test_self_view.c
+test_self_view_SOURCES = test_self_view.c test_utils.c
 
 test_self_view_CFLAGS = \
     -I$(top_srcdir)/local \
@@ -43,7 +43,7 @@ test_self_view_LDADD = \
     $(GLIB_LIBS) \
     $(top_builddir)/owr/libopenwebrtc.la
 
-test_send_receive_SOURCES = test_send_receive.c
+test_send_receive_SOURCES = test_send_receive.c test_utils.c
 
 test_send_receive_CFLAGS = \
     -I$(top_srcdir)/local \

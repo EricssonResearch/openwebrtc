@@ -75,7 +75,7 @@ void owr_transport_agent_add_helper_server(OwrTransportAgent *transport_agent, O
 void owr_transport_agent_add_local_address(OwrTransportAgent *transport_agent, const gchar *local_address);
 void owr_transport_agent_set_local_port_range(OwrTransportAgent *transport_agent, guint min_port, guint max_port);
 void owr_transport_agent_add_session(OwrTransportAgent *agent, OwrSession *session);
-void owr_transport_agent_dump_dot_file(OwrTransportAgent *transport_agent, const gchar *base_file_name, gboolean with_ts);
+gchar * owr_transport_agent_get_dot_data(OwrTransportAgent *transport_agent);
 
 G_END_DECLS
 

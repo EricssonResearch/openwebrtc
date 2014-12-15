@@ -67,7 +67,7 @@ struct _OwrMediaRendererClass {
 GType owr_media_renderer_get_type(void) G_GNUC_CONST;
 
 void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *source);
-void owr_media_renderer_dump_dot_file(OwrMediaRenderer *renderer, const gchar *base_file_name, gboolean with_ts);
+gchar * owr_media_renderer_get_dot_data(OwrMediaRenderer *renderer);
 
 G_END_DECLS
 

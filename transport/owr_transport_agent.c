@@ -2117,15 +2117,10 @@ static void on_new_jitterbuffer(G_GNUC_UNUSED GstElement *rtpbin, GstElement *ji
         g_object_set(jitterbuffer, "do-retransmission", TRUE, NULL);
 }
 
-void owr_transport_agent_dump_dot_file(OwrTransportAgent *transport_agent, const gchar *base_file_name, gboolean with_ts)
+gchar * owr_transport_agent_get_dot_data(OwrTransportAgent *transport_agent)
 {
-    g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
-    g_return_if_fail(base_file_name != NULL);
-    g_return_if_fail(transport_agent->priv->pipeline);
+    g_return_val_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent), NULL);
+    g_return_val_if_fail(transport_agent->priv->pipeline, NULL);
 
-    if (with_ts) {
-        GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(transport_agent->priv->pipeline), GST_DEBUG_GRAPH_SHOW_ALL, base_file_name);
-    } else {
-        GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(transport_agent->priv->pipeline), GST_DEBUG_GRAPH_SHOW_ALL, base_file_name);
-    }
+    return gst_debug_bin_to_dot_data(GST_BIN(transport_agent->priv->pipeline), GST_DEBUG_GRAPH_SHOW_ALL);
 }
