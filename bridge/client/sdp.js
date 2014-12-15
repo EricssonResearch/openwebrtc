@@ -101,9 +101,9 @@ if (typeof(SDP) == "undefined")
             "a=ice-ufrag:${ufrag}\r\n" +
             "a=ice-pwd:${password}\r\n",
 
-        "candidate":
-            "a=candidate:${foundation} ${componentId} ${transport} ${priority} ${address} ${port}" +
-            " typ ${type}${[ raddr ]relatedAddress}${[ rport ]relatedPort}${[ tcptype ]tcpType}\r\n",
+        "candidateAttribute":
+            "candidate:${foundation} ${componentId} ${transport} ${priority} ${address} ${port}" +
+            " typ ${type}${[ raddr ]relatedAddress}${[ rport ]relatedPort}${[ tcptype ]tcpType}",
 
         "dtlsFingerprint": "a=fingerprint:${fingerprintHashFunction} ${fingerprint}\r\n",
         "dtlsSetup": "a=setup:${setup}\r\n",
@@ -141,6 +141,36 @@ if (typeof(SDP) == "undefined")
         }
         return text;
     }
+
+    SDP.parseCandidate = function (candidateText) {
+        candidateText = new String(candidateText);
+        if (candidateText.substring(0, 2) !== 'a=') {
+            candidateText = 'a=' + candidateText;
+        }
+        var candidateLine = match(candidateText, regexps.candidate, "mi");
+        var candidate = {
+            "foundation": candidateLine[1],
+            "componentId": parseInt(candidateLine[2]),
+            "transport": candidateLine[3].toUpperCase(),
+            "priority": parseInt(candidateLine[4]),
+            "address": candidateLine[5],
+            "port": parseInt(candidateLine[6]),
+            "type": candidateLine[7]
+        };
+        if (candidateLine[9])
+            candidate.relatedAddress = candidateLine[9];
+        if (!isNaN(candidateLine[10]))
+            candidate.relatedPort = parseInt(candidateLine[10]);
+        if (candidateLine[12])
+            candidate.tcpType = candidateLine[12];
+        else if (candidate.transport == "TCP") {
+            if (candidate.port == 0 || candidate.port == 9) {
+                candidate.tcpType = "active";
+                candidate.port = 9;
+            }
+        }
+        return candidate;
+    };
 
     SDP.parse = function (sdpText) {
         sdpText = new String(sdpText);
@@ -273,31 +303,7 @@ if (typeof(SDP) == "undefined")
                 if (!mediaDescription.ice)
                     mediaDescription.ice = {};
                 mediaDescription.ice.candidates = [];
-                candidateLines.forEach(function (line) {
-                    var candidateLine = match(line, regexps.candidate, "mi");
-                    var candidate = {
-                        "foundation": candidateLine[1],
-                        "componentId": parseInt(candidateLine[2]),
-                        "transport": candidateLine[3].toUpperCase(),
-                        "priority": parseInt(candidateLine[4]),
-                        "address": candidateLine[5],
-                        "port": parseInt(candidateLine[6]),
-                        "type": candidateLine[7]
-                    };
-                    if (candidateLine[9])
-                        candidate.relatedAddress = candidateLine[9];
-                    if (!isNaN(candidateLine[10]))
-                        candidate.relatedPort = parseInt(candidateLine[10]);
-                    if (candidateLine[12])
-                        candidate.tcpType = candidateLine[12];
-                    else if (candidate.transport == "TCP") {
-                        if (candidate.port == 0 || candidate.port == 9) {
-                            candidate.tcpType = "active";
-                            candidate.port = 9;
-                        }
-                    }
-                    mediaDescription.ice.candidates.push(candidate);
-                });
+                mediaDescription.ice.candidates = candidateLines.map(SDP.parseCandidate);
             }
 
             var fingerprint = match(mblock, regexps.fingerprint, "mi", sblock);
@@ -334,6 +340,16 @@ if (typeof(SDP) == "undefined")
 
         return sdpObj;
     };
+
+    SDP.generateCandidate = function (candidateObj) {
+        candidateObj = JSON.parse(JSON.stringify(candidateObj));
+        addDefaults(candidateObj, {
+            "relatedAddress": null,
+            "relatedPort": null,
+            "tcpType": null
+        });
+        return fillTemplate(templates.candidateAttribute, candidateObj);
+    }
 
     SDP.generate = function (sdpObj) {
         sdpObj = JSON.parse(JSON.stringify(sdpObj));
@@ -440,13 +456,8 @@ if (typeof(SDP) == "undefined")
                 iceInfo.iceCredentialLines = fillTemplate(templates.iceCredentials,
                     mediaDescription.ice);
                 if (mediaDescription.ice.candidates) {
-                    mediaDescription.ice.candidates.forEach(function (candidate) {
-                        addDefaults(candidate, {
-                            "relatedAddress": null,
-                            "relatedPort": null,
-                            "tcpType": null
-                        });
-                        iceInfo.candidateLines += fillTemplate(templates.candidate, candidate);
+                    iceInfo.candidateLines = mediaDescription.ice.candidates.map(function (candidate) {
+                        return "a=" + SDP.generateCandidate(candidate) + "\r\n";
                     });
                 }
             }
