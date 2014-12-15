@@ -628,19 +628,12 @@ class CWriter(Writer):
 
     def jni_return_declare(self, obj):
         self.declare(self.str_c_type(obj), 'result')
-        self.declare(self.str_c_type(obj), 'ret')
-        self.declare(self.str_jni_type(obj), 'jRet')
+        self.declare(self.str_jni_type(obj), 'jResult')
 
     def return_jni_result(self, obj):
         ret = copy.copy(obj)
-        ret['camel_name'] = 'ret'
-        ret['title_name'] = 'Ret'
-
-        self.lval('ret')
-        if ret['types']['jni'] == 'jstring':
-            self.call('g_strdup', 'result')
-        else:
-            self.rval('result')
+        ret['camel_name'] = 'result'
+        ret['title_name'] = 'Result'
 
         self.c_to_jni(ret)
 
@@ -648,7 +641,7 @@ class CWriter(Writer):
         self.cleanup_c(ret, skip_transfer = 'none')
 
         self.line()
-        self.ret('jRet')
+        self.ret('jResult')
 
      ######
     ##    ##
@@ -689,17 +682,10 @@ class CWriter(Writer):
         elif java_type == 'java.util.Map<>':
             pass
         elif java_type == 'java.lang.String':
-            self.lval('%s_jstring' % c_name)
-            if obj.get('transfer') == 'none':
-                self.call('g_strdup', c_name)
-            else:
-                self.rval(c_name)
             self.lval(jni_name)
             self.cast(c_type)
-            self.call('(*env)->NewStringUTF', 'env', '%s_jstring' % c_name)
+            self.call('(*env)->NewStringUTF', 'env', c_name)
             self.check_exception()
-            if obj.get('transfer') == 'none':
-                self.call('g_free', '%s_jstring' % c_name)
         elif java_type in self.enums:
             self.lval(jni_name)
             self.call('{}_to_java_enum'.format(c_type), 'env', c_name)
@@ -723,7 +709,7 @@ class CWriter(Writer):
         if obj['transfer'] == skip_transfer:
             return
 
-        if jni_type == 'jstring':
+        if java_type == 'java.lang.String':
             if c_type in ['gchar*', 'const gchar*', 'char*', 'const char*']:
                 self.call('g_free', '(void*) {}'.format(c_name))
             else:
