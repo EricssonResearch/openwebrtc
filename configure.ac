@@ -189,6 +189,7 @@ AC_SUBST(ANDROID_NDK_PREFIX)
 AC_OUTPUT([
 Makefile
 bridge/Makefile
+bridge/openwebrtc-bridge-0.1.pc
 bridge/client/Makefile
 bridge/seed/Makefile
 bridge/shared/Makefile
