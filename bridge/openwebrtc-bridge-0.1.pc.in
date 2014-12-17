@@ -1,13 +1,13 @@
-prefix=/usr/local
-exec_prefix=${prefix}
-libdir=${exec_prefix}/lib
-datarootdir=${prefix}/share
-datadir=${datarootdir}
-includedir=${prefix}/include
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+datarootdir=@datarootdir@
+datadir=@datadir@
+includedir=@includedir@
 
 Name: libopenwebrtc-bridge
 Description: libopenwebrtc-bridge
-Version: 0.1
+Version: @VERSION@
 Requires: openwebrtc-0.1 glib-2.0 gobject-2.0 gmodule-2.0 gthread-2.0 seed
 Libs: -L${libdir} -lopenwebrtc_bridge
 Cflags: -I${includedir}
