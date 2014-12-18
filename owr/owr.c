@@ -272,9 +272,23 @@ void owr_init_with_main_context(GMainContext *main_context)
     owr_init();
 }
 
+#if defined(__ANDROID__)
+static gboolean keep_alive_function(gpointer data) {
+    /* I keep the mainloop thread warm */
+    OWR_UNUSED(data);
+    return TRUE;
+}
+#endif
 
 static gpointer owr_run(gpointer data)
 {
+#if defined(__ANDROID__)
+    /* Fix for the mainloop thread not always being awoken when adding a source
+        https://bugzilla.gnome.org/show_bug.cgi?id=745965 */
+    GSource *keep_alive_timer = g_timeout_source_new(1000);
+    g_source_set_callback(keep_alive_timer, keep_alive_function, NULL, NULL);
+    g_source_attach(keep_alive_timer, owr_main_context);
+#endif
     g_return_val_if_fail(!data, NULL);
     g_main_context_push_thread_default(owr_main_context);
     g_main_loop_run(owr_main_loop);
