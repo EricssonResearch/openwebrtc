@@ -98,6 +98,8 @@
     };
 
     var sourceInfoMap = {};
+    var renderControllerMap = {};
+
     var bridge = new JsonRpc(messageChannel);
     bridge.importFunctions("createPeerHandler", "requestSources", "renderSources");
 
@@ -1154,8 +1156,8 @@
             var video = elements[i];
             var imgDiv = ensureImgDiv(video);
             var img = imgDiv.firstChild;
-            if (!imgDiv.play)
-                img.style.visibility = "hidden";
+            img.style.visibility = "hidden";
+            img.src = "";
 
             var tag = randomString();
             bridge.renderSources(audioSources, videoSources, tag, function (renderInfo) {
@@ -1164,11 +1166,15 @@
                 var retryTime;
                 var imgUrl;
 
+                if (renderControllerMap[imgDiv.__src]) {
+                    renderControllerMap[imgDiv.__src].stop();
+                    delete renderControllerMap[imgDiv.__src];
+                }
+                renderControllerMap[url] = renderInfo.controller;
+                imgDiv.__src = url;
+
                 if (renderInfo.port)
                     imgUrl = "http://127.0.0.1:" + renderInfo.port + "/__" + tag + "-";
-
-                if (imgDiv.play)
-                    return;
 
                 img.onload = function () {
                     imgDiv.videoWidth = img.naturalWidth;
@@ -1192,8 +1198,7 @@
                     }
 
                     setTimeout(function () {
-                        img.src = imgUrl + (++count % roll);
-                        return;
+                        img.src = imgUrl ? imgUrl + (++count % roll) : "";
                     }, retryTime || 100);
                 };
 
@@ -1203,7 +1208,8 @@
                     "set": function (isMuted) {
                         muted = !!isMuted;
                         renderInfo.controller.setAudioMuted(muted);
-                    }
+                    },
+                    "configurable": true
                 });
 
                 imgDiv.play = function () {

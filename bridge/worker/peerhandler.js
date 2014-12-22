@@ -33,6 +33,7 @@ function PeerHandler(configuration, client, jsonRpc) {
     var mediaSessions = [];
     var numberOfReceivePreparedMediaSessions = 0;
     var numberOfSendPreparedMediaSessions = 0;
+    var remoteSources = [];
 
     this.prepareToReceive = function (localSessionInfo, isInitiator) {
         var dtlsRoles = [];
@@ -107,6 +108,7 @@ function PeerHandler(configuration, client, jsonRpc) {
 
             mediaSession.signal.on_incoming_source.connect(function (m, remoteSource) {
                 var mdescIndex = localSessionInfo.mediaDescriptions.indexOf(mdesc);
+                remoteSources[mdescIndex] = remoteSource;
                 client.gotRemoteSource(mdescIndex, jsonRpc.createObjectRef(remoteSource));
             });
 
@@ -186,7 +188,20 @@ function PeerHandler(configuration, client, jsonRpc) {
     };
 
     this.stop = function () {
-        console.log("PeerHandler.stop() called (not implemented)");
+        var i;
+        for (i = 0; i < remoteSources.length; i++) {
+            if (remoteSources[i]) {
+                jsonRpc.removeObjectRef(remoteSources[i]);
+                delete remoteSources[i];
+            }
+        }
+        remoteSources = null;
+        for (i = 0; i < mediaSessions.length; i++) {
+            mediaSessions[i].set_send_source(null);
+            delete mediaSessions[i];
+        }
+        mediaSessions = null;
+        transportAgent = null;
     };
 
     function internalAddRemoteCandidate(mediaSession, candidate, ufrag, password) {
