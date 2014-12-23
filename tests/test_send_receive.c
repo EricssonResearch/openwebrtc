@@ -126,7 +126,6 @@ static void got_sources(GList *sources, gpointer user_data)
             g_object_set(payload, "rtx-payload-type", 123, NULL);
 
             owr_media_session_set_send_payload(send_session_video, payload);
-            g_object_unref(payload);
 
             owr_media_session_set_send_source(send_session_video, source);
 
@@ -147,7 +146,6 @@ static void got_sources(GList *sources, gpointer user_data)
 
             payload = owr_audio_payload_new(OWR_CODEC_TYPE_OPUS, 100, 48000, 1);
             owr_media_session_set_send_payload(send_session_audio, payload);
-            g_object_unref(payload);
 
             owr_media_session_set_send_source(send_session_audio, source);
 
@@ -220,7 +218,6 @@ int main() {
     g_object_set(receive_payload, "rtx-payload-type", 123, NULL);
 
     owr_media_session_add_receive_payload(recv_session_video, receive_payload);
-    g_object_unref(receive_payload);
 
     owr_transport_agent_add_session(recv_transport_agent, OWR_SESSION(recv_session_video));
 
@@ -230,7 +227,6 @@ int main() {
 
     receive_payload = owr_audio_payload_new(OWR_CODEC_TYPE_OPUS, 100, 48000, 1);
     owr_media_session_add_receive_payload(recv_session_audio, receive_payload);
-    g_object_unref(receive_payload);
 
     owr_transport_agent_add_session(recv_transport_agent, OWR_SESSION(recv_session_audio));
 
