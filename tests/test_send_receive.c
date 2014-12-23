@@ -122,7 +122,6 @@ static void got_sources(GList *sources, gpointer user_data)
             payload = owr_video_payload_new(OWR_CODEC_TYPE_VP8, 103, 90000, TRUE, FALSE);
             g_object_set(payload, "width", 1280, "height", 720, "framerate", 30.0, NULL);
             owr_media_session_set_send_payload(send_session_video, payload);
-            g_object_unref(payload);
 
             owr_media_session_set_send_source(send_session_video, source);
 
@@ -143,7 +142,6 @@ static void got_sources(GList *sources, gpointer user_data)
 
             payload = owr_audio_payload_new(OWR_CODEC_TYPE_OPUS, 100, 48000, 1);
             owr_media_session_set_send_payload(send_session_audio, payload);
-            g_object_unref(payload);
 
             owr_media_session_set_send_source(send_session_audio, source);
 
@@ -214,7 +212,6 @@ int main() {
 
     receive_payload = owr_video_payload_new(OWR_CODEC_TYPE_VP8, 103, 90000, TRUE, FALSE);
     owr_media_session_add_receive_payload(recv_session_video, receive_payload);
-    g_object_unref(receive_payload);
 
     owr_transport_agent_add_session(recv_transport_agent, OWR_SESSION(recv_session_video));
 
@@ -224,7 +221,6 @@ int main() {
 
     receive_payload = owr_audio_payload_new(OWR_CODEC_TYPE_OPUS, 100, 48000, 1);
     owr_media_session_add_receive_payload(recv_session_audio, receive_payload);
-    g_object_unref(receive_payload);
 
     owr_transport_agent_add_session(recv_transport_agent, OWR_SESSION(recv_session_audio));
 

@@ -315,7 +315,7 @@ OwrMediaSession * owr_media_session_new(gboolean dtls_client_mode)
 /**
  * owr_media_session_add_receive_payload:
  * @media_session: the media session on which to add the receive payload.
- * @payload: (transfer none): the receive payload to add
+ * @payload: (transfer full): the receive payload to add
  *
  * The function adds support for receiving the given payload type.
  */
@@ -331,15 +331,13 @@ void owr_media_session_add_receive_payload(OwrMediaSession *media_session, OwrPa
     g_hash_table_insert(args, "payload", payload);
 
     g_object_ref(media_session);
-    g_object_ref(payload);
     _owr_schedule_with_hash_table((GSourceFunc)add_receive_payload, args);
 }
-
 
 /**
  * owr_media_session_set_send_payload:
  * @media_session: The media session on which set the send payload.
- * @payload: (transfer none) (allow-none): the send payload to set
+ * @payload: (transfer full) (allow-none): the send payload to set
  *
  * Sets what payload that will be sent.
  */
@@ -354,12 +352,9 @@ void owr_media_session_set_send_payload(OwrMediaSession *media_session, OwrPaylo
     g_hash_table_insert(args, "media_session", media_session);
     g_hash_table_insert(args, "payload", payload);
     g_object_ref(media_session);
-    if (payload)
-        g_object_ref(payload);
 
     _owr_schedule_with_hash_table((GSourceFunc)set_send_payload, args);
 }
-
 
 /**
  * owr_media_session_set_send_source:
@@ -384,7 +379,6 @@ void owr_media_session_set_send_source(OwrMediaSession *media_session, OwrMediaS
 
     _owr_schedule_with_hash_table((GSourceFunc)set_send_source, args);
 }
-
 
 
 /* Internal functions */
