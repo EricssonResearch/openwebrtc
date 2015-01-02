@@ -1,5 +1,8 @@
 /*
  * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
+ *     Author: Arun Raghavan <arun@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -42,6 +45,7 @@
 
 #define DEFAULT_MTU 1200
 #define DEFAULT_BITRATE 0
+#define DEFAULT_RTX_TIME 0    /* FIXME: what's a sane default here? */
 
 #define LIMITED_WIDTH 640
 #define LIMITED_HEIGHT 480
@@ -59,6 +63,8 @@ struct _OwrPayloadPrivate {
     guint clock_rate;
     guint mtu;
     guint bitrate;
+    gint rtx_payload_type;      /* -1 => no retransmission, else payload type for rtx pt map */
+    guint rtx_time;             /* milliseconds */
 };
 
 
@@ -70,6 +76,8 @@ enum {
     PROP_CLOCK_RATE,
     PROP_MTU,
     PROP_BITRATE,
+    PROP_RTX_PAYLOAD_TYPE,
+    PROP_RTX_TIME,
     N_PROPERTIES
 };
 
@@ -81,6 +89,7 @@ static guint get_unique_id();
 static void owr_payload_set_property(GObject *object, guint property_id, const GValue *value, GParamSpec *pspec)
 {
     OwrPayloadPrivate *priv;
+    gint pt;
 
     g_return_if_fail(object);
     g_return_if_fail(value);
@@ -93,7 +102,9 @@ static void owr_payload_set_property(GObject *object, guint property_id, const G
         priv->codec_type = g_value_get_uint(value);
         break;
     case PROP_PAYLOAD_TYPE:
-        priv->payload_type = g_value_get_uint(value);
+        pt = g_value_get_uint(value);
+        g_return_if_fail(pt == -1 || pt >= 96);
+        priv->payload_type = pt;
         break;
     case PROP_CLOCK_RATE:
         priv->clock_rate = g_value_get_uint(value);
@@ -103,6 +114,12 @@ static void owr_payload_set_property(GObject *object, guint property_id, const G
         break;
     case PROP_BITRATE:
         priv->bitrate = g_value_get_uint(value);
+        break;
+    case PROP_RTX_PAYLOAD_TYPE:
+        priv->rtx_payload_type = g_value_get_int(value);
+        break;
+    case PROP_RTX_TIME:
+        priv->rtx_time = g_value_get_uint(value);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
@@ -138,6 +155,12 @@ static void owr_payload_get_property(GObject *object, guint property_id, GValue 
         break;
     case PROP_BITRATE:
         g_value_set_uint(value, priv->bitrate);
+        break;
+    case PROP_RTX_PAYLOAD_TYPE:
+        g_value_set_int(value, priv->rtx_payload_type);
+        break;
+    case PROP_RTX_TIME:
+        g_value_set_uint(value, priv->rtx_time);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
@@ -221,6 +244,16 @@ static void owr_payload_class_init(OwrPayloadClass *klass)
         0, G_MAXUINT, DEFAULT_BITRATE,
         G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
+    obj_properties[PROP_RTX_PAYLOAD_TYPE] = g_param_spec_int("rtx-payload-type", "Retransmission payload type",
+        "The payload type to use for retransmission. (-1 means no retransmission)",
+        -1, 127, OWR_RTX_PAYLOAD_TYPE_DISABLED,
+        G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+
+    obj_properties[PROP_RTX_TIME] = g_param_spec_uint("rtx-time", "Retransmission buffer time",
+        "How long a packet should be kept in buffers for retransmission (milliseconds, 0 means use the default)",
+        0, G_MAXUINT, DEFAULT_RTX_TIME,
+        G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+
     obj_properties[PROP_MTU] = g_param_spec_uint("mtu", "MTU",
         "The maximum size of one RTP packet (in bytes)",
         0, G_MAXUINT, DEFAULT_MTU,
@@ -238,6 +271,9 @@ static void owr_payload_init(OwrPayload *payload)
     payload->priv = OWR_PAYLOAD_GET_PRIVATE(payload);
     payload->priv->mtu = DEFAULT_MTU;
     payload->priv->bitrate = DEFAULT_BITRATE;
+
+    payload->priv->rtx_payload_type = -1;
+    payload->priv->rtx_time = DEFAULT_RTX_TIME;
 }
 
 

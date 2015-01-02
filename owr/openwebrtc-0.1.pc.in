@@ -3,7 +3,7 @@ exec_prefix=@exec_prefix@
 libdir=@libdir@
 datarootdir=@datarootdir@
 datadir=@datadir@
-includedir=@includedir@/libopenwebrtc-0.1
+includedir=@includedir@
 
 Name: libopenwebrtc
 Description: libopenwebrtc

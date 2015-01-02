@@ -1,5 +1,8 @@
 /*
  * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
+ *     Author: Arun Raghavan <arun@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -72,6 +75,14 @@ static guint next_transport_agent_id = 1;
 
 G_DEFINE_TYPE(OwrTransportAgent, owr_transport_agent, G_TYPE_OBJECT)
 
+typedef struct {
+    GstElement *dtls_srtp_bin_rtp;
+    GstElement *dtls_srtp_bin_rtcp;
+    GstElement *send_output_bin;
+
+    gboolean linked_rtcp;
+} SendBinInfo;
+
 struct _OwrTransportAgentPrivate {
     NiceAgent *nice_agent;
     gboolean ice_controlling_mode;
@@ -83,8 +94,8 @@ struct _OwrTransportAgentPrivate {
     GstElement *pipeline, *transport_bin;
     GstElement *rtpbin;
 
-    GHashTable *streams;
-
+    /* session_id -> struct SendBinInfo */
+    GHashTable *send_bins;
 
     guint local_min_port;
     guint local_max_port;
@@ -123,10 +134,12 @@ static void on_rtpbin_pad_added(GstElement *rtpbin, GstPad *new_pad, OwrTranspor
 static void setup_video_receive_elements(GstPad *new_pad, guint32 session_id, OwrPayload *payload, OwrTransportAgent *transport_agent);
 static void setup_audio_receive_elements(GstPad *new_pad, guint32 session_id, OwrPayload *payload, OwrTransportAgent *transport_agent);
 static GstCaps * on_rtpbin_request_pt_map(GstElement *rtpbin, guint session_id, guint pt, OwrTransportAgent *agent);
+static GstElement * on_rtpbin_request_aux_sender(GstElement *rtpbin, guint session_id, OwrTransportAgent *transport_agent);
+static GstElement * on_rtpbin_request_aux_receiver(GstElement *rtpbin, guint session_id, OwrTransportAgent *transport_agent);
 
 static gboolean on_sending_rtcp(GObject *session, GstBuffer *buffer, gboolean early, OwrTransportAgent *agent);
-static void on_feedback_rtcp(GObject *session, guint type, guint fbtype, guint sender_ssrc, guint media_ssrc, GstBuffer *fci, OwrTransportAgent *transport_agent);
 static void on_ssrc_active(GstElement *rtpbin, guint session_id, guint ssrc, OwrTransportAgent *transport_agent);
+static void on_new_jitterbuffer(GstElement *rtpbin, GstElement *jitterbuffer, guint session_id, guint ssrc, OwrTransportAgent *transport_agent);
 static void prepare_rtcp_stats(OwrMediaSession *media_session, GObject *rtp_source);
 
 static void owr_transport_agent_finalize(GObject *object)
@@ -163,6 +176,8 @@ static void owr_transport_agent_finalize(GObject *object)
         g_hash_table_destroy(item->data);
     }
     g_list_free(priv->helper_server_infos);
+
+    g_hash_table_destroy(priv->send_bins);
 
     G_OBJECT_CLASS(owr_transport_agent_parent_class)->finalize(object);
 }
@@ -292,7 +307,10 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
     g_object_set(priv->rtpbin, "do-lost", TRUE, NULL);
     g_signal_connect(priv->rtpbin, "pad-added", G_CALLBACK(on_rtpbin_pad_added), transport_agent);
     g_signal_connect(priv->rtpbin, "request-pt-map", G_CALLBACK(on_rtpbin_request_pt_map), transport_agent);
+    g_signal_connect(priv->rtpbin, "request-aux-sender", G_CALLBACK(on_rtpbin_request_aux_sender), transport_agent);
+    g_signal_connect(priv->rtpbin, "request-aux-receiver", G_CALLBACK(on_rtpbin_request_aux_receiver), transport_agent);
     g_signal_connect(priv->rtpbin, "on-ssrc-active", G_CALLBACK(on_ssrc_active), transport_agent);
+    g_signal_connect(priv->rtpbin, "new-jitterbuffer", G_CALLBACK(on_new_jitterbuffer), transport_agent);
 
     g_signal_connect(priv->transport_bin, "pad-added", G_CALLBACK(on_transport_bin_pad_added), transport_agent);
 
@@ -303,6 +321,8 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
     priv->local_max_port = 0;
 
     priv->helper_server_infos = NULL;
+
+    priv->send_bins = g_hash_table_new_full(NULL, NULL, NULL, g_free);
 }
 
 
@@ -721,8 +741,6 @@ static gboolean add_media_session(GHashTable *args)
     gboolean media_session_found = FALSE;
     gboolean rtcp_mux = FALSE;
     guint stream_id;
-    gchar *send_rtp_sink_pad_name;
-    GstPad *rtp_sink_pad;
     GObject *session;
     GstStateChangeReturn state_change_status;
 
@@ -770,12 +788,6 @@ static gboolean add_media_session(GHashTable *args)
     _owr_session_set_on_remote_candidate(OWR_SESSION(media_session),
         g_cclosure_new_object_swap(G_CALLBACK(on_new_remote_candidate), G_OBJECT(transport_agent)));
 
-    /* This is to trigger the creation of the RTP session in RTPBIN */
-    send_rtp_sink_pad_name = g_strdup_printf("send_rtp_sink_%u", stream_id);
-    rtp_sink_pad = gst_element_get_request_pad(transport_agent->priv->rtpbin, send_rtp_sink_pad_name);
-    g_free(send_rtp_sink_pad_name);
-    gst_object_unref(rtp_sink_pad);
-
     prepare_transport_bin_receive_elements(transport_agent, stream_id, rtcp_mux);
     prepare_transport_bin_send_elements(transport_agent, stream_id, rtcp_mux);
 
@@ -796,7 +808,6 @@ static gboolean add_media_session(GHashTable *args)
     g_signal_emit_by_name(transport_agent->priv->rtpbin, "get-internal-session", stream_id, &session);
     g_object_set_data(session, "session_id", GUINT_TO_POINTER(stream_id));
     g_signal_connect_after(session, "on-sending-rtcp", G_CALLBACK(on_sending_rtcp), transport_agent);
-    g_signal_connect(session, "on-feedback-rtcp", G_CALLBACK(on_feedback_rtcp), transport_agent);
     g_object_unref(session);
 
     maybe_handle_new_send_source_with_payload(transport_agent, media_session);
@@ -999,86 +1010,102 @@ static void on_rtcp_mux_changed(OwrMediaSession *media_session, GParamSpec *pspe
     g_free(pad_name);
 }
 
-static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, guint stream_id,
-    GstElement *dtls_srtp_bin_rtp, GstElement *dtls_srtp_bin_rtcp, GstElement *send_output_bin)
+static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, guint stream_id, gboolean rtp, gboolean rtcp)
 {
     gchar *rtpbin_pad_name, *dtls_srtp_pad_name;
     gchar *output_selector_name;
     gboolean linked_ok;
     GstPad *sink_pad, *src_pad;
     GstElement *output_selector;
+    GstElement *dtls_srtp_bin_rtp;
+    GstElement *dtls_srtp_bin_rtcp;
+    GstElement *send_output_bin;
     OwrMediaSession *media_session;
+    SendBinInfo *send_bin_info;
 
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
+
+    send_bin_info = g_hash_table_lookup(transport_agent->priv->send_bins, GINT_TO_POINTER(stream_id));
+    g_return_if_fail(send_bin_info);
+
+    dtls_srtp_bin_rtp = send_bin_info->dtls_srtp_bin_rtp;
+    dtls_srtp_bin_rtcp = send_bin_info->dtls_srtp_bin_rtcp;
+    send_output_bin = send_bin_info->send_output_bin;
+
     g_return_if_fail(GST_IS_ELEMENT(dtls_srtp_bin_rtp));
     g_return_if_fail(!dtls_srtp_bin_rtcp || GST_IS_ELEMENT(dtls_srtp_bin_rtcp));
 
     /* RTP */
+    if (rtp) {
+	rtpbin_pad_name = g_strdup_printf("send_rtp_src_%u", stream_id);
+	dtls_srtp_pad_name = g_strdup_printf("rtp_sink_%u", stream_id);
 
-    rtpbin_pad_name = g_strdup_printf("send_rtp_src_%u", stream_id);
-    dtls_srtp_pad_name = g_strdup_printf("rtp_sink_%u", stream_id);
+	sink_pad = gst_element_get_request_pad(dtls_srtp_bin_rtp, dtls_srtp_pad_name);
+	g_assert(GST_IS_PAD(sink_pad));
+	ghost_pad_and_add_to_bin(sink_pad, send_output_bin, dtls_srtp_pad_name);
+	gst_object_unref(sink_pad);
 
-    sink_pad = gst_element_get_request_pad(dtls_srtp_bin_rtp, dtls_srtp_pad_name);
-    g_assert(GST_IS_PAD(sink_pad));
-    ghost_pad_and_add_to_bin(sink_pad, send_output_bin, dtls_srtp_pad_name);
-    gst_object_unref(sink_pad);
+	linked_ok = gst_element_link_pads(transport_agent->priv->rtpbin, rtpbin_pad_name,
+		send_output_bin, dtls_srtp_pad_name);
+	g_warn_if_fail(linked_ok);
 
-    linked_ok = gst_element_link_pads(transport_agent->priv->rtpbin, rtpbin_pad_name,
-        send_output_bin, dtls_srtp_pad_name);
-    g_warn_if_fail(linked_ok);
-
-    g_free(rtpbin_pad_name);
-    g_free(dtls_srtp_pad_name);
-
-    /* RTCP */
-    output_selector_name = g_strdup_printf("rtcp_output_selector_%u", stream_id);
-    output_selector = gst_element_factory_make("output-selector", output_selector_name);
-    g_free(output_selector_name);
-    g_object_set(output_selector, "pad-negotiation-mode", 0, NULL);
-    gst_bin_add(GST_BIN(send_output_bin), output_selector);
-    gst_element_sync_state_with_parent(output_selector);
-
-    rtpbin_pad_name = g_strdup_printf("send_rtcp_src_%u", stream_id);
-    dtls_srtp_pad_name = g_strdup_printf("rtcp_sink_%u",  stream_id);
-
-    /* RTCP muxing */
-    sink_pad = gst_element_get_request_pad(dtls_srtp_bin_rtp, dtls_srtp_pad_name);
-    g_assert(GST_IS_PAD(sink_pad));
-    src_pad = gst_element_get_request_pad(output_selector, "src_%u");
-    g_assert(GST_IS_PAD(src_pad));
-    linked_ok = gst_pad_link(src_pad, sink_pad) == GST_PAD_LINK_OK;
-    g_warn_if_fail(linked_ok);
-    g_object_set(output_selector, "active-pad", src_pad, NULL);
-    gst_object_unref(src_pad);
-    gst_object_unref(sink_pad);
-
-    if (dtls_srtp_bin_rtcp) {
-        /* RTCP standalone */
-        sink_pad = gst_element_get_request_pad(dtls_srtp_bin_rtcp, dtls_srtp_pad_name);
-        g_assert(GST_IS_PAD(sink_pad));
-        src_pad = gst_element_get_request_pad(output_selector, "src_%u");
-        g_assert(GST_IS_PAD(src_pad));
-        linked_ok = gst_pad_link(src_pad, sink_pad) == GST_PAD_LINK_OK;
-        g_warn_if_fail(linked_ok);
-        g_object_set(output_selector, "active-pad", src_pad, NULL);
-        gst_object_unref(src_pad);
-        gst_object_unref(sink_pad);
-
-        media_session = get_media_session(transport_agent, stream_id);
-        g_signal_connect_object(media_session, "notify::rtcp-mux", G_CALLBACK(on_rtcp_mux_changed),
-            output_selector, 0);
+	g_free(rtpbin_pad_name);
+	g_free(dtls_srtp_pad_name);
     }
 
-    sink_pad = gst_element_get_static_pad(output_selector, "sink");
-    ghost_pad_and_add_to_bin(sink_pad, send_output_bin, dtls_srtp_pad_name);
-    gst_object_unref(sink_pad);
+    /* RTCP */
+    if (rtcp && !send_bin_info->linked_rtcp) {
+	output_selector_name = g_strdup_printf("rtcp_output_selector_%u", stream_id);
+	output_selector = gst_element_factory_make("output-selector", output_selector_name);
+	g_free(output_selector_name);
+	g_object_set(output_selector, "pad-negotiation-mode", 0, NULL);
+	gst_bin_add(GST_BIN(send_output_bin), output_selector);
+	gst_element_sync_state_with_parent(output_selector);
 
-    linked_ok = gst_element_link_pads(transport_agent->priv->rtpbin, rtpbin_pad_name,
-        send_output_bin, dtls_srtp_pad_name);
-    g_warn_if_fail(linked_ok);
+	rtpbin_pad_name = g_strdup_printf("send_rtcp_src_%u", stream_id);
+	dtls_srtp_pad_name = g_strdup_printf("rtcp_sink_%u",  stream_id);
 
-    g_free(rtpbin_pad_name);
-    g_free(dtls_srtp_pad_name);
+	/* RTCP muxing */
+	sink_pad = gst_element_get_request_pad(dtls_srtp_bin_rtp, dtls_srtp_pad_name);
+	g_assert(GST_IS_PAD(sink_pad));
+	src_pad = gst_element_get_request_pad(output_selector, "src_%u");
+	g_assert(GST_IS_PAD(src_pad));
+	linked_ok = gst_pad_link(src_pad, sink_pad) == GST_PAD_LINK_OK;
+	g_warn_if_fail(linked_ok);
+	g_object_set(output_selector, "active-pad", src_pad, NULL);
+	gst_object_unref(src_pad);
+	gst_object_unref(sink_pad);
+
+	if (dtls_srtp_bin_rtcp) {
+	    /* RTCP standalone */
+	    sink_pad = gst_element_get_request_pad(dtls_srtp_bin_rtcp, dtls_srtp_pad_name);
+	    g_assert(GST_IS_PAD(sink_pad));
+	    src_pad = gst_element_get_request_pad(output_selector, "src_%u");
+	    g_assert(GST_IS_PAD(src_pad));
+	    linked_ok = gst_pad_link(src_pad, sink_pad) == GST_PAD_LINK_OK;
+	    g_warn_if_fail(linked_ok);
+	    g_object_set(output_selector, "active-pad", src_pad, NULL);
+	    gst_object_unref(src_pad);
+	    gst_object_unref(sink_pad);
+
+	    media_session = get_media_session(transport_agent, stream_id);
+	    g_signal_connect_object(media_session, "notify::rtcp-mux", G_CALLBACK(on_rtcp_mux_changed),
+		    output_selector, 0);
+	}
+
+	sink_pad = gst_element_get_static_pad(output_selector, "sink");
+	ghost_pad_and_add_to_bin(sink_pad, send_output_bin, dtls_srtp_pad_name);
+	gst_object_unref(sink_pad);
+
+	linked_ok = gst_element_link_pads(transport_agent->priv->rtpbin, rtpbin_pad_name,
+		send_output_bin, dtls_srtp_pad_name);
+	g_warn_if_fail(linked_ok);
+
+	g_free(rtpbin_pad_name);
+	g_free(dtls_srtp_pad_name);
+
+	send_bin_info->linked_rtcp = TRUE;
+    }
 }
 
 static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_agent, guint stream_id,
@@ -1087,6 +1114,7 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
     GstElement *nice_element, *dtls_srtp_bin_rtp, *dtls_srtp_bin_rtcp = NULL;
     gboolean linked_ok, synced_ok;
     GstElement *send_output_bin;
+    SendBinInfo *send_bin_info;
     gchar *bin_name;
 
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
@@ -1124,9 +1152,16 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
         g_warn_if_fail(synced_ok);
     }
 
-    link_rtpbin_to_send_output_bin(transport_agent, stream_id, dtls_srtp_bin_rtp, dtls_srtp_bin_rtcp, send_output_bin);
+    send_bin_info = g_new(SendBinInfo, 1);
+    send_bin_info->dtls_srtp_bin_rtp = dtls_srtp_bin_rtp;
+    send_bin_info->dtls_srtp_bin_rtcp = dtls_srtp_bin_rtcp;
+    send_bin_info->send_output_bin = send_output_bin;
+    send_bin_info->linked_rtcp = FALSE;
+
+    g_hash_table_insert(transport_agent->priv->send_bins, GINT_TO_POINTER(stream_id), send_bin_info);
 }
 
+/* #define TEST_RTX 1 */
 static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_agent,
     guint stream_id, gboolean rtcp_mux)
 {
@@ -1135,6 +1170,9 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
     gchar *rtpbin_pad_name;
     gboolean linked_ok, synced_ok;
     GstElement *receive_input_bin;
+#ifdef TEST_RTX
+    GstElement *identity;
+#endif
     gchar *bin_name;
 
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
@@ -1160,8 +1198,18 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
     gst_object_unref(rtp_src_pad);
 
     rtpbin_pad_name = g_strdup_printf("recv_rtp_sink_%u", stream_id);
+#ifndef TEST_RTX
     linked_ok = gst_element_link_pads(receive_input_bin, "rtp_src", transport_agent->priv->rtpbin,
         rtpbin_pad_name);
+#else
+    identity = gst_element_factory_make("identity", NULL);
+    g_object_set(identity, "drop-probability", 0.01, NULL);
+    gst_bin_add(GST_BIN(transport_agent->priv->transport_bin), identity);
+    gst_element_link_pads(receive_input_bin, "rtp_src", identity, "sink");
+    linked_ok = gst_element_link_pads(identity, "src", transport_agent->priv->rtpbin,
+        rtpbin_pad_name);
+    gst_element_sync_state_with_parent(identity);
+#endif
     g_warn_if_fail(linked_ok);
     g_free(rtpbin_pad_name);
     synced_ok = gst_element_sync_state_with_parent(dtls_srtp_bin);
@@ -1407,8 +1455,10 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
 
     rtpbin = transport_agent->priv->rtpbin;
     name = g_strdup_printf("send_rtp_sink_%u", stream_id);
-    rtp_sink_pad = gst_element_get_static_pad(rtpbin, name);
+    rtp_sink_pad = gst_element_get_request_pad(rtpbin, name);
     g_free(name);
+
+    link_rtpbin_to_send_output_bin(transport_agent, stream_id, TRUE, TRUE);
 
     g_object_get(payload, "media-type", &media_type, NULL);
 
@@ -1668,6 +1718,9 @@ static void on_rtpbin_pad_added(GstElement *rtpbin, GstPad *new_pad, OwrTranspor
         else
             setup_audio_receive_elements(new_pad, session_id, payload, transport_agent);
 
+	/* Hook up RTCP sending if it isn't already */
+	link_rtpbin_to_send_output_bin(transport_agent, session_id, FALSE, TRUE);
+
         g_object_unref(payload);
     } else if (g_str_has_prefix(new_pad_name, "send_rtp_src")) {
         guint32 session_id = 0;
@@ -1821,11 +1874,113 @@ static GstCaps * on_rtpbin_request_pt_map(GstElement *rtpbin, guint session_id, 
     payload = _owr_media_session_get_receive_payload(media_session, pt);
 
     g_return_val_if_fail(OWR_IS_MEDIA_SESSION(media_session), NULL);
-    g_return_val_if_fail(OWR_IS_PAYLOAD(payload), NULL);
+
     caps = _owr_payload_create_rtp_caps(payload);
     g_object_unref(payload);
 
     return caps;
+}
+
+static GstElement * create_aux_bin(gchar *prefix, GstElement *rtx, guint session_id)
+{
+    GstElement *bin;
+    GstPad *pad;
+    gchar *tmp;
+
+    tmp = g_strdup_printf("%s_%u", prefix, session_id);
+    bin = gst_bin_new(tmp);
+    g_free(tmp);
+
+    gst_bin_add(GST_BIN(bin), rtx);
+
+    tmp = g_strdup_printf("src_%u", session_id);
+    pad = gst_element_get_static_pad(rtx, "src");
+
+    gst_element_add_pad(bin, gst_ghost_pad_new(tmp, pad));
+
+    gst_object_unref(pad);
+    g_free(tmp);
+
+    tmp = g_strdup_printf("sink_%u", session_id);
+    pad = gst_element_get_static_pad(rtx, "sink");
+
+    gst_element_add_pad(bin, gst_ghost_pad_new(tmp, pad));
+
+    gst_object_unref(pad);
+    g_free(tmp);
+
+    return bin;
+}
+
+static GstElement * on_rtpbin_request_aux_sender(G_GNUC_UNUSED GstElement *rtpbin, guint session_id, OwrTransportAgent *transport_agent)
+{
+    OwrMediaSession *media_session;
+    OwrPayload *payload;
+    GstElement *rtxsend;
+    GstStructure *pt_map;
+    gint rtx_pt;
+    guint pt, rtx_time;
+    gchar *tmp;
+
+    media_session = OWR_MEDIA_SESSION(g_hash_table_lookup(transport_agent->priv->sessions, GUINT_TO_POINTER(session_id)));
+    g_return_val_if_fail(media_session, NULL);
+
+    payload = _owr_media_session_get_send_payload(media_session);
+    if (!payload)
+        goto no_retransmission;
+
+    g_object_get(payload, "rtx-payload-type", &rtx_pt, NULL);
+    if (rtx_pt < 0)
+        goto no_retransmission;
+
+    rtxsend = gst_element_factory_make("rtprtxsend", NULL);
+    g_return_val_if_fail(rtxsend != NULL, NULL);
+
+    /* Create and set the pt map */
+    g_object_get(payload, "payload-type", &pt, NULL);
+
+    pt_map = gst_structure_new_empty("application/x-rtp-pt-map");
+    tmp = g_strdup_printf("%u", pt);
+    gst_structure_set(pt_map, tmp, G_TYPE_UINT, (guint) rtx_pt, NULL);
+    g_free(tmp);
+
+    g_object_set(rtxsend, "payload-type-map", pt_map, NULL);
+    gst_structure_free(pt_map);
+
+    g_object_get(payload, "rtx-time", &rtx_time, NULL);
+    if (rtx_time)
+        g_object_set(rtxsend, "max-size-time", rtx_time, NULL);
+
+    return create_aux_bin("rtprtxsend", rtxsend, session_id);
+
+no_retransmission:
+    return NULL;
+}
+
+static GstElement * on_rtpbin_request_aux_receiver(G_GNUC_UNUSED GstElement *rtpbin, G_GNUC_UNUSED guint session_id, OwrTransportAgent *transport_agent)
+{
+    OwrMediaSession *media_session;
+    GstElement *rtxrecv;
+    GstStructure *pt_map;
+
+    media_session = OWR_MEDIA_SESSION(g_hash_table_lookup(transport_agent->priv->sessions, GUINT_TO_POINTER(session_id)));
+    g_return_val_if_fail(media_session, NULL);
+
+    pt_map = _owr_media_session_get_receive_rtx_pt_map(media_session);
+    if (!pt_map)
+        goto no_retransmission;
+
+    rtxrecv = gst_element_factory_make("rtprtxreceive", NULL);
+    g_return_val_if_fail(rtxrecv != NULL, NULL);
+
+    g_object_set(rtxrecv, "payload-type-map", pt_map, NULL);
+    gst_structure_free(pt_map);
+    /* FIXME: how do we get rtx-time? */
+
+    return create_aux_bin("rtprtxrecv", rtxrecv, session_id);
+
+no_retransmission:
+    return NULL;
 }
 
 static gboolean on_sending_rtcp(GObject *session, GstBuffer *buffer, gboolean early,
@@ -1950,28 +2105,16 @@ static void on_ssrc_active(GstElement *rtpbin, guint session_id, guint ssrc,
     g_object_unref(rtp_session);
 }
 
-static void on_feedback_rtcp(GObject *session, guint fbtype, guint type, guint sender_ssrc, guint media_ssrc, GstBuffer *fci, OwrTransportAgent *transport_agent)
+static void on_new_jitterbuffer(G_GNUC_UNUSED GstElement *rtpbin, GstElement *jitterbuffer, guint session_id, G_GNUC_UNUSED guint ssrc, OwrTransportAgent *transport_agent)
 {
-    g_return_if_fail(session);
-    g_return_if_fail(transport_agent);
+    OwrMediaSession *media_session;
 
-    OWR_UNUSED(sender_ssrc);
-    OWR_UNUSED(media_ssrc);
-    OWR_UNUSED(fci);
+    g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
+    media_session = get_media_session(transport_agent, session_id);
+    g_return_if_fail(OWR_IS_MEDIA_SESSION(media_session));
 
-    /* FIXME: temporary solution until everyone supports RTP retransmission properly */
-    if (fbtype == GST_RTCP_TYPE_RTPFB && type == GST_RTCP_RTPFB_TYPE_NACK) {
-        GstPad *rtp_sink_pad;
-        guint session_id = GPOINTER_TO_UINT(g_object_get_data(session, "session_id"));
-        gchar *name = g_strdup_printf("send_rtp_sink_%u", session_id);
-        g_warn_if_fail(session_id);
-        rtp_sink_pad = gst_element_get_static_pad(transport_agent->priv->rtpbin, name);
-        g_free(name);
-        g_warn_if_fail(GST_IS_PAD(rtp_sink_pad));
-        gst_pad_push_event(rtp_sink_pad, gst_event_new_custom(GST_EVENT_CUSTOM_UPSTREAM,
-            gst_structure_new("GstForceKeyUnit", "all-headers", G_TYPE_BOOLEAN, FALSE, NULL)));
-        gst_object_unref(rtp_sink_pad);
-    }
+    if (_owr_media_session_want_receive_rtx(media_session))
+        g_object_set(jitterbuffer, "do-retransmission", TRUE, NULL);
 }
 
 void owr_transport_agent_dump_dot_file(OwrTransportAgent *transport_agent, const gchar *base_file_name, gboolean with_ts)

@@ -1,5 +1,8 @@
 /*
  * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
+ *     Author: Arun Raghavan <arun@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -414,21 +417,6 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
                 g_assert_not_reached();
                 goto done;
             }
-
-#if defined(__APPLE__) && !TARGET_IPHONE_SIMULATOR
-            /* workaround for osxaudiosrc bug
-             * https://bugzilla.gnome.org/show_bug.cgi?id=711764 */
-            CREATE_ELEMENT(capsfilter, "capsfilter", "audio-source-capsfilter");
-            source_caps = gst_caps_copy(caps);
-            source_structure = gst_caps_get_structure(source_caps, 0);
-            gst_structure_set(source_structure,
-                "format", G_TYPE_STRING, "S32LE",
-                "rate", G_TYPE_INT, 44100, NULL);
-            gst_structure_remove_field(source_structure, "channels");
-            g_object_set(capsfilter, "caps", source_caps, NULL);
-            gst_caps_unref(source_caps);
-            gst_bin_add(GST_BIN(source_pipeline), capsfilter);
-#endif
 
             break;
             }

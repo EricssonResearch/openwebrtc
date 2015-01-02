@@ -1,5 +1,7 @@
 /*
  * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -121,6 +123,8 @@ static void got_sources(GList *sources, gpointer user_data)
 
             payload = owr_video_payload_new(OWR_CODEC_TYPE_VP8, 103, 90000, TRUE, FALSE);
             g_object_set(payload, "width", 1280, "height", 720, "framerate", 30.0, NULL);
+            g_object_set(payload, "rtx-payload-type", 123, NULL);
+
             owr_media_session_set_send_payload(send_session_video, payload);
             g_object_unref(payload);
 
@@ -213,6 +217,8 @@ int main() {
     g_signal_connect(recv_session_video, "on-incoming-source", G_CALLBACK(got_remote_source), NULL);
 
     receive_payload = owr_video_payload_new(OWR_CODEC_TYPE_VP8, 103, 90000, TRUE, FALSE);
+    g_object_set(receive_payload, "rtx-payload-type", 123, NULL);
+
     owr_media_session_add_receive_payload(recv_session_video, receive_payload);
     g_object_unref(receive_payload);
 

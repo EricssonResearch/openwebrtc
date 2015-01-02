@@ -74,9 +74,17 @@ server.onaccept = function (event) {
     var rpcScope = {};
     var jsonRpc = new JsonRpc(channel, {"scope": rpcScope, "noRemoteExceptions": true});
     var peerHandlers = [];
+    var renderControllers = [];
 
     ws.onclose = function (event) {
-        for (var i = 0; i < peerHandlers.length; i++) {
+        var i;
+        for (i = 0; i < renderControllers.length; i++) {
+            renderControllers[i].stop();
+            jsonRpc.removeObjectRef(renderControllers[i]);
+            delete renderControllers[i];
+        }
+        renderControllers = null;
+        for (i = 0; i < peerHandlers.length; i++) {
             peerHandlers[i].stop();
             jsonRpc.removeObjectRef(peerHandlers[i]);
             delete peerHandlers[i];
@@ -205,13 +213,13 @@ server.onaccept = function (event) {
     };
 
     rpcScope.renderSources = function (audioSources, videoSources, tag) {
-
         var audioRenderer;
         if (audioSources.length > 0) {
             audioRenderer = new owr.AudioRenderer({ "disabled": true });
             audioRenderer.set_source(audioSources[0]);
         }
         var imageServer;
+        var imageServerPort = 0;
         var videoRenderer;
         if (videoSources.length > 0) {
             videoRenderer = new owr.ImageRenderer();
@@ -219,28 +227,43 @@ server.onaccept = function (event) {
 
             if (nextImageServerPort > imageServerBasePort + 10)
                 nextImageServerPort = imageServerBasePort;
-            imageServer = imageServers[nextImageServerPort];
+            imageServerPort = nextImageServerPort++;
+            imageServer = imageServers[imageServerPort];
             if (!imageServer)
-                imageServer = imageServers[nextImageServerPort] = new owr.ImageServer({ "port": nextImageServerPort });
+                imageServer = imageServers[imageServerPort] = new owr.ImageServer({ "port": imageServerPort });
             imageServer.add_image_renderer(videoRenderer, tag);
-            nextImageServerPort++;
         }
 
-        var controller = new RenderController(audioRenderer, videoRenderer);
-        jsonRpc.exportFunctions(controller.setAudioMuted);
-        var controllerRef = jsonRpc.createObjectRef(controller, "setAudioMuted");
+        var controller = new RenderController(audioRenderer, videoRenderer, imageServerPort, tag);
+        renderControllers.push(controller);
+        jsonRpc.exportFunctions(controller.setAudioMuted, controller.stop);
+        var controllerRef = jsonRpc.createObjectRef(controller, "setAudioMuted", "stop");
 
-        return { "controller": controllerRef, "port": imageServer ? imageServer.port : 0 };
+        return { "controller": controllerRef, "port": imageServerPort };
     };
 
     jsonRpc.exportFunctions(rpcScope.createPeerHandler, rpcScope.requestSources, rpcScope.renderSources);
 
 };
 
-function RenderController(audioRenderer, videoRenderer) {
+function RenderController(audioRenderer, videoRenderer, imageServerPort, tag) {
     this.setAudioMuted = function (isMuted) {
         if (audioRenderer)
             audioRenderer.disabled = isMuted;
+    };
+
+    this.stop = function () {
+        if (audioRenderer)
+            audioRenderer.set_source(null);
+        if (videoRenderer)
+            videoRenderer.set_source(null);
+        if (imageServerPort) {
+            var imageServer = imageServers[imageServerPort];
+            if (imageServer)
+                imageServer.remove_image_renderer(tag);
+        }
+
+        audioRenderer = videoRenderer = imageServerPort = null;
     };
 }
 
