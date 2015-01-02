@@ -30,10 +30,34 @@
 var imageServers = {};
 var imageServerBasePort = 10000 + Math.floor(Math.random() * 40000);
 var nextImageServerPort = imageServerBasePort;
+var extensionConnect = false;
+var validExtenstionOrigin = "safari-extension://com.ericsson.research.owr";
+var extensionApproved = false;
+var extws;
+//var reqQueue = []; for future work
+var busy = false;
+var accepts = [];
+
+var extensionServer = new WebSocketServer(10719, "127.0.0.1");
+extensionServer.onaccept = function (event) {
+    extensionConnect = true;
+    extws = event.socket;
+    var reqOrigin = event.origin;
+    console.log("Extension-web-socket set up, origin: " + reqOrigin);
+    var reqOriginFirst45 = reqOrigin.slice(0, 44);
+    //check if reqOriginF45 is equal to "safari-extension://com.ericsson.research.owr"
+    if (reqOriginFirst45 == validExtenstionOrigin) extensionApproved = true;
+    extws.onlcose = function (evt) {
+        extws = null;
+    }
+}
 
 var server = new WebSocketServer(10717, "127.0.0.1");
 server.onaccept = function (event) {
+    extensionConnect = true;
     var ws = event.socket;
+    var mainOrigin = event.origin;
+    console.log("channel socket origin: " + mainOrigin);
     var channel = {
         "postMessage": function (message) {
             ws.send(btoa(message));
@@ -75,6 +99,7 @@ server.onaccept = function (event) {
 
     rpcScope.requestSources = function (options, client) {
         var mediaTypes = 0;
+        var requestId;
         if (options.audio)
             mediaTypes |= owr.MediaType.AUDIO;
         if (options.video)
@@ -103,7 +128,79 @@ server.onaccept = function (event) {
                     }
                 }
             }
-            client.gotSources(sourceInfos);
+
+
+            function returnToClient (sourcesToUse) {
+                sourcesToUse.forEach(function (el, ix, ar) {
+                    usedSources.push(el);
+                    console.log("pushed source " + el + " to usedSources");
+                });
+                console.log("usedSources: " + usedSources);
+                client.gotSources(sourcesToUse);
+            }
+            function deRef (accept_el, accept_ix, accept_ar) {
+                accept_el.forEach(function (source_el, source_ix, source_ar) {
+                    console.log("deref, accept_ix: " +accept_ix + "source_ix: " +source_ix + " el: " + source_el + " el.source: " + source_el.source);
+                    jsonRpc.removeObjectRef(source_el.source);
+                });
+            }
+
+            function handleExtResponse (evt) {
+                console.log("message received on extsocket");
+                var response = JSON.parse(evt.data);
+                if (response.name == "accept" && response.Id == requestId) {
+                    console.log("accept received on socket for requestId " + requestId);
+                    accepts[requestId] = JSON.parse(response.acceptSourceInfos);
+                    client.gotSources(JSON.parse(response.acceptSourceInfos));
+                }
+                if (response.name == "revokeAll") {
+                    console.log("revokeAll received on socket");
+                    accepts.forEach(deRef);
+                    accepts = [];
+                }
+                if (response.name == "revoke") {
+                    console.log("revoke received on socket for requestId " + response.Id);
+                    if (accepts[response.Id]) {
+                        deRef(accepts[response.Id], response.Id, accepts);
+                        accepts[response.Id] = null;
+                    }
+                }
+                clearBlock(); //clearing regardless of whether reponse was "accept", "reject" or "timeout"
+            }
+
+            function clearBlock () {
+                busy = false;
+            }
+
+            if (extensionConnect) { //If an extension ever did try to connect
+                if (extws && extensionApproved) {
+                    requestId = Math.floor(Math.random() * 40000);
+                    console.log("sourceInfos: " + sourceInfos);
+                    var requestMessage = {
+                        "name": "request",
+                        "origin": mainOrigin,
+                        "Id": requestId,
+                        "requestSourceInfos": JSON.stringify(sourceInfos)
+                    }
+                    if (!busy) {
+                        busy = true;
+                        extws.send(JSON.stringify(requestMessage));
+                        console.log("sent request to bar");
+                        extws.onmessage = handleExtResponse;
+
+                    } else {
+                        //outstanding request to extension; queue up
+                        //reqQueue.push(requestMessage); -- for a later version, just drop on floor now
+                        console.log("an extension is connected but busy serving (i.e. get accept or reject for) an gUM call. Dropping on floor.");
+                    }
+
+                } else {
+                    console.log("an extension has been (at least) trying to connect, but can for some reason not serve the gUM request at this time. Dropping on floor.");
+                }
+            } else {
+                console.log("no extension");
+                client.gotSources(sourcesToUse);
+            }
         });
     };
 
