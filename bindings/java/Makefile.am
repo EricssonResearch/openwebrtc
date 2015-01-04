@@ -26,6 +26,7 @@ libopenwebrtc_bridge_jni_la_LIBADD = \
 
 BUILT_SOURCES = owr_jni.c
 noinst_DATA = \
+	gen/owr/com/ericsson/research \
 	gen/owr/com/ericsson/research/owr \
 	gen/bridge/com/ericsson/research/owr
 CLEANFILES = owr_jni.c owr gen
@@ -37,10 +38,10 @@ else
 OWR_GIR = Owr-0.1.gir
 endif
 
-owr_jni.c: $(OWR_GIR)
+owr_jni.c: $(OWR_GIR) $(top_srcdir)/bindings/java/
 	$(top_srcdir)/bindings/java/gen_jni.py \
 	--gir=$< \
-	--c-out=$(top_builddir)/bindings/java \
+	--c-out=$(top_builddir)/bindings/java/owr_jni.c \
 	--j-out=$(top_builddir)/bindings/java/owr
 
 Owr-0.1.gir:
@@ -52,7 +53,7 @@ gen/bridge/%: bridge/%
 
 gen/owr/%: owr/%
 	mkdir -p gen/owr
-	$(JAVAC) -classpath '$(ANDROID_CLASSPATH)' -d gen/owr $</*.java
+	$(JAVAC) -classpath '$(ANDROID_CLASSPATH):gen/owr/' -d gen/owr $+/*.java
 
 # This must be done in install because we need the installed version of
 # the shared library created by libtool, not the "uninstalled" version
@@ -64,6 +65,7 @@ install-data-local: install-exec
 	done
 	$(JAR) cvf '$(DESTDIR)/$(jardir)/openwebrtc.jar' \
 		-C gen/owr com/ericsson/research/owr \
+		-C gen/owr com/ericsson/research \
 		-C jar-build lib/armeabi/libopenwebrtc.so \
 		-C jar-build lib/armeabi/libopenwebrtc_jni.so
 	$(JAR) cvf '$(DESTDIR)/$(jardir)/openwebrtc_bridge.jar' \

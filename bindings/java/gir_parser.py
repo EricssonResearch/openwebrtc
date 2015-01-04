@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # Copyright (c) 2014, Ericsson AB. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without modification,
@@ -23,7 +21,13 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
 # OF SUCH DAMAGE.
 
+from __future__ import print_function
 import xml.etree.ElementTree as ET
+import itertools
+from standard_types import VoidType, IntType, LongPtrType, GParamSpecType, JObjectWrapperType
+from standard_types import ClassCallbackMetaType, GObjectMetaType, CallbackMetaType
+from standard_types import EnumMetaType, BitfieldMetaType, GWeakRefType
+from copy import copy
 
 NS = '{http://www.gtk.org/introspection/core/1.0}'
 C_NS = '{http://www.gtk.org/introspection/c/1.0}'
@@ -53,10 +57,14 @@ TAG_SIGNAL = GLIB_NS + 'signal'
 ATTR_NAME = 'name'
 ATTR_WHEN = 'when'
 ATTR_VALUE = 'value'
+ATTR_SCOPE = 'scope'
 ATTR_PARENT = 'parent'
+ATTR_CLOSURE = 'closure'
 ATTR_READABLE = 'readable'
 ATTR_WRITABLE = 'writable'
+ATTR_ALLOW_NONE = 'allow-none'
 ATTR_CONSTRUCT_ONLY = 'construct-only'
+ATTR_SHARED_LIBRARY = 'shared-library'
 ATTR_TRANSFER_ONWERSHIP = 'transfer-ownership'
 
 ATTR_C_IDENTIFIER_PREFIXES = C_NS + 'identifier-prefixes'
@@ -68,310 +76,448 @@ ATTR_C_TYPE = C_NS + 'type'
 ATTR_GLIB_NICK = GLIB_NS + 'nick'
 ATTR_GLIB_TYPE_NAME = GLIB_NS + 'type-name'
 ATTR_GLIB_GET_TYPE = GLIB_NS + 'get-type'
+ATTR_GLIB_TYPE_STRUCT = GLIB_NS + 'type-struct'
 
 
-TYPE_TABLE_GIR_TO_JAVA = {
-    'none': 'void',
-    'utf8': 'java.lang.String',
-    'gchar': 'char',
-    'guchar': 'char',
-    'gint': 'int',
-    'guint': 'int',
-    'gint64': 'long',
-    'guint64': 'long',
-    'gboolean': 'boolean',
-    'gdouble': 'double',
-    'guintptr': 'long',
-    'gpointer': 'long',
-    'GLib.List': 'java.util.List<>',
-    'GLib.HashTable': 'java.util.Map<>'
-}
+def printable(cls):
+    cls.__repr__ = lambda self: str(self.__dict__)
+    return cls
 
-TYPE_TABLE_GIR_TO_JNI = {
-    'none': 'void',
-    'utf8': 'jstring',
-    'gchar': 'jbyte',
-    'guchar': 'jbyte',
-    'gint': 'jint',
-    'guint': 'jint',
-    'gint64': 'jlong',
-    'guint64': 'jlong',
-    'gboolean': 'jboolean',
-    'gfloat': 'jfloat',
-    'gdouble': 'jdouble',
-    'guintptr': 'jlong',
-    'gpointer': 'jlong',
-    'GLib.List': 'jobject',
-    'GLib.HashTable': 'jobject'
-}
+
+def partition(pred, iterable):
+    t1, t2 = itertools.tee(iterable)
+    return filter(pred, t1), filter(lambda x: not pred(x), t2)
+
+
+def by_name(elements):
+    return {e.name: e for e in elements}
 
 
 def title_case(st):
-    return ''.join(x for x in st.title() if x.isalpha())
+    return ''.join(c for c in st.title() if c.isalpha())
+
 
 def camel_case(st):
-    st = ''.join(x for x in st.title() if x.isalpha())
+    st = title_case(st)
     return st[0].lower() + st[1:]
 
-def snake_case(st):
-    return '_'.join(w.lower() for w in re.split("([A-Z][a-z]*)", st) if w != '')
 
-def to_jnitype(type):
-    type = TYPE_TABLE_GIR_TO_JNI.get(type)
-    return type or 'jobject'
+def parse_tag_value(type_registry, tag, name=None):
+    def lookup_type(tag):
+        gir_type = tag.get(ATTR_NAME)
+        c_type = tag.get(ATTR_C_TYPE)
+        return type_registry.lookup(gir_type, c_type)
 
-def to_javatype(type):
-    return TYPE_TABLE_GIR_TO_JAVA.get(type) or type
+    transfer = tag.get(ATTR_TRANSFER_ONWERSHIP)
+    type_tag = tag.find(TAG_TYPE)
+    allow_none = tag.get(ATTR_ALLOW_NONE) == '1'
+    inner_type_tags = type_tag.findall(TAG_TYPE)
 
-def parse_type_tag(tag, enums):
-    inner_tags = tag.findall(TAG_TYPE)
-    gir_type = tag.get(ATTR_NAME)
-    c_type = tag.get(ATTR_C_TYPE)
+    if name is None:
+        name = tag.get(ATTR_NAME)
+    assert name
 
-    enum = enums.get(gir_type)
-    if enum is not None:
-        if enum['bitfield']:
-            c_type = enum['c_name']
-            gir_type = 'gint'
+    typ = lookup_type(type_tag)
+
+    if inner_type_tags:
+        assert typ.is_container
+        types = enumerate(map(lookup_type, inner_type_tags))
+        type_params = [c(name + '_' + str(i), transfer == 'full') for i, c in types]
+        return typ(name, transfer != 'none', allow_none, *type_params)
+    else:
+        assert transfer != 'container'
+        return typ(name, transfer == 'full', allow_none)
+
+
+@printable
+class Parameters(object):
+    def __init__(self, return_value, instance_param, params=None, java_params=None):
+        params = params or []
+        self.instance_param = instance_param
+        if return_value is None:
+            return_value = VoidType()
+        self.return_value = return_value
+        self.params = params
+        if instance_param is not None:
+            self.all_params = [instance_param] + params
         else:
-            c_type = enum['c_name']
-            gir_type = enum['name']
+            self.all_params = params
 
-    java_type = to_javatype(gir_type)
-    jni_type = to_jnitype(gir_type)
+        def is_closure_param(param):
+            return isinstance(param, JObjectWrapperType)
 
-    if java_type == 'WindowHandle':
-        java_type = 'android.view.Surface'
+        self.closure_params, self.java_params = partition(is_closure_param, params)
 
-    return dict(
-        gir = gir_type,
-        java = java_type,
-        jni = jni_type,
-        c = c_type,
-        inner = [parse_type_tag(t, enums) for t in inner_tags] or None
-    )
+        if java_params:
+            self.java_params = java_params
 
+        def set_parent(param):
+            if param is not None:
+                param.parent = self
 
-def parse_parameters(elem, enums):
-    parameters = []
-    tags = elem.findall(TAG_PARAMETERS + '/' + TAG_PARAMETER)
-    if tags is not None:
-        for tag in tags:
-            name = tag.get(ATTR_NAME)
-            types = parse_type_tag(tag.find(TAG_TYPE), enums)
-            parameters.append(dict(
-                title_name = title_case(name),
-                camel_name = camel_case(name),
-                c_name = name,
-                transfer = tag.get(ATTR_TRANSFER_ONWERSHIP),
-                types = types
-            ))
-    return parameters
+        map(set_parent, [return_value, instance_param] + params)
 
+    def __iter__(self):
+        return iter(self.all_params)
 
-def parse_return_value(elem, enums):
-    tag = elem.find(TAG_RETURN_VALUE)
-    return dict(
-        transfer = tag.get(ATTR_TRANSFER_ONWERSHIP),
-        types = parse_type_tag(tag.find(TAG_TYPE), enums)
-    ).items()
+    @classmethod
+    def from_tag(cls, type_registry, tag):
+        return_value = parse_tag_value(type_registry, tag.find(TAG_RETURN_VALUE), 'result')
 
+        params_tag = tag.find(TAG_PARAMETERS)
+        if params_tag is None:
+            return cls(return_value, None)
 
-def parse_callback(top, enums):
-    name = top.get(ATTR_NAME)
-    result = dict(dict(
-        title_name = name,
-        camel_name = 'on' + name.replace('Callback', ''),
-        name = name,
-        c_name = top.get(ATTR_C_TYPE),
-        parameters = parse_parameters(top, enums),
-    ).items() + parse_return_value(top, enums))
+        closure_refs = {}
+        for tag_index, tag in enumerate(params_tag.findall(TAG_PARAMETER)):
+            closure = tag.get(ATTR_CLOSURE)
+            if closure is not None:
+                closure_refs[int(closure)] = tag_index
 
-    return result
+        params = []
+        instance_param = None
+        real_tag_index = 0
 
-
-def parse_class(top, enums):
-    parent = None
-    constructor = None
-    properties = []
-    methods = []
-    functions = []
-    signals = []
-
-    parent = top.get(ATTR_PARENT)
-    if parent == 'GObject.Object':
-        parent = None
-
-    for tag in top.findall(TAG_PROPERTY):
-        properties.append(dict(
-            title_name = title_case(tag.get(ATTR_NAME)),
-            camel_name = camel_case(tag.get(ATTR_NAME)),
-            c_name = tag.get(ATTR_NAME),
-            readable = str(tag.get(ATTR_READABLE)) != '0',
-            writable = str(tag.get(ATTR_WRITABLE)) == '1',
-            construct_only = bool(tag.get(ATTR_CONSTRUCT_ONLY)),
-            transfer = tag.get(ATTR_TRANSFER_ONWERSHIP),
-            types = parse_type_tag(tag.find(TAG_TYPE), enums)
-        ))
-
-    for tag in top.findall(TAG_METHOD):
-        name = tag.get(ATTR_NAME)
-        methods.append(dict(dict(
-            title_name = title_case(name),
-            camel_name = camel_case(name),
-            c_name = tag.get(ATTR_C_IDENTIFIER),
-            short_c_name = name,
-            parameters = parse_parameters(tag, enums),
-        ).items() + parse_return_value(tag, enums)))
-
-    for tag in top.findall(TAG_FUNCTION):
-        name = tag.get(ATTR_NAME)
-        functions.append(dict(dict(
-            title_name = title_case(name),
-            camel_name = camel_case(name),
-            c_name = tag.get(ATTR_C_IDENTIFIER),
-            short_c_name = name,
-            parameters = parse_parameters(tag, enums),
-        ).items() + parse_return_value(tag, enums)))
-
-    for tag in top.findall(TAG_SIGNAL):
-        name = tag.get(ATTR_NAME)
-        if name == 'on-new-stats': # TODO: Implement hash table conversion
-            continue
-        signals.append(dict(dict(
-            title_name = title_case(name[3:] if name[:3] == 'on-' else name),
-            camel_name = camel_case(name),
-            c_name = name,
-            parameters = parse_parameters(tag, enums),
-            when = tag.get(ATTR_WHEN)
-        ).items() + parse_return_value(tag, enums)))
-
-    constructor_tag = top.find(TAG_CONSTRUCTOR)
-
-    if constructor_tag is not None:
-        tag = constructor_tag
-        parameters = parse_parameters(tag, enums)
-        constructor = dict(dict(
-            title_name = 'NativeConstructor',
-            camel_name = 'nativeConstructor',
-            c_name = tag.get(ATTR_C_IDENTIFIER),
-            short_c_name = tag.get(ATTR_NAME),
-            parameters = parse_parameters(tag, enums),
-        ).items() + parse_return_value(tag, enums))
-
-    return dict(
-        c_name = top.get(ATTR_C_TYPE),
-        title_name = 'Self',
-        camel_name = 'self',
-        symbol_prefix = top.get(ATTR_C_SYMBOL_PREFIX),
-        name = top.get(ATTR_NAME),
-        parent = parent,
-        constructor = constructor,
-        properties = properties,
-        methods = methods,
-        functions = functions,
-        signals = signals
-    )
-
-
-def parse_enum(top):
-    members = []
-
-    name = top.get(ATTR_NAME)
-    glib_type = top.get(ATTR_GLIB_TYPE_NAME)
-    bitfield = top.tag == TAG_BITFIELD
-
-    if glib_type is not None:
-        return name
-
-    for member in top.findall(TAG_MEMBER):
-        members.append(dict(
-            original_name = member.get(ATTR_NAME),
-            name = member.get(ATTR_NAME).upper(),
-            value = member.get(ATTR_VALUE),
-            c_name = member.get(ATTR_C_IDENTIFIER)
-        ))
-
-    return dict(
-        name = name,
-        c_name = top.get(ATTR_C_TYPE),
-        members = members,
-        bitfield = bitfield
-    )
-
-
-def parse_function(top, enums):
-    name = top.get(ATTR_NAME)
-
-    return dict(dict(
-        title_name = title_case(name),
-        camel_name = camel_case(name),
-        c_name = top.get(ATTR_C_IDENTIFIER),
-        short_c_name = name,
-        parameters = parse_parameters(top, enums)
-    ).items() + parse_return_value(top, enums))
-
-
-def parse_namespace(namespace):
-    callbacks = {}
-    classes = []
-    enums = {}
-    glib_enums = []
-    functions = []
-
-    for top in namespace:
-        if top.tag == TAG_ENUMERATION or top.tag == TAG_BITFIELD:
-            enum = parse_enum(top)
-            if type(enum) is str:
-                glib_enums.append(enum)
+        for tag in params_tag:
+            if tag.tag == TAG_INSTANCE_PARAMETER:
+                assert real_tag_index == 0
+                instance_param = parse_tag_value(type_registry, tag)
             else:
-                enums[enum['name']] = enum
+                if closure_refs.get(real_tag_index) is not None:
+                    name = tag.get(ATTR_NAME)
+                    closure_index = closure_refs.get(real_tag_index)
+                    assert closure_index == real_tag_index - 1 or closure_index == real_tag_index
+                    closure = params[-1]
+                    params.append(JObjectWrapperType(name, closure, transfer_ownership=True))
+                else:
+                    params.append(parse_tag_value(type_registry, tag))
+                real_tag_index += 1
 
-    for glib_name in glib_enums:
-        for name, enum in enums.items():
-            if glib_name[0:-1] == name:
-                enums[glib_name] = enum
-
-    for top in namespace:
-        if top.tag == TAG_CLASS:
-            classes.append(parse_class(top, enums))
-
-    for clazz in classes:
-        parent = clazz['parent']
-        if parent is not None:
-            for parentclass in (c for c in classes if c['name'] == parent):
-                parentclass['is_parent'] = True
-
-    for top in namespace:
-        if top.tag == TAG_CALLBACK:
-            callback = parse_callback(top, enums)
-            callbacks[callback['name']] = callback
-
-    for top in namespace: # TODO: GMainContext implementation?
-        if top.tag == TAG_FUNCTION and top.get(ATTR_NAME) not in [
-                'init_with_main_context']:
-            functions.append(parse_function(top, enums))
-
-    return dict(
-        name = namespace.get(ATTR_NAME),
-        callbacks = callbacks,
-        classes = classes,
-        enums = enums,
-        functions = functions,
-        symbol_prefix = namespace.get(ATTR_C_SYMBOL_PREFIXES),
-        identifier_prefix = namespace.get(ATTR_C_IDENTIFIER_PREFIXES)
-    )
+        return cls(return_value, instance_param, params)
 
 
-def parse_gir_file(path):
-    tree = ET.parse(path)
-    root = tree.getroot()
-    namespaces = []
+@printable
+class Property(object):
+    def __init__(self, name, value, class_value, readable, writable, construct_only):
+        self.name = name
+        self.value = value
+        self.readable = readable
+        self.writable = writable
+        self.construct_only = construct_only
 
-    for elem in root:
-        if elem.tag == TAG_NAMESPACE:
-            namespaces.append(parse_namespace(elem))
+        if readable:
+            get_value = copy(value)
+            get_value.transfer_ownership = not get_value.transfer_ownership
+            self.getter = Method(
+                c_name=None,
+                name='get' + title_case(name),
+                params=Parameters(get_value, class_value),
+            )
+            self.signal = Signal(
+                name='on' + title_case(name) + 'Changed',
+                params=Parameters(None, class_value, [
+                    GParamSpecType('pspec', transfer_ownership=False),
+                    JObjectWrapperType('listener', None, transfer_ownership=False),
+                ], java_params=[value]),
+                signal_name='notify::' + name,
+                interface_name=title_case(name) + 'ChangeListener',
+                class_value=class_value,
+                when='first',
+            )
 
-    return namespaces
+        if writable:
+            self.setter = Method(
+                c_name=None,
+                name='set' + title_case(name),
+                params=Parameters(None, class_value, [value]),
+            )
 
+    @classmethod
+    def from_tag(cls, type_registry, class_value, tag):
+        name = tag.get(ATTR_NAME)
+        return cls(
+            name=name,
+            value=parse_tag_value(type_registry, tag, camel_case(name)),
+            class_value=class_value,
+            readable=str(tag.get(ATTR_READABLE)) != '0',
+            writable=str(tag.get(ATTR_WRITABLE)) == '1' and str(tag.get(ATTR_CONSTRUCT_ONLY)) != '1',
+            construct_only=bool(tag.get(ATTR_CONSTRUCT_ONLY)),
+        )
+
+
+@printable
+class BaseFunction(object):
+    def __init__(self, name, params, c_name=None):
+        self.name = name
+        self.c_name = c_name
+        self.params = params
+
+    @property
+    def method_signature(self):
+        arg_signature = ''.join((p.java_signature for p in self.params.java_params if p.java_signature is not None))
+        return '(' + arg_signature + ')' + self.params.return_value.java_signature
+
+    @classmethod
+    def from_tag(cls, type_registry, tag):
+        return cls(
+            name=camel_case(tag.get(ATTR_NAME)),
+            c_name=tag.get(ATTR_C_IDENTIFIER),
+            params=Parameters.from_tag(type_registry, tag),
+        )
+
+
+class Function(BaseFunction):
+    pass
+
+
+class Method(BaseFunction):
+    pass
+
+
+class Constructor(BaseFunction):
+    def __init__(self, **kwargs):
+        super(Constructor, self).__init__(**kwargs)
+        p = self.params
+        self.params = Parameters(GWeakRefType('instance_pointer'), p.instance_param, p.params)
+        self.name = 'nativeConstructor'
+
+
+class Callback(BaseFunction):
+    def __init__(self, value, **kwargs):
+        super(Callback, self).__init__(**kwargs)
+        self.value = value
+
+    @classmethod
+    def from_tag(cls, type_registry, tag):
+        callback_name = tag.get(ATTR_NAME)
+        callback_value = type_registry.lookup(callback_name, None)('listener', False)
+        return cls(
+            name='on' + callback_name,
+            value=callback_value,
+            params=Parameters.from_tag(type_registry, tag),
+        )
+
+
+class Signal(BaseFunction):
+    def __init__(self, signal_name, interface_name, class_value, when, **kwargs):
+        BaseFunction.__init__(self, **kwargs)
+        self.signal_name = signal_name
+        self.when = when
+
+        listener_value = ClassCallbackMetaType(
+            java_type=interface_name,
+            outer=class_value,
+        )('listener')
+        handle_value = IntType('handle', transfer_ownership=False)
+        closure_value = JObjectWrapperType('user_data', listener_value, transfer_ownership=False)
+        self.add_listener = Method(
+            c_name=None,
+            name='connect' + listener_value.java_type,
+            params=Parameters(handle_value, class_value, [listener_value, closure_value]),
+        )
+        self.remove_listener = Method(
+            c_name=None,
+            name='disconnect' + listener_value.java_type,
+            params=Parameters(None, class_value, [handle_value]),
+        )
+        self.public_add_listener = Method(
+            c_name=None,
+            name='add' + listener_value.java_type,
+            params=Parameters(None, None, [listener_value]),
+        )
+        self.public_remove_listener = Method(
+            c_name=None,
+            name='remove' + listener_value.java_type,
+            params=Parameters(None, None, [listener_value]),
+        )
+        self.value = listener_value
+
+    @classmethod
+    def from_tag(cls, type_registry, class_value, tag):
+        signal_name = tag.get(ATTR_NAME)
+
+        parsed_params = Parameters.from_tag(type_registry, tag)
+        return_value = parsed_params.return_value
+        params = parsed_params.all_params if parsed_params is not None else []
+        params = [return_value, class_value] + [params + [JObjectWrapperType('listener', None, transfer_ownership=False)]]
+
+        return cls(
+            name=camel_case(signal_name),
+            signal_name=signal_name,
+            interface_name=title_case(signal_name) + 'Listener',
+            class_value=class_value,
+            when=tag.get(ATTR_WHEN),
+            params=Parameters(*params),
+        )
+
+
+@printable
+class Class(object):
+    def __init__(self, **kwargs):
+        self.__dict__.update(**kwargs)
+
+    @classmethod
+    def from_tag(cls, type_registry, tag):
+        parent = tag.get(ATTR_PARENT)
+        if parent == 'GObject.Object':
+            parent = None
+
+        name = tag.get(ATTR_NAME)
+        value = type_registry.lookup(name, None)('self')
+
+        return cls(
+            name=name,
+            parent=parent,
+            c_type=tag.get(ATTR_C_TYPE),
+            value=value,
+            c_symbol_prefix=tag.get(ATTR_C_SYMBOL_PREFIX),
+            glib_type_name=tag.get(ATTR_GLIB_TYPE_NAME),
+            glib_get_type=tag.get(ATTR_GLIB_GET_TYPE),
+            glib_type_struct=tag.get(ATTR_GLIB_TYPE_STRUCT),
+            constructors=[Constructor.from_tag(type_registry, t) for t in tag.findall(TAG_CONSTRUCTOR)],
+            properties=[Property.from_tag(type_registry, value, t) for t in tag.findall(TAG_PROPERTY)],
+            methods=[Method.from_tag(type_registry, t) for t in tag.findall(TAG_METHOD)],
+            functions=[Function.from_tag(type_registry, t) for t in tag.findall(TAG_FUNCTION)],
+            signals=[Signal.from_tag(type_registry, value, t) for t in tag.findall(TAG_SIGNAL)],
+        )
+
+
+@printable
+class EnumMember(object):
+    def __init__(self, value, name, c_name, nick=None, description=None):
+        self.value = value
+        self.name = name
+        self.c_name = c_name
+        self.nick = nick
+        self.description = description
+
+    @classmethod
+    def from_tag(cls, tag, glib_tag=None):
+        value = tag.get(ATTR_VALUE)
+        if glib_tag is not None:
+            assert value == glib_tag.get(ATTR_VALUE)
+            return cls(
+                value=value,
+                name=tag.get(ATTR_NAME).upper(),
+                c_name=tag.get(ATTR_C_IDENTIFIER),
+                nick=glib_tag.get(ATTR_GLIB_NICK),
+                description=glib_tag.get(ATTR_C_IDENTIFIER),
+            )
+        else:
+            return cls(
+                value=value,
+                name=tag.get(ATTR_NAME).upper(),
+                c_name=tag.get(ATTR_C_IDENTIFIER),
+            )
+
+
+@printable
+class Enum(object):
+    def __init__(self, name, c_name, type, is_bitfield, members, has_nick=False, has_description=False):
+        self.name = name
+        self.c_name = c_name
+        self.type = type
+        self.is_bitfield = is_bitfield
+        self.members = members
+        self.has_nick = has_nick
+        self.has_description = has_description
+
+    @classmethod
+    def from_tag(cls, type_registry, tag, glib_tag=None):
+        members = tag.findall(TAG_MEMBER)
+        name = tag.get(ATTR_NAME)
+        c_name = tag.get(ATTR_C_TYPE)
+        type = type_registry.lookup(name, c_name);
+        if glib_tag is not None:
+            glib_members = glib_tag.findall(TAG_MEMBER)
+            return cls(
+                name=name,
+                c_name=c_name,
+                type=type,
+                is_bitfield=tag.tag == TAG_BITFIELD,
+                members=[EnumMember.from_tag(*tags) for tags in zip(members, glib_members)],
+                has_nick=True,
+                has_description=True,
+            )
+        else:
+            return cls(
+                name= name,
+                c_name= c_name,
+                type=type,
+                is_bitfield=tag.tag == TAG_BITFIELD,
+                members=[EnumMember.from_tag(tag) for tag in members],
+            )
+
+
+@printable
+class Namespace(object):
+    def __init__(self, type_registry, tag):
+        def find_enum_pairs():
+            enum_tags = tag.findall(TAG_ENUMERATION) + tag.findall(TAG_BITFIELD);
+            c_enums, glib_enums = partition(lambda top: top.get(ATTR_GLIB_TYPE_NAME) is None, enum_tags)
+            glib_enum_dict = {enum.get(ATTR_NAME): enum for enum in glib_enums}
+
+            def glib_from_c(c_enum):
+                glib_enum = glib_enum_dict.get(c_enum.get(ATTR_NAME) + 's')
+                if glib_enum is not None:
+                    return [c_enum, glib_enum]
+                else:
+                    return [c_enum]
+
+            return map(glib_from_c, c_enums)
+
+        self.name = tag.get(ATTR_NAME)
+        self.symbol_prefix = tag.get(ATTR_C_SYMBOL_PREFIXES)
+        self.identifier_prefix = tag.get(ATTR_C_IDENTIFIER_PREFIXES)
+        self.shared_library = tag.get(ATTR_SHARED_LIBRARY)
+        self.enums = [Enum.from_tag(type_registry, *tags) for tags in find_enum_pairs()]
+        self.callbacks = [Callback.from_tag(type_registry, t) for t in tag.findall(TAG_CALLBACK)]
+        self.classes = [Class.from_tag(type_registry, t) for t in tag.findall(TAG_CLASS)]
+        self.functions = [Function.from_tag(type_registry, t) for t in tag.findall(TAG_FUNCTION)]
+
+
+class GirParser(object):
+    def __init__(self, xml_root):
+        self.xml_root = xml_root
+
+    def parse_types(self):
+        types = []
+
+        for namespace in self.xml_root.findall(TAG_NAMESPACE):
+            prefix = namespace.get(ATTR_C_SYMBOL_PREFIXES)
+            tag_types = {
+                TAG_CLASS: GObjectMetaType,
+                TAG_CALLBACK: CallbackMetaType,
+                TAG_ENUMERATION: EnumMetaType,
+                TAG_BITFIELD: BitfieldMetaType,
+            }
+            tags = sum(map(namespace.findall, tag_types.keys()), [])
+            for tag in tags:
+                gir_type = tag.get(ATTR_NAME)
+                c_type = tag.get(ATTR_C_TYPE)
+                MetaType = tag_types[tag.tag]
+
+                if MetaType == EnumMetaType and tag.get(ATTR_GLIB_TYPE_NAME) is not None:
+                    continue
+
+                types.append(MetaType(
+                    gir_type=gir_type,
+                    c_type=c_type,
+                    prefix=prefix,
+                ))
+
+        return types
+
+    def parse_enum_aliases(self):
+        aliases = {}
+        for namespace in self.xml_root.findall(TAG_NAMESPACE):
+            for tag in namespace.findall(TAG_ENUMERATION):
+                if tag.get(ATTR_GLIB_TYPE_NAME) is not None:
+                    alias = tag.get(ATTR_NAME)
+                    name = alias[:-1]
+                    aliases[alias] = name
+        return aliases
+
+    def parse_full(self, type_registry):
+        return [Namespace(type_registry, tag) for tag in self.xml_root.findall(TAG_NAMESPACE)]
 
