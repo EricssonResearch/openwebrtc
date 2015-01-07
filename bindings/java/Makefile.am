@@ -68,6 +68,9 @@ install-data-local: install-exec
 		-C gen/owr com/ericsson/research \
 		-C jar-build lib/armeabi/libopenwebrtc.so \
 		-C jar-build lib/armeabi/libopenwebrtc_jni.so
+	$(JAR) cvf '$(DESTDIR)/$(jardir)/openwebrtc-source.jar' \
+		-C owr com/ericsson/research/owr \
+		-C owr com/ericsson/research
 	$(JAR) cvf '$(DESTDIR)/$(jardir)/openwebrtc_bridge.jar' \
 		-C gen/bridge com/ericsson/research/owr \
 		-C jar-build lib/armeabi/libopenwebrtc_bridge.so \

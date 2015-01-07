@@ -47,6 +47,29 @@ def java_arg(param):
 
 
 @add_to(J)
+class JavaDoc(J.Block):
+    _line_prefix = ' * '
+    def __init__(self, text, params, ret):
+        self.text = text
+        self.params = params
+        self.ret = ret
+
+    @property
+    def start(self):
+        return ('/**' if self.text or self.params or self.ret else [])
+
+    @property
+    def end(self):
+        return (' */' if self.text or self.params or self.ret else [])
+
+    @property
+    def body(self):
+        return [self.text if self.text else []] + [
+            '@param %s %s' % kv for kv in self.params.items()
+        ] + ['@return ' + self.ret if self.ret else []]
+
+
+@add_to(J)
 class Class(J.Block):
     def __init__(self,
             name,
@@ -114,6 +137,7 @@ class Method(J.FunctionBlock):
             abstract=False,
             native=False,
             synchronized=False,
+            doc=None,
             **kwargs):
         super(Method, self).__init__(**kwargs)
 
@@ -126,6 +150,7 @@ class Method(J.FunctionBlock):
         self.synchronized = synchronized
         self.abstract = abstract
         self.native = native
+        self.doc = doc
 
     @property
     def modifiers(self):
@@ -144,7 +169,11 @@ class Method(J.FunctionBlock):
 
     @property
     def start(self):
-        return self.definition + (' {' if len(self.body) else ';')
+        row = self.definition + (' {' if len(self.body) else ';')
+        if self.doc:
+            return [self.doc, row]
+        else:
+            return row
 
     @property
     def end(self):
@@ -161,6 +190,10 @@ class Method(J.FunctionBlock):
             'name': method.name,
             'params': map(java_param, method.params.java_params),
             'native': True,
+            'doc': JavaDoc(method.doc,
+                {p.name: getattr(p, 'doc', None) for p in method.params.java_params if getattr(p, 'doc', None) is not None},
+                getattr(method.params.return_value, 'doc', None),
+            ),
         }
         args.update(kwargs)
         return Method(**args)
