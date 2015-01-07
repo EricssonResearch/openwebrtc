@@ -47,6 +47,7 @@ TAG_RECORD = NS + 'record'
 TAG_FIELD = NS + 'field'
 TAG_ENUMERATION = NS + 'enumeration'
 TAG_MEMBER = NS + 'member'
+TAG_DOC = NS + 'doc'
 TAG_CALLBACK = NS + 'callback'
 TAG_INSTANCE_PARAMETER = NS + 'instance-parameter'
 TAG_METHOD = NS + 'method'
@@ -97,6 +98,13 @@ def title_case(st):
     return ''.join(c for c in st.title() if c.isalpha())
 
 
+def parse_doc(tag):
+    text = tag.findtext(TAG_DOC)
+    if text:
+        text = text.replace('\n', ' ')
+    return text
+
+
 def camel_case(st):
     st = title_case(st)
     return st[0].lower() + st[1:]
@@ -118,15 +126,18 @@ def parse_tag_value(type_registry, tag, name=None):
     assert name
 
     typ = lookup_type(type_tag)
+    value = None
 
     if inner_type_tags:
         assert typ.is_container
         types = enumerate(map(lookup_type, inner_type_tags))
         type_params = [c(name + '_' + str(i), transfer == 'full') for i, c in types]
-        return typ(name, transfer != 'none', allow_none, *type_params)
+        value = typ(name, transfer != 'none', allow_none, *type_params)
     else:
         assert transfer != 'container'
-        return typ(name, transfer == 'full', allow_none)
+        value = typ(name, transfer == 'full', allow_none)
+    value.doc = parse_doc(tag)
+    return value
 
 
 @printable
@@ -247,10 +258,11 @@ class Property(object):
 
 @printable
 class BaseFunction(object):
-    def __init__(self, name, params, c_name=None):
+    def __init__(self, name, params, c_name=None, doc=None):
         self.name = name
         self.c_name = c_name
         self.params = params
+        self.doc = doc
 
     @property
     def method_signature(self):
@@ -260,6 +272,7 @@ class BaseFunction(object):
     @classmethod
     def from_tag(cls, type_registry, tag):
         return cls(
+            doc=parse_doc(tag),
             name=camel_case(tag.get(ATTR_NAME)),
             c_name=tag.get(ATTR_C_IDENTIFIER),
             params=Parameters.from_tag(type_registry, tag),
@@ -292,6 +305,7 @@ class Callback(BaseFunction):
         callback_name = tag.get(ATTR_NAME)
         callback_value = type_registry.lookup(callback_name, None)('listener', False)
         return cls(
+            doc=parse_doc(tag),
             name='on' + callback_name,
             value=callback_value,
             params=Parameters.from_tag(type_registry, tag),
