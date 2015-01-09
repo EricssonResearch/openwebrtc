@@ -44,10 +44,8 @@ include_HEADERS = \
     owr_audio_renderer.h \
     owr_video_renderer.h \
     owr_image_renderer.h \
-    owr_image_renderer_private.h \
     owr_image_server.h \
-    owr_window_registry.h \
-    owr_device_list_private.h
+    owr_window_registry.h
 
 noinst_HEADERS = \
     owr_local_media_source_private.h \
