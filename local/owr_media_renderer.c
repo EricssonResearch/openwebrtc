@@ -373,10 +373,12 @@ void _owr_media_renderer_set_sink(OwrMediaRenderer *renderer, gpointer sink_ptr)
         priv->sink = NULL;
     }
 
-    if (!sink && priv->src) {
-        _owr_media_source_release_source(priv->source, priv->src);
-        gst_bin_remove(GST_BIN(priv->pipeline), priv->src);
-        priv->src = NULL;
+    if (!sink) {
+        if (priv->src) {
+            _owr_media_source_release_source(priv->source, priv->src);
+            gst_bin_remove(GST_BIN(priv->pipeline), priv->src);
+            priv->src = NULL;
+        }
         g_mutex_unlock(&priv->media_renderer_lock);
         return;
     }
