@@ -33,7 +33,8 @@
 void write_dot_file(const gchar *base_file_name, gchar *dot_data, gboolean with_timestamp)
 {
     GTimeVal time;
-    gchar *path, *filename, *timestamp = NULL;
+    const gchar *path;
+    gchar *filename, *timestamp = NULL;
     gboolean success;
 
     g_return_if_fail(base_file_name);
