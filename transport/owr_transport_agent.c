@@ -154,6 +154,9 @@ static void owr_transport_agent_finalize(GObject *object)
     transport_agent = OWR_TRANSPORT_AGENT(object);
     priv = transport_agent->priv;
 
+    gst_element_set_state(priv->pipeline, GST_STATE_NULL);
+    gst_object_unref(priv->pipeline);
+
     sessions_list = g_hash_table_get_values(priv->sessions);
     for (item = sessions_list; item; item = item->next) {
         media_session = item->data;
@@ -166,8 +169,6 @@ static void owr_transport_agent_finalize(GObject *object)
 
     g_object_unref(priv->nice_agent);
 
-    gst_element_set_state(priv->pipeline, GST_STATE_NULL);
-    gst_object_unref(priv->pipeline);
     g_free(priv->transport_bin_name);
 
     for (item = priv->helper_server_infos; item; item = item->next) {
