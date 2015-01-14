@@ -72,6 +72,7 @@ struct _OwrPayloadPrivate {
     guint bitrate;
     gint rtx_payload_type;      /* -1 => no retransmission, else payload type for rtx pt map */
     guint rtx_time;             /* milliseconds */
+    gboolean use_adaptation;
 };
 
 
@@ -85,6 +86,7 @@ enum {
     PROP_BITRATE,
     PROP_RTX_PAYLOAD_TYPE,
     PROP_RTX_TIME,
+    PROP_USE_ADAPTATION,
     N_PROPERTIES
 };
 
@@ -128,6 +130,9 @@ static void owr_payload_set_property(GObject *object, guint property_id, const G
     case PROP_RTX_TIME:
         priv->rtx_time = g_value_get_uint(value);
         break;
+    case PROP_USE_ADAPTATION:
+        priv->use_adaptation = g_value_get_boolean(value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
         break;
@@ -168,6 +173,9 @@ static void owr_payload_get_property(GObject *object, guint property_id, GValue 
         break;
     case PROP_RTX_TIME:
         g_value_set_uint(value, priv->rtx_time);
+        break;
+    case PROP_USE_ADAPTATION:
+        g_value_set_boolean(value, priv->use_adaptation);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
@@ -265,6 +273,10 @@ static void owr_payload_class_init(OwrPayloadClass *klass)
         "The maximum size of one RTP packet (in bytes)",
         0, G_MAXUINT, DEFAULT_MTU,
         G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+
+    obj_properties[PROP_USE_ADAPTATION] = g_param_spec_boolean("use-adaptation", "Use adaptation",
+        "Set to TRUE to enable adaptation",
+        FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
     g_object_class_install_properties(gobject_class, N_PROPERTIES, obj_properties);
 }
