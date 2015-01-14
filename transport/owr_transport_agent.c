@@ -124,7 +124,7 @@ static OwrMediaSession * get_media_session(OwrTransportAgent *transport_agent, g
 static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_agent, guint stream_id, gboolean rtcp_mux);
 static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_agent, guint stream_id, gboolean rtcp_mux);
 static void set_send_ssrc_and_cname(OwrTransportAgent *agent, OwrMediaSession *media_session);
-static void on_new_candidate(NiceAgent *nice_agent, guint stream_id, guint component_id, gchar *foundation, OwrTransportAgent *transport_agent);
+static void on_new_candidate(NiceAgent *nice_agent, NiceCandidate *nice_candidate, OwrTransportAgent *transport_agent);
 static void on_candidate_gathering_done(NiceAgent *nice_agent, guint stream_id, OwrTransportAgent *transport_agent);
 static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMediaSession *media_session, OwrPayload * payload);
 static void on_new_remote_candidate(OwrTransportAgent *transport_agent, gboolean forced, OwrSession *session);
@@ -284,7 +284,7 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
     priv->nice_agent = nice_agent_new(_owr_get_main_context(), NICE_COMPATIBILITY_RFC5245);
     g_object_bind_property(transport_agent, "ice-controlling-mode", priv->nice_agent,
         "controlling-mode", G_BINDING_SYNC_CREATE);
-    g_signal_connect(G_OBJECT(priv->nice_agent), "new-candidate",
+    g_signal_connect(G_OBJECT(priv->nice_agent), "new-candidate-full",
         G_CALLBACK(on_new_candidate), transport_agent);
     g_signal_connect(G_OBJECT(priv->nice_agent), "candidate-gathering-done",
         G_CALLBACK(on_candidate_gathering_done), transport_agent);
@@ -1279,10 +1279,7 @@ static gboolean emit_new_candidate(GHashTable *args)
     OwrTransportAgent *transport_agent;
     OwrTransportAgentPrivate *priv;
     OwrMediaSession *media_session;
-    guint stream_id, component_id;
-    gchar *foundation;
-    GSList *lcands, *item;
-    NiceCandidate *nice_candidate = NULL;
+    NiceCandidate *nice_candidate;
     OwrCandidate *owr_candidate;
     gchar *ufrag = NULL, *password = NULL;
     gboolean got_credentials;
@@ -1291,27 +1288,14 @@ static gboolean emit_new_candidate(GHashTable *args)
     g_return_val_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent), FALSE);
     priv = transport_agent->priv;
 
-    stream_id = GPOINTER_TO_UINT(g_hash_table_lookup(args, "stream_id"));
-    component_id = GPOINTER_TO_UINT(g_hash_table_lookup(args, "component_id"));
-    foundation = g_hash_table_lookup(args, "foundation");
-
-    media_session = get_media_session(transport_agent, stream_id);
+    nice_candidate = (NiceCandidate *)g_hash_table_lookup(args, "nice_candidate");
+    g_return_val_if_fail(nice_candidate, FALSE);
+    media_session = get_media_session(transport_agent, nice_candidate->stream_id);
     g_return_val_if_fail(OWR_IS_MEDIA_SESSION(media_session), FALSE);
 
-    lcands = nice_agent_get_local_candidates(priv->nice_agent, stream_id, component_id);
-    for (item = lcands; item; item = item->next) {
-        nice_candidate = item->data;
-        g_warn_if_fail(nice_candidate->component_id == component_id);
-
-        if (!g_strcmp0(nice_candidate->foundation, foundation))
-            break;
-    }
-    if (!item)
-        goto out;
-
     if (!nice_candidate->username || !nice_candidate->password) {
-        got_credentials = nice_agent_get_local_credentials(priv->nice_agent, stream_id,
-            &ufrag, &password);
+        got_credentials = nice_agent_get_local_credentials(priv->nice_agent,
+            nice_candidate->stream_id, &ufrag, &password);
         g_warn_if_fail(got_credentials);
 
         if (!nice_candidate->username)
@@ -1327,34 +1311,31 @@ static gboolean emit_new_candidate(GHashTable *args)
 
     owr_candidate = _owr_candidate_new_from_nice_candidate(nice_candidate);
     g_return_val_if_fail(owr_candidate, FALSE);
+    nice_candidate_free(nice_candidate);
 
     g_signal_emit_by_name(media_session, "on-new-candidate", owr_candidate);
     g_object_unref(owr_candidate);
 
-out:
-    g_slist_free_full(lcands, (GDestroyNotify)nice_candidate_free);
     g_object_unref(media_session);
-    g_free(foundation);
     g_hash_table_destroy(args);
     g_object_unref(transport_agent);
 
     return FALSE;
 }
 
-static void on_new_candidate(NiceAgent *nice_agent, guint stream_id, guint component_id,
-    gchar *foundation, OwrTransportAgent *transport_agent)
+static void on_new_candidate(NiceAgent *nice_agent, NiceCandidate *nice_candidate,
+    OwrTransportAgent *transport_agent)
 {
     GHashTable *args;
 
     g_return_if_fail(nice_agent);
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
+    g_return_if_fail(nice_candidate);
 
     g_object_ref(transport_agent);
     args = g_hash_table_new(g_str_hash, g_str_equal);
     g_hash_table_insert(args, "transport_agent", transport_agent);
-    g_hash_table_insert(args, "stream_id", GUINT_TO_POINTER(stream_id));
-    g_hash_table_insert(args, "component_id", GUINT_TO_POINTER(component_id));
-    g_hash_table_insert(args, "foundation", g_strdup(foundation));
+    g_hash_table_insert(args, "nice_candidate", nice_candidate_copy(nice_candidate));
 
     _owr_schedule_with_hash_table((GSourceFunc)emit_new_candidate, args);
 }
