@@ -87,6 +87,7 @@ struct _OwrTransportAgentPrivate {
     NiceAgent *nice_agent;
     gboolean ice_controlling_mode;
 
+    GMutex sessions_lock;
     GHashTable *sessions;
     guint next_stream_id;
     guint agent_id;
@@ -162,6 +163,7 @@ static void owr_transport_agent_finalize(GObject *object)
     g_list_free(sessions_list);
 
     g_hash_table_destroy(priv->sessions);
+    g_mutex_clear(&priv->sessions_lock);
 
     g_object_unref(priv->nice_agent);
 
@@ -275,6 +277,7 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
     priv->nice_agent = NULL;
 
     priv->sessions = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, g_object_unref);
+    g_mutex_init(&priv->sessions_lock);
     priv->next_stream_id = 0;
 
     g_return_if_fail(_owr_is_initialized());
@@ -485,7 +488,9 @@ static void add_helper_server_info(GResolver *resolver, GAsyncResult *result, GH
     priv = transport_agent->priv;
     priv->helper_server_infos = g_list_append(priv->helper_server_infos, info);
 
+    g_mutex_lock(&priv->sessions_lock);
     stream_ids = g_hash_table_get_keys(priv->sessions);
+    g_mutex_unlock(&priv->sessions_lock);
     for (item = stream_ids; item; item = item->next) {
         stream_id = GPOINTER_TO_UINT(item->data);
         update_helper_servers(transport_agent, stream_id);
@@ -754,6 +759,7 @@ static gboolean add_media_session(GHashTable *args)
 
     sessions = transport_agent->priv->sessions;
 
+    g_mutex_lock(&transport_agent->priv->sessions_lock);
     g_hash_table_iter_init(&iter, sessions);
     while (g_hash_table_iter_next(&iter, NULL, (gpointer)&s)) {
         if (s == media_session) {
@@ -764,8 +770,10 @@ static gboolean add_media_session(GHashTable *args)
 
     if (media_session_found) {
         g_warning("An already existing media session was added to the transport agent. Action aborted.");
+        g_mutex_unlock(&transport_agent->priv->sessions_lock);
         goto end;
     }
+    g_mutex_unlock(&transport_agent->priv->sessions_lock);
 
     g_object_get(media_session, "rtcp-mux", &rtcp_mux, NULL);
     stream_id = nice_agent_add_stream(transport_agent->priv->nice_agent, rtcp_mux ? 1 : 2);
@@ -774,8 +782,10 @@ static gboolean add_media_session(GHashTable *args)
         goto end;
     }
 
+    g_mutex_lock(&transport_agent->priv->sessions_lock);
     g_hash_table_insert(sessions, GUINT_TO_POINTER(stream_id), media_session);
     g_object_ref(media_session);
+    g_mutex_unlock(&transport_agent->priv->sessions_lock);
 
     update_helper_servers(transport_agent, stream_id);
 
@@ -973,6 +983,7 @@ static GstElement *add_dtls_srtp_bin(OwrTransportAgent *transport_agent, guint s
     g_warn_if_fail(added_ok);
 
     g_free(element_name);
+    g_object_unref(media_session);
 
     return dtls_srtp_bin;
 }
@@ -1091,6 +1102,7 @@ static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, g
 	    media_session = get_media_session(transport_agent, stream_id);
 	    g_signal_connect_object(media_session, "notify::rtcp-mux", G_CALLBACK(on_rtcp_mux_changed),
 		    output_selector, 0);
+	    g_object_unref(media_session);
 	}
 
 	sink_pad = gst_element_get_static_pad(output_selector, "sink");
@@ -1284,7 +1296,7 @@ static gboolean emit_new_candidate(GHashTable *args)
     component_id = GPOINTER_TO_UINT(g_hash_table_lookup(args, "component_id"));
     foundation = g_hash_table_lookup(args, "foundation");
 
-    media_session = g_hash_table_lookup(priv->sessions, GUINT_TO_POINTER(stream_id));
+    media_session = get_media_session(transport_agent, stream_id);
     g_return_val_if_fail(OWR_IS_MEDIA_SESSION(media_session), FALSE);
 
     lcands = nice_agent_get_local_candidates(priv->nice_agent, stream_id, component_id);
@@ -1322,6 +1334,7 @@ static gboolean emit_new_candidate(GHashTable *args)
 
 out:
     g_slist_free_full(lcands, (GDestroyNotify)nice_candidate_free);
+    g_object_unref(media_session);
     g_free(foundation);
     g_hash_table_destroy(args);
     g_object_unref(transport_agent);
@@ -1370,9 +1383,8 @@ static void on_candidate_gathering_done(NiceAgent *nice_agent, guint stream_id, 
     g_return_if_fail(nice_agent);
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
 
-    media_session = g_hash_table_lookup(transport_agent->priv->sessions, GUINT_TO_POINTER(stream_id));
+    media_session = get_media_session(transport_agent, stream_id);
     g_return_if_fail(OWR_IS_MEDIA_SESSION(media_session));
-    g_object_ref(media_session);
 
     args = g_hash_table_new(g_str_hash, g_str_equal);
     g_hash_table_insert(args, "media_session", media_session);
@@ -1386,11 +1398,15 @@ static guint get_stream_id(OwrTransportAgent *transport_agent, OwrSession *sessi
     OwrSession *s;
     gpointer stream_id = GUINT_TO_POINTER(0);
 
+    g_mutex_lock(&transport_agent->priv->sessions_lock);
     g_hash_table_iter_init(&iter, transport_agent->priv->sessions);
     while (g_hash_table_iter_next(&iter, &stream_id, (gpointer)&s)) {
-        if (s == session)
+        if (s == session) {
+            g_mutex_unlock(&transport_agent->priv->sessions_lock);
             return GPOINTER_TO_UINT(stream_id);
+        }
     }
+    g_mutex_unlock(&transport_agent->priv->sessions_lock);
 
     g_warn_if_reached();
     return 0;
@@ -1398,15 +1414,13 @@ static guint get_stream_id(OwrTransportAgent *transport_agent, OwrSession *sessi
 
 static OwrMediaSession * get_media_session(OwrTransportAgent *transport_agent, guint stream_id)
 {
-    GHashTableIter iter;
-    OwrMediaSession *s = NULL;
-    gpointer id = GUINT_TO_POINTER(0);
+    OwrMediaSession *s;
 
-    g_hash_table_iter_init(&iter, transport_agent->priv->sessions);
-    while (g_hash_table_iter_next(&iter, &id, (gpointer)&s)) {
-        if (GPOINTER_TO_UINT(id) == stream_id)
-            break;
-    }
+    g_mutex_lock(&transport_agent->priv->sessions_lock);
+    s = OWR_MEDIA_SESSION(g_hash_table_lookup(transport_agent->priv->sessions, GUINT_TO_POINTER(stream_id)));
+    if (s)
+      g_object_ref (s);
+    g_mutex_unlock(&transport_agent->priv->sessions_lock);
 
     return s;
 }
@@ -1633,6 +1647,7 @@ static gboolean emit_on_incoming_source(GHashTable *args)
     g_signal_emit_by_name(media_session, "on-incoming-source", source);
 
     g_object_unref(source);
+    g_object_unref(media_session);
     g_hash_table_unref(args);
     return FALSE;
 }
@@ -1721,6 +1736,7 @@ static void on_rtpbin_pad_added(GstElement *rtpbin, GstPad *new_pad, OwrTranspor
 	/* Hook up RTCP sending if it isn't already */
 	link_rtpbin_to_send_output_bin(transport_agent, session_id, FALSE, TRUE);
 
+        g_object_unref(media_session);
         g_object_unref(payload);
     } else if (g_str_has_prefix(new_pad_name, "send_rtp_src")) {
         guint32 session_id = 0;
@@ -1870,13 +1886,14 @@ static GstCaps * on_rtpbin_request_pt_map(GstElement *rtpbin, guint session_id, 
     g_return_val_if_fail(rtpbin, NULL);
     g_return_val_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent), NULL);
 
-    media_session = OWR_MEDIA_SESSION(g_hash_table_lookup(transport_agent->priv->sessions, GUINT_TO_POINTER(session_id)));
-    payload = _owr_media_session_get_receive_payload(media_session, pt);
-
+    media_session = get_media_session(transport_agent, session_id);
     g_return_val_if_fail(OWR_IS_MEDIA_SESSION(media_session), NULL);
+
+    payload = _owr_media_session_get_receive_payload(media_session, pt);
 
     caps = _owr_payload_create_rtp_caps(payload);
     g_object_unref(payload);
+    g_object_unref(media_session);
 
     return caps;
 }
@@ -1922,10 +1939,11 @@ static GstElement * on_rtpbin_request_aux_sender(G_GNUC_UNUSED GstElement *rtpbi
     guint pt, rtx_time;
     gchar *tmp;
 
-    media_session = OWR_MEDIA_SESSION(g_hash_table_lookup(transport_agent->priv->sessions, GUINT_TO_POINTER(session_id)));
+    media_session = get_media_session(transport_agent, session_id);
     g_return_val_if_fail(media_session, NULL);
 
     payload = _owr_media_session_get_send_payload(media_session);
+    g_object_unref(media_session);
     if (!payload)
         goto no_retransmission;
 
@@ -1963,10 +1981,12 @@ static GstElement * on_rtpbin_request_aux_receiver(G_GNUC_UNUSED GstElement *rtp
     GstElement *rtxrecv;
     GstStructure *pt_map;
 
-    media_session = OWR_MEDIA_SESSION(g_hash_table_lookup(transport_agent->priv->sessions, GUINT_TO_POINTER(session_id)));
+    media_session = get_media_session(transport_agent, session_id);
     g_return_val_if_fail(media_session, NULL);
 
     pt_map = _owr_media_session_get_receive_rtx_pt_map(media_session);
+    g_object_unref(media_session);
+
     if (!pt_map)
         goto no_retransmission;
 
@@ -2026,6 +2046,7 @@ static gboolean on_sending_rtcp(GObject *session, GstBuffer *buffer, gboolean ea
     source = g_value_get_object(g_value_array_get_nth(sources, 0));
     prepare_rtcp_stats(media_session, source);
     g_value_array_free(sources);
+    g_object_unref(media_session);
 
     return do_not_suppress;
 }
@@ -2103,6 +2124,7 @@ static void on_ssrc_active(GstElement *rtpbin, guint session_id, guint ssrc,
     prepare_rtcp_stats(media_session, rtp_source);
     g_object_unref(rtp_source);
     g_object_unref(rtp_session);
+    g_object_unref(media_session);
 }
 
 static void on_new_jitterbuffer(G_GNUC_UNUSED GstElement *rtpbin, GstElement *jitterbuffer, guint session_id, G_GNUC_UNUSED guint ssrc, OwrTransportAgent *transport_agent)
@@ -2115,6 +2137,7 @@ static void on_new_jitterbuffer(G_GNUC_UNUSED GstElement *rtpbin, GstElement *ji
 
     if (_owr_media_session_want_receive_rtx(media_session))
         g_object_set(jitterbuffer, "do-retransmission", TRUE, NULL);
+    g_object_unref(media_session);
 }
 
 gchar * owr_transport_agent_get_dot_data(OwrTransportAgent *transport_agent)
