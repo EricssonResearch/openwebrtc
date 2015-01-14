@@ -89,7 +89,6 @@ struct _OwrTransportAgentPrivate {
 
     GMutex sessions_lock;
     GHashTable *sessions;
-    guint next_stream_id;
     guint agent_id;
     gchar *transport_bin_name;
     GstElement *pipeline, *transport_bin;
@@ -278,7 +277,6 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
 
     priv->sessions = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, g_object_unref);
     g_mutex_init(&priv->sessions_lock);
-    priv->next_stream_id = 0;
 
     g_return_if_fail(_owr_is_initialized());
 
