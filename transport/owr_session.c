@@ -189,6 +189,8 @@ static void owr_session_finalize(GObject *object)
     OwrSession *session = OWR_SESSION(object);
     OwrSessionPrivate *priv = session->priv;
 
+    _owr_session_clear_closures(session);
+
     if (priv->dtls_certificate)
         g_free(priv->dtls_certificate);
     if (priv->dtls_key)
@@ -199,8 +201,6 @@ static void owr_session_finalize(GObject *object)
     g_slist_free_full(priv->local_candidates, (GDestroyNotify)g_object_unref);
     g_slist_free_full(priv->remote_candidates, (GDestroyNotify)g_object_unref);
     g_slist_free_full(priv->forced_remote_candidates, (GDestroyNotify)g_object_unref);
-
-    _owr_session_clear_closures(session);
 
     G_OBJECT_CLASS(owr_session_parent_class)->finalize(object);
 }

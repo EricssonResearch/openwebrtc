@@ -188,6 +188,8 @@ static void owr_media_session_finalize(GObject *object)
     OwrMediaSession *media_session = OWR_MEDIA_SESSION(object);
     OwrMediaSessionPrivate *priv = media_session->priv;
 
+    _owr_media_session_clear_closures(media_session);
+
     if (priv->incoming_srtp_key)
         g_free(priv->incoming_srtp_key);
     if (priv->outgoing_srtp_key)
@@ -210,8 +212,6 @@ static void owr_media_session_finalize(GObject *object)
     if (priv->send_payload)
         g_object_unref(priv->send_payload);
     g_ptr_array_unref(priv->receive_payloads);
-
-    _owr_media_session_clear_closures(media_session);
 
     g_rw_lock_clear(&priv->rw_lock);
 
