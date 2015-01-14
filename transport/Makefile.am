@@ -21,6 +21,7 @@ AM_CFLAGS = \
 noinst_LTLIBRARIES = libopenwebrtc_transport.la
 
 libopenwebrtc_transport_la_SOURCES = \
+    owr_arrival_time_meta.c \
     owr_candidate.c \
     owr_payload.c \
     owr_audio_payload.c \
@@ -52,6 +53,7 @@ include_HEADERS = \
     owr_data_session.h
 
 noinst_HEADERS = \
+    owr_arrival_time_meta.h \
     owr_candidate_private.h \
     owr_session_private.h \
     owr_media_session_private.h \

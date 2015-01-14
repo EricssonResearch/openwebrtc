@@ -246,7 +246,8 @@ function PeerHandler(configuration, client, jsonRpc) {
                     "payload_type": payload.type,
                     "codec_type": owr.CodecType[payload.encodingName.toUpperCase()],
                     "clock_rate": payload.clockRate,
-                    "channels": payload.channels
+                    "channels": payload.channels,
+                    "use-adaptation": !!payload.ericscream,
                 }) :
                 new owr.VideoPayload({
                     "payload_type": payload.type,
@@ -254,6 +255,7 @@ function PeerHandler(configuration, client, jsonRpc) {
                     "clock_rate": payload.clockRate,
                     "ccm_fir": !!payload.ccmfir,
                     "nack_pli": !!payload.nackpli,
+                    "use-adaptation": !!payload.ericscream,
                     "rtx_payload_type": rtxPayload ? rtxPayload.type : -1,
                     "rtx_time": rtxPayload && rtxPayload.parameters.rtxTime || 0
                 });
