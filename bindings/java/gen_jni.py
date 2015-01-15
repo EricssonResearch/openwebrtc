@@ -1144,6 +1144,17 @@ def cify_namespace(namespace):
         cache_class(clazz['name'], clazz)
         cache_field('nativeInstance', 'J')
 
+        for prop in clazz['properties']:
+            if prop['readable']:
+                subclass = prop['title_name'] + 'ChangeListener'
+                classname = '%s_%s' % (clazz['name'], subclass)
+                cache_class(classname, clazz, subclass)
+                cache_method(dict(
+                    camel_name = 'on' + prop['title_name'] + 'Changed',
+                    parameters = [prop],
+                    types = dict(java = 'void')
+                ))
+
         for signal in clazz['signals']:
             classname = '%s_%s' % (clazz['name'], signal['title_name'])
             cache_class(classname, clazz, signal['title_name'] + 'Listener')
@@ -1445,6 +1456,7 @@ def cify_namespace(namespace):
             w.comment('properties')
         for prop in clazz['properties']:
             if prop['writable']:
+                # setter
                 w.jni_function(name = 'set' + prop['title_name'], parameters = [prop])
                 w.declare_self()
                 w.c_declare(prop)
@@ -1459,6 +1471,7 @@ def cify_namespace(namespace):
                 w.line()
 
             if prop['readable']:
+                # getter
                 w.jni_function(return_value = prop, name = 'get' + prop['title_name'])
                 w.declare_self()
                 w.jni_declare(prop)
@@ -1474,6 +1487,60 @@ def cify_namespace(namespace):
                 w.g_object_unref('self')
                 w.ret(w.str_jni_name(prop))
                 w.line()
+
+                # notify signal
+                handler_name = 'notify_{}_{}'.format(clazz['name'], prop['camel_name'])
+                listener_param = dict(
+                    title_name = 'Listener',
+                    types = dict(jni = 'jobject')
+                )
+
+                w.set_return_type(prop['types']['c'])
+
+                w.line('static void %s(%s* self, GParamSpec* pspec, UserData* data)' % (handler_name, clazz['c_name']))
+                w.push()
+
+                w.declare('JNIEnv*', 'env')
+                w.jni_declare(prop)
+                w.c_declare(prop)
+                w.line()
+
+                w.lval('env')
+                w.call('get_jni_env')
+                w.call('g_object_get', 'self', '"{c_name}"'.format(**prop), '&{camel_name}'.format(**prop), 'NULL')
+                w.c_to_jni(prop)
+
+                w.cleanup_c(prop)
+
+                call_name = 'Call{}Method'.format(w.str_jni_call_name(prop))
+                methodname = CACHE_METHOD('%s_%sChangeListener' % (clazz['name'], prop['title_name']), 'on' + prop['title_name'] + 'Changed')
+                w.env(call_name, 'data->self', methodname, w.str_jni_name(prop))
+                w.check_exception()
+
+                w.pop()
+                w.line()
+
+
+                # addChangeListener
+                w.jni_function(name = 'add' + prop['title_name'] + 'ChangeListener', parameters = [listener_param])
+                w.declare_self()
+                w.declare('gulong', 'handler_id')
+                w.declare('UserData*', 'data')
+                w.line()
+
+                w.get_self()
+                w.line()
+
+                w.lval('data')
+                w.call('user_data_create', w.str_jni_name(listener_param))
+                w.lval('handler_id')
+                w.call('g_signal_connect_data', 'G_OBJECT(self)', quot('notify::' + prop['c_name']),
+                    'G_CALLBACK({})'.format(handler_name), 'data', 'user_data_closure_notify', '0')
+                w.cast('void')
+                w.rval('handler_id')
+                w.pop()
+                w.line()
+
 
         for signal in clazz['signals']:
             void = signal['types']['c'] == 'void'
@@ -1643,10 +1710,24 @@ def javify_class(clazz, package):
     # properties
     for prop in clazz['properties']:
         w.line()
-        w.method(prop, name = 'get' + prop['title_name'])
+        if prop['readable']:
+            w.method(prop, name = 'get' + prop['title_name'])
 
         if prop['writable']:
             w.method(name = 'set' + prop['title_name'], parameters = [prop])
+
+        if prop['readable']:
+            interface = prop['title_name'] + 'ChangeListener'
+            w.line()
+            w.method(name = 'add' + interface, parameters = [dict(
+                camel_name = 'listener',
+                types = dict(java = interface)
+            )])
+            w.line()
+            w.class_declaration(static = True, typename = 'interface', name = interface)
+            w.method(name = 'on' + prop['title_name'] + 'Changed',
+                native = False, parameters = [prop])
+            w.pop()
 
     # signals
     for signal in clazz['signals']:
