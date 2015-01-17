@@ -139,28 +139,25 @@ server.onaccept = function (event) {
             }
 
 
-            function returnToClient (sourcesToUse) {
-                sourcesToUse.forEach(function (el, ix, ar) {
-                    usedSources.push(el);
-                    console.log("pushed source " + el + " to usedSources");
-                });
-                console.log("usedSources: " + usedSources);
-                client.gotSources(sourcesToUse);
-            }
             function deRef (accept_el, accept_ix, accept_ar) {
                 accept_el.forEach(function (source_el, source_ix, source_ar) {
                     console.log("deref, accept_ix: " +accept_ix + "source_ix: " +source_ix + " el: " + source_el + " el.source: " + source_el.source);
-                    jsonRpc.removeObjectRef(source_el.source);
+                    //try {jsonRpc.removeObjectRef(source_el.source);} catch(e) {console.log("removeObjectRef went worng, e: " + e);};
                 });
             }
 
             function handleExtResponse (evt) {
                 console.log("message received on extsocket");
                 var response = JSON.parse(evt.data);
-                if (response.name == "accept" && response.Id == requestId) {
-                    console.log("accept received on socket for requestId " + requestId);
-                    accepts[requestId] = response.acceptSourceInfos;
-                    client.gotSources(response.acceptSourceInfos);
+                if (response.name == "accept") {
+                    console.log("accept received on socket; response.Id: " + response.Id);
+                    if (response.Id == requestId) {
+                        console.log("was right id!");
+                        accepts[requestId] = response.acceptSourceInfos;
+                        client.gotSources(response.acceptSourceInfos);
+                    } else {
+                        console.log("was wrong Id, the requestId was: " + requestId);
+                    }
                 }
                 if (response.name == "revokeAll") {
                     console.log("revokeAll received on socket");
@@ -186,6 +183,7 @@ server.onaccept = function (event) {
                 } else {
                     //request queued up
                     var requestMessage = reqQueue.pop();
+                    requestId = requestMessage.Id;
                     extws.send(JSON.stringify(requestMessage));
                     console.log("sent request popped from reqQueue to bar");
                     extws.onmessage = handleExtResponse;                    
