@@ -70,7 +70,7 @@ static GList *generate_source_device_list(NSString *mediaType, DeviceMapFunc map
 
 GList *_owr_get_avf_video_sources()
 {
-    return generate_source_device_list(AVMediaTypeVideo,
+    GList *list = generate_source_device_list(AVMediaTypeVideo,
             ^(AVCaptureDevice *av_device, gint index) {
         OwrLocalMediaSource *source;
         const gchar *name;
@@ -82,6 +82,12 @@ GList *_owr_get_avf_video_sources()
 
         return source;
     });
+
+#if TARGET_OS_IPHONE
+    return g_list_reverse(list);
+#else
+    return list;
+#endif
 }
 
 #if !TARGET_OS_IPHONE
