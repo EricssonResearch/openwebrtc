@@ -106,8 +106,12 @@ build(){
         elif [[ $target_triple == "x86_64-unknown-linux" ]] ; then
             local configure_flags="--enable-static --enable-owr-static --enable-shared"
             local seed_platform_libs="-ljavascriptcoregtk-3.0 -licui18n -licuuc -licudata"
+            export PULSE_CFLAGS="$(/usr/bin/pkg-config --cflags libpulse-mainloop-glib) $(/usr/bin/pkg-config --cflags libpulse) "
+            export PULSE_LIBS="$(/usr/bin/pkg-config --libs libpulse-mainloop-glib) $(/usr/bin/pkg-config --libs libpulse) "
+            export V4L2_CFLAGS="$(/usr/bin/pkg-config --cflags libv4l2) "
+            export V4L2_LIBS="$(/usr/bin/pkg-config --libs libv4l2) "
             export PLATFORM_GLIB_LIBS="-lpthread -lffi -lrt -ldl -lresolv"
-            export PLATFORM_GSTREAMER_LIBS="-lgstvideoconvert -lgstpulse -lpulse-mainloop-glib -lpulse -lgstvideo4linux2 -lv4l2 -lX11 -lXv -lgstallocators-1.0 -lGLU -lGL"
+            export PLATFORM_GSTREAMER_LIBS="-lgstvideoconvert -lgstpulse -lgstvideo4linux2 -lX11 -lXv -lgstallocators-1.0 -lGLU -lGL"
             export PLATFORM_CXX_LIBS="-lstdc++"
         fi
 
@@ -125,8 +129,8 @@ build(){
         export XML_CFLAGS="-I${src_dir}/openwebrtc-deps-${target}/include/libxml2"
         export XML_LIBS="-L${src_dir}/openwebrtc-deps-${target}/lib -lxml2 -lm"
         export GSTREAMER_CFLAGS="-isystem ${src_dir}/openwebrtc-deps-${target}/include/gstreamer-1.0 -isystem ${src_dir}/openwebrtc-deps-${target}/include/private-gstreamer -isystem ${src_dir}/openwebrtc-deps-${target}/lib/gstreamer-1.0/include"
-        export GSTREAMER_LIBS="-L${src_dir}/openwebrtc-deps-${target}/lib -L${src_dir}/openwebrtc-deps-${target}/lib/gstreamer-1.0 -lgstaudiotestsrc -lgstvideotestsrc -lgstcoreelements -lgstalaw -lgstmulaw -lgstopus -lopus -lgstapp -lgstaudioconvert -lgstaudioresample -lgstvolume -lgstvideoconvert -lgstvpx -lvpx -lgstopengl -lgstinter"
-        export GSTREAMER_LIBS="$GSTREAMER_LIBS $PLATFORM_GSTREAMER_LIBS -lgstrtpmanager -lgstrtp -lgstsrtp -lsrtp -lgstvideocrop -lgstvideofilter -lgstvideoparsersbad -lgstvideorate -lgstvideoscale -lgstnice -lgstcontroller-1.0 -lgstpbutils-1.0 -lgstnet-1.0 -lgstrtp-1.0 -lgstgl-1.0 -lgstbadvideo-1.0 -lgstbadbase-1.0"
+        export GSTREAMER_LIBS="-L${src_dir}/openwebrtc-deps-${target}/lib -L${src_dir}/openwebrtc-deps-${target}/lib/gstreamer-1.0 -lgstaudiotestsrc -lgstvideotestsrc -lgstcoreelements -lgstalaw -lgstmulaw -lgstopus -lopus -lgstapp -lgstaudioconvert -lgstaudioresample -lgstvolume -lgstvideoconvert -lgstvpx -lvpx -lgstopengl -lgstinter -lgstgl-1.0"
+        export GSTREAMER_LIBS="$GSTREAMER_LIBS $PLATFORM_GSTREAMER_LIBS -lgstrtpmanager -lgstrtp -lgstsrtp -lsrtp -lgstvideocrop -lgstvideofilter -lgstvideoparsersbad -lgstvideorate -lgstvideoscale -lgstnice -lgstcontroller-1.0 -lgstpbutils-1.0 -lgstnet-1.0 -lgstrtp-1.0 -lgstbadvideo-1.0 -lgstbadbase-1.0"
         export GSTREAMER_LIBS="$GSTREAMER_LIBS -lgsttag-1.0 -lgstapp-1.0 -lgstaudio-1.0 -lgstvideo-1.0 -lgstcodecparsers-1.0 -lgstbase-1.0 -lgstreamer-1.0"
         export SEED_CFLAGS="-isystem ${src_dir}/openwebrtc-deps-${target}/include/seed-gtk3 -isystem ${src_dir}/openwebrtc-deps-${target}/include/gobject-introspection-1.0"
         export SEED_LIBS="-L${src_dir}/openwebrtc-deps-${target}/lib/seed-gtk3 -lseed-gtk3 -lseed_sandbox $seed_platform_libs -lgirepository-1.0 -lgirepository-internals $PLATFORM_CXX_LIBS"
