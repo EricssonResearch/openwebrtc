@@ -120,6 +120,10 @@ if test "x$enable_owr_java" = xyes; then
   if test -z "$JAR"; then
     AC_MSG_ERROR([You need 'jar' to build the Android bindings])
   fi
+  AC_PATH_PROG(JAVADOC, javadoc)
+  if test -z "$JAVADOC"; then
+    AC_MSG_ERROR([You need 'javadoc' to build the Android bindings])
+  fi
   AC_DEFINE(OWR_JAVA, 1,
   [Define if generating bindings for java])
 fi
@@ -133,6 +137,15 @@ AC_ARG_WITH(jardir,
             jardir=${withval}, jardir=${libdir}/jni)
 AC_MSG_RESULT([$jardir])
 AC_SUBST(jardir)
+
+dnl The Javadoc installation path is needed as well
+AC_MSG_CHECKING([for javadoc installation path])
+AC_ARG_WITH(javadocdir,
+            AS_HELP_STRING([--with-javadocdir],
+                           [javadoc file installation path [LIBDIR/share/javadoc]]),
+            javadocdir=${withval}, javadocdir=${libdir}/share/javadoc/openwebrtc)
+AC_MSG_RESULT([$javadocdir])
+AC_SUBST(javadocdir)
 
 dnl Android SDK path is needed when Java bindings are enabled
 AC_ARG_WITH(android-sdk,

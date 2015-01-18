@@ -28,8 +28,9 @@ BUILT_SOURCES = owr_jni.c
 noinst_DATA = \
 	gen/owr/com/ericsson/research \
 	gen/owr/com/ericsson/research/owr \
-	gen/bridge/com/ericsson/research/owr
-CLEANFILES = owr_jni.c owr gen
+	gen/bridge/com/ericsson/research/owr \
+	javadoc
+CLEANFILES = owr_jni.c owr gen javadoc
 
 if HAVE_INTROSPECTION
 OWR_GIR = $(top_builddir)/owr/Owr-0.1.gir
@@ -55,9 +56,14 @@ gen/owr/%: owr/%
 	mkdir -p gen/owr
 	$(JAVAC) -classpath '$(ANDROID_CLASSPATH):gen/owr/' -d gen/owr $+/*.java
 
+javadoc: owr
+	$(JAVADOC) -d javadoc -sourcepath owr -subpackages com.ericsson.research.owr -classpath '$(ANDROID_CLASSPATH)'
+
 # This must be done in install because we need the installed version of
 # the shared library created by libtool, not the "uninstalled" version
 install-data-local: install-exec
+	mkdir -p '$(DESTDIR)/$(javadocdir)'
+	cp -r javadoc/* '$(DESTDIR)/$(javadocdir)'
 	mkdir -p '$(DESTDIR)/$(jardir)'
 	rm -rf jar-build && mkdir -p jar-build/lib/armeabi
 	for eachlib in '$(DESTDIR)/$(libdir)'/libopenwebrtc{,_bridge}{,_jni}.so; do \

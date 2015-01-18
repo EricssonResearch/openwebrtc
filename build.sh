@@ -90,7 +90,7 @@ build(){
         elif [[ $target_triple == "arm-linux-androideabi" ]]; then
             local android_sdk="$(dirname $(which adb))/.."
             local platform_ldflags="-llog -Wl,--allow-multiple-definition -landroid "
-            local configure_flags="--disable-static --enable-owr-static --enable-shared --disable-introspection --enable-owr-java --with-jardir=${installdir}/jar --with-android-ndk=$ANDROID_NDK --with-android-sdk=${android_sdk}"
+            local configure_flags="--disable-static --enable-owr-static --enable-shared --disable-introspection --enable-owr-java --with-jardir=${installdir}/jar --with-javadocdir=${installdir}/share/javadoc/openwebrtc --with-android-ndk=$ANDROID_NDK --with-android-sdk=${android_sdk}"
             local seed_platform_libs="-ljavascriptcoregtk-3.0 -licui18n -licuuc -licudata"
             export PLATFORM_GLIB_LIBS="-lffi -liconv -lintl "
             export PLATFORM_GSTREAMER_LIBS="-lgstopensles -lOpenSLES -lGLESv2 -lEGL"
