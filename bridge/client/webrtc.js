@@ -144,8 +144,8 @@
         EventTarget.call(this, {
             "onactive": null,
             "oninactive": null,
-            "odaddtrack": null,
-            "onremavetrack": null
+            "onaddtrack": null,
+            "onremovetrack": null
         });
 
         var a = { // attributes
