@@ -42,10 +42,13 @@ openwebrtc_daemon_LDFLAGS += -static-libtool-libs
 endif
 openwebrtc_daemon_LDFLAGS += -static -export-dynamic
 openwebrtc_daemon_LDADD = \
-	libopenwebrtc_bridge.la \
-	$(top_builddir)/owr/libopenwebrtc.la \
-	$(OPENWEBRTC_GST_PLUGINS_LIBS) \
-	$(SEED_LIBS)
+    libopenwebrtc_bridge.la \
+    $(top_builddir)/owr/libopenwebrtc.la \
+    $(OPENWEBRTC_GST_PLUGINS_LIBS) \
+    $(GSTREAMER_LIBS) \
+    $(ORC_LIBS) \
+    $(SEED_LIBS) \
+    $(GLIB_LIBS)
 
 includedir = $(prefix)/include/owr
 include_HEADERS = \
