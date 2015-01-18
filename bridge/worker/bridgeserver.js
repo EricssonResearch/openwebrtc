@@ -36,7 +36,6 @@ var extensionApproved = false;
 var extws;
 var reqQueue = [];
 var busy = false;
-var accepts = [];
 
 var extensionServer = new WebSocketServer(10719, "127.0.0.1");
 extensionServer.onaccept = function (event) {
@@ -138,37 +137,17 @@ server.onaccept = function (event) {
                 }
             }
 
-
-            function deRef (accept_el, accept_ix, accept_ar) {
-                accept_el.forEach(function (source_el, source_ix, source_ar) {
-                    console.log("deref, accept_ix: " +accept_ix + "source_ix: " +source_ix + " el: " + source_el + " el.source: " + source_el.source);
-                    //try {jsonRpc.removeObjectRef(source_el.source);} catch(e) {console.log("removeObjectRef went worng, e: " + e);};
-                });
-            }
-
             function handleExtResponse (evt) {
                 console.log("message received on extsocket");
+                extws.onmessage = null; //don't listen for unsolicted messages
                 var response = JSON.parse(evt.data);
                 if (response.name == "accept") {
                     console.log("accept received on socket; response.Id: " + response.Id);
                     if (response.Id == requestId) {
                         console.log("was right id!");
-                        accepts[requestId] = response.acceptSourceInfos;
                         client.gotSources(response.acceptSourceInfos);
                     } else {
                         console.log("was wrong Id, the requestId was: " + requestId);
-                    }
-                }
-                if (response.name == "revokeAll") {
-                    console.log("revokeAll received on socket");
-                    accepts.forEach(deRef);
-                    accepts = [];
-                }
-                if (response.name == "revoke") {
-                    console.log("revoke received on socket for requestId " + response.Id);
-                    if (accepts[response.Id]) {
-                        deRef(accepts[response.Id], response.Id, accepts);
-                        accepts[response.Id] = null;
                     }
                 }
                 if (response.name == "reject") {
