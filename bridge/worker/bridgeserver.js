@@ -30,11 +30,75 @@
 var imageServers = {};
 var imageServerBasePort = 10000 + Math.floor(Math.random() * 40000);
 var nextImageServerPort = imageServerBasePort;
+var extensionConnect = false;
+var validExtenstionOrigin = "safari-extension://com.ericsson.research.owr";
+var extws;
+var reqQueue = [];
+
+var extensionServer = new WebSocketServer(10719, "127.0.0.1");
+extensionServer.onaccept = function (event) {
+    extensionConnect = true;
+    extws = event.socket;
+    extws.onmessage = handleExtResponse;
+    var reqOrigin = event.origin;
+    console.log("Extension-web-socket set up, origin: " + reqOrigin);
+    var reqOriginFirst45 = reqOrigin.slice(0, 44);
+    //check if reqOriginF45 is equal to "safari-extension://com.ericsson.research.owr"
+    if (reqOriginFirst45 != validExtenstionOrigin) {
+        extws.close();
+    }
+    extws.onlcose = function (evt) {
+        console.log("extws closed");
+        extws = null;
+    }
+
+    function handleExtResponse (evt) {
+        console.log("message received on extsocket");
+        var response = JSON.parse(evt.data);
+        var outstandingRequest;
+        if (response.name == "accept") {
+            outstandingRequest = reqQueue.shift();
+            console.log("accept received on socket; response.Id: " + response.Id);
+            if (response.Id == outstandingRequest.reqMsg.Id) {
+                console.log("was right id!");
+                outstandingRequest.reqClient.gotSources(response.acceptSourceInfos);
+            } else {
+                console.log("was wrong Id, the requestId was: " + outstandingRequest.reqMsg.Id);
+            }
+            handleReqQueue();
+        }
+        if (response.name == "reject") {
+            console.log("reject received on socket response.Id: " + response.Id);
+            outstandingRequest = reqQueue.shift();
+            if (response.Id == outstandingRequest.reqMsg.Id) {
+                console.log("was right id!");
+            } else {
+                console.log("was wrong Id, the requestId was: " + outstandingRequest.reqMsg.Id);
+            }
+            handleReqQueue();
+        }
+        //if resp was not one of accept and reject it was a spurious response; don't handle req queue; don't shift array
+    }
+
+    function handleReqQueue () {
+        if (reqQueue.length == 0) {
+            return;
+        } else {
+            //request queued up
+            var requestMessage = reqQueue[0].reqMsg;
+            extws.send(JSON.stringify(requestMessage));
+            console.log("sent request from reqQueue to bar");
+        }
+    }
+
+}
+
 
 var server = new WebSocketServer(10717, "127.0.0.1");
 server.onaccept = function (event) {
     var ws = event.socket;
     var origin = event.origin;
+    console.log("channel socket origin: " + origin);
     var channel = {
         "postMessage": function (message) {
             ws.send(message);
@@ -83,6 +147,7 @@ server.onaccept = function (event) {
 
     rpcScope.requestSources = function (options, client) {
         var mediaTypes = 0;
+        var requestId;
         if (options.audio)
             mediaTypes |= owr.MediaType.AUDIO;
         if (options.video)
@@ -111,7 +176,37 @@ server.onaccept = function (event) {
                     }
                 }
             }
-            client.gotSources(sourceInfos);
+
+            if (extensionConnect) { //If an extension ever did try to connect
+                if (extws) {
+                    var requestId = Math.floor(Math.random() * 40000);
+                    console.log("sourceInfos: " + sourceInfos);
+                    var requestMessage = {
+                        "name": "request",
+                        "origin": origin,
+                        "Id": requestId,
+                        "requestSourceInfos": sourceInfos
+                    }
+                    reqQueue.push(
+                        {
+                            reqMsg: requestMessage,
+                            reqClient: client
+                        }); 
+                    if (reqQueue.length == 1) {
+                        extws.send(JSON.stringify(requestMessage));
+                        console.log("sent incoming request to bar");
+                    } else {
+                        //outstanding request to extension; queue up
+                        console.log("an extension is connected but busy serving (i.e. get accept or reject for) an gUM call. Pushing to reqQueue");
+                    }
+
+                } else {
+                    console.log("an extension has been (at least) trying to connect, but can for some reason not serve the gUM request at this time. Dropping on floor.");
+                }
+            } else {
+                console.log("no extension - just call 'gotSources'");
+                client.gotSources(sourceInfos);
+            }
         });
     };
 
