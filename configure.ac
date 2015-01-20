@@ -26,6 +26,8 @@ PKG_CHECK_MODULES(GSTREAMER, [gstreamer-1.0 >= $GST_REQUIRED gstreamer-rtp-1.0 >
 PKG_CHECK_MODULES(NICE, [nice >= 0.1.7.1])
 PKG_CHECK_MODULES(ORC, [orc-0.4])
 PKG_CHECK_MODULES(SEED, [seed])
+PKG_CHECK_MODULES(JSON_GLIB, [json-glib-1.0])
+PKG_CHECK_MODULES(SOUP, [soup-2.4])
 
 # check for gobject-introspection
 m4_ifdef([GOBJECT_INTROSPECTION_CHECK], [
