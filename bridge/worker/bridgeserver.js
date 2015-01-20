@@ -41,7 +41,7 @@ extensionServer.onaccept = function (event) {
     extws = event.socket;
     extws.onmessage = handleExtResponse;
     var reqOrigin = event.origin;
-    console.log("Extension-web-socket set up, origin: " + reqOrigin);
+    console.log("Extension-web-socket set up");
     var reqOriginFirst45 = reqOrigin.slice(0, 44);
     //check if reqOriginF45 is equal to "safari-extension://com.ericsson.research.owr"
     if (reqOriginFirst45 != validExtenstionOrigin) {
@@ -53,27 +53,22 @@ extensionServer.onaccept = function (event) {
     }
 
     function handleExtResponse (evt) {
-        console.log("message received on extsocket");
         var response = JSON.parse(evt.data);
         var outstandingRequest;
         if (response.name == "accept") {
             outstandingRequest = reqQueue.shift();
-            console.log("accept received on socket; response.Id: " + response.Id);
             if (response.Id == outstandingRequest.reqMsg.Id) {
-                console.log("was right id!");
                 outstandingRequest.reqClient.gotSources(response.acceptSourceInfos);
             } else {
-                console.log("was wrong Id, the requestId was: " + outstandingRequest.reqMsg.Id);
+                //console.log("was wrong Id, the requestId was: " + outstandingRequest.reqMsg.Id);
             }
             handleReqQueue();
         }
         if (response.name == "reject") {
-            console.log("reject received on socket response.Id: " + response.Id);
             outstandingRequest = reqQueue.shift();
             if (response.Id == outstandingRequest.reqMsg.Id) {
-                console.log("was right id!");
             } else {
-                console.log("was wrong Id, the requestId was: " + outstandingRequest.reqMsg.Id);
+                //console.log("was wrong Id, the requestId was: " + outstandingRequest.reqMsg.Id);
             }
             handleReqQueue();
         }
@@ -87,7 +82,6 @@ extensionServer.onaccept = function (event) {
             //request queued up
             var requestMessage = reqQueue[0].reqMsg;
             extws.send(JSON.stringify(requestMessage));
-            console.log("sent request from reqQueue to bar");
         }
     }
 
@@ -98,7 +92,6 @@ var server = new WebSocketServer(10717, "127.0.0.1");
 server.onaccept = function (event) {
     var ws = event.socket;
     var origin = event.origin;
-    console.log("channel socket origin: " + origin);
     var channel = {
         "postMessage": function (message) {
             ws.send(message);
@@ -180,7 +173,6 @@ server.onaccept = function (event) {
             if (extensionConnect) { //If an extension ever did try to connect
                 if (extws) {
                     var requestId = Math.floor(Math.random() * 40000);
-                    console.log("sourceInfos: " + sourceInfos);
                     var requestMessage = {
                         "name": "request",
                         "origin": origin,
@@ -194,17 +186,15 @@ server.onaccept = function (event) {
                         }); 
                     if (reqQueue.length == 1) {
                         extws.send(JSON.stringify(requestMessage));
-                        console.log("sent incoming request to bar");
                     } else {
                         //outstanding request to extension; queue up
-                        console.log("an extension is connected but busy serving (i.e. get accept or reject for) an gUM call. Pushing to reqQueue");
                     }
 
                 } else {
                     console.log("an extension has been (at least) trying to connect, but can for some reason not serve the gUM request at this time. Dropping on floor.");
                 }
             } else {
-                console.log("no extension - just call 'gotSources'");
+                //This option should be removed eventually - only extenstions that ask for consent should be allowed
                 client.gotSources(sourceInfos);
             }
         });
