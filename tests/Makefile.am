@@ -10,7 +10,6 @@ AM_CPPFLAGS = \
     -I$(top_srcdir)/owr
 
 AM_CFLAGS = \
-    -ansi \
     -Wall \
     -Wextra \
     -Werror \
@@ -19,7 +18,8 @@ AM_CFLAGS = \
 bin_PROGRAMS = \
     list-devices \
     test-self-view \
-    test-send-receive
+    test-send-receive \
+    test-client
 
 list_devices_SOURCES = list_devices.c
 
@@ -53,6 +53,22 @@ test_send_receive_CFLAGS = \
 test_send_receive_LDADD = \
     $(GSTREAMER_LIBS) \
     $(NICE_LIBS) \
+    $(GLIB_LIBS) \
+    $(top_builddir)/owr/libopenwebrtc.la
+
+test_client_SOURCES = test_client.c
+
+test_client_CFLAGS = \
+    $(AM_CFLAGS) \
+    $(JSON_GLIB_CFLAGS) \
+    $(SOUP_CFLAGS) \
+    -I$(top_srcdir)/local \
+    -I$(top_srcdir)/transport \
+    -I$(top_srcdir)/owr
+
+test_client_LDADD = \
+    $(JSON_GLIB_LIBS) \
+    $(SOUP_LIBS) \
     $(GLIB_LIBS) \
     $(top_builddir)/owr/libopenwebrtc.la
 
