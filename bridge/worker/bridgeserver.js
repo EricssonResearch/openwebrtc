@@ -30,6 +30,49 @@
 var imageServers = {};
 var imageServerBasePort = 10000 + Math.floor(Math.random() * 40000);
 var nextImageServerPort = imageServerBasePort;
+var extensionConnect = false;
+var validExtenstionOrigin = "safari-extension://com.ericsson.research.owr";
+var extws;
+var requestQueue = [];
+
+var extensionServer = new WebSocketServer(10719, "127.0.0.1");
+extensionServer.onaccept = function (event) {
+    extensionConnect = true;
+    extws = event.socket;
+    extws.onmessage = handleExtResponse;
+    var reqOrigin = event.origin;
+    console.log("Extension-web-socket set up");
+    var reqOriginFirst45 = reqOrigin.slice(0, 44);
+    //check if reqOriginF45 is equal to "safari-extension://com.ericsson.research.owr"
+    if (reqOriginFirst45 != validExtenstionOrigin) {
+        extws.close();
+    }
+    extws.onclose = function (evt) {
+        console.log("extws closed");
+        extws = null;
+    }
+
+    function handleExtResponse (evt) {
+        var response = JSON.parse(evt.data);
+        var outstandingRequest = requestQueue.shift(); //regardless if the response was correct name/Id or not, shift the queue
+        if (response.name == "accept") {
+            if (response.Id == outstandingRequest.Id) {
+                outstandingRequest.reqClient.gotSources(response.acceptSourceInfos);
+            } 
+        }
+        handleRequestQueue();
+    }
+
+    function handleRequestQueue () {
+        if (requestQueue.length > 0) {
+            //request queued up
+            var requestMessage = requestQueue[0].reqMsg;
+            extws.send(JSON.stringify(requestMessage));
+        }
+    }
+
+}
+
 
 var server = new WebSocketServer(10717, "127.0.0.1");
 server.onaccept = function (event) {
@@ -83,6 +126,7 @@ server.onaccept = function (event) {
 
     rpcScope.requestSources = function (options, client) {
         var mediaTypes = 0;
+        var requestId;
         if (options.audio)
             mediaTypes |= owr.MediaType.AUDIO;
         if (options.video)
@@ -111,7 +155,32 @@ server.onaccept = function (event) {
                     }
                 }
             }
-            client.gotSources(sourceInfos);
+
+            if (extensionConnect) { //If an extension ever did try to connect
+                if (extws) {
+                    var requestId = Math.floor(Math.random() * 40000);
+                    var requestMessage = {
+                        "name": "request",
+                        "origin": origin,
+                        "Id": requestId,
+                        "requestSourceInfos": sourceInfos
+                    }
+                    requestQueue.push(
+                        {
+                            Id: requestId,
+                            reqClient: client
+                        }); 
+                    if (requestQueue.length == 1) {
+                        extws.send(JSON.stringify(requestMessage)); //only send if there was no one before in the queue
+                    }
+
+                } else {
+                    console.log("an extension has been (at least) trying to connect, but can for some reason not serve the gUM request at this time. Dropping on floor.");
+                }
+            } else {
+                //This option should be removed eventually - only extenstions that ask for consent should be allowed
+                client.gotSources(sourceInfos);
+            }
         });
     };
 
