@@ -33,7 +33,7 @@ var nextImageServerPort = imageServerBasePort;
 var extensionConnect = false;
 var validExtenstionOrigin = "safari-extension://com.ericsson.research.owr";
 var extws;
-var reqQueue = [];
+var requestQueue = [];
 
 var extensionServer = new WebSocketServer(10719, "127.0.0.1");
 extensionServer.onaccept = function (event) {
@@ -47,40 +47,26 @@ extensionServer.onaccept = function (event) {
     if (reqOriginFirst45 != validExtenstionOrigin) {
         extws.close();
     }
-    extws.onlcose = function (evt) {
+    extws.onclose = function (evt) {
         console.log("extws closed");
         extws = null;
     }
 
     function handleExtResponse (evt) {
         var response = JSON.parse(evt.data);
-        var outstandingRequest;
+        var outstandingRequest = requestQueue.shift(); //regardless if the response was correct name/Id or not, shift the queue
         if (response.name == "accept") {
-            outstandingRequest = reqQueue.shift();
-            if (response.Id == outstandingRequest.reqMsg.Id) {
+            if (response.Id == outstandingRequest.Id) {
                 outstandingRequest.reqClient.gotSources(response.acceptSourceInfos);
-            } else {
-                //console.log("was wrong Id, the requestId was: " + outstandingRequest.reqMsg.Id);
-            }
-            handleReqQueue();
+            } 
         }
-        if (response.name == "reject") {
-            outstandingRequest = reqQueue.shift();
-            if (response.Id == outstandingRequest.reqMsg.Id) {
-            } else {
-                //console.log("was wrong Id, the requestId was: " + outstandingRequest.reqMsg.Id);
-            }
-            handleReqQueue();
-        }
-        //if resp was not one of accept and reject it was a spurious response; don't handle req queue; don't shift array
+        handleRequestQueue();
     }
 
-    function handleReqQueue () {
-        if (reqQueue.length == 0) {
-            return;
-        } else {
+    function handleRequestQueue () {
+        if (requestQueue.length > 0) {
             //request queued up
-            var requestMessage = reqQueue[0].reqMsg;
+            var requestMessage = requestQueue[0].reqMsg;
             extws.send(JSON.stringify(requestMessage));
         }
     }
@@ -179,15 +165,13 @@ server.onaccept = function (event) {
                         "Id": requestId,
                         "requestSourceInfos": sourceInfos
                     }
-                    reqQueue.push(
+                    requestQueue.push(
                         {
-                            reqMsg: requestMessage,
+                            Id: requestId,
                             reqClient: client
                         }); 
-                    if (reqQueue.length == 1) {
-                        extws.send(JSON.stringify(requestMessage));
-                    } else {
-                        //outstanding request to extension; queue up
+                    if (requestQueue.length == 1) {
+                        extws.send(JSON.stringify(requestMessage)); //only send if there was no one before in the queue
                     }
 
                 } else {
