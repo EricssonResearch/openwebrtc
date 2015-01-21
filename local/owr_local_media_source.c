@@ -296,6 +296,54 @@ drop_reconfigure_event(GstPad *pad, GstPadProbeInfo *info, gpointer user_data)
     return GST_PAD_PROBE_OK;
 }
 
+/* For each raw video structure, adds a variant with framerate unset */
+static gboolean
+fix_video_caps_framerate(GstCapsFeatures *f, GstStructure *s, gpointer user_data)
+{
+    GstCaps *ret = GST_CAPS(user_data);
+    gint fps_n, fps_d;
+    OWR_UNUSED(f);
+
+    gst_caps_append_structure(ret, gst_structure_copy(s));
+
+    /* Don't mess with non-raw structures */
+    if (!gst_structure_has_name(s, "video/x-raw"))
+        goto done;
+
+    /* If possible try to limit the framerate at the source already */
+    if (gst_structure_get_fraction(s, "framerate", &fps_n, &fps_d)) {
+        GstStructure *tmp = gst_structure_copy(s);
+        gst_structure_remove_field(tmp, "framerate");
+        gst_caps_append_structure(ret, tmp);
+    }
+
+done:
+    return TRUE;
+}
+
+/* For each raw video structure, adds a variant with format unset */
+static gboolean
+fix_video_caps_format(GstCapsFeatures *f, GstStructure *s, gpointer user_data)
+{
+    GstCaps *ret = GST_CAPS(user_data);
+    OWR_UNUSED(f);
+
+    gst_caps_append_structure(ret, gst_structure_copy(s));
+
+    /* Don't mess with non-raw structures */
+    if (!gst_structure_has_name(s, "video/x-raw"))
+        goto done;
+
+    if (gst_structure_has_field(s, "format")) {
+        GstStructure *tmp = gst_structure_copy(s);
+        gst_structure_remove_field(tmp, "format");
+        gst_caps_append_structure(ret, tmp);
+    }
+
+done:
+    return TRUE;
+}
+
 /*
  * owr_local_media_source_get_pad
  *
@@ -349,7 +397,6 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
         GEnumValue *media_enum_value, *source_enum_value;
         gchar *bin_name;
         GstCaps *source_caps;
-        GstStructure *source_structure;
         GstBus *bus;
 
         g_object_get(media_source, "media-type", &media_type, "type", &source_type, NULL);
@@ -423,7 +470,8 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
             }
         case OWR_MEDIA_TYPE_VIDEO:
         {
-            gint fps_n, fps_d;
+            GstPad *srcpad;
+            GstCaps *device_caps;
 
             switch (source_type) {
             case OWR_SOURCE_TYPE_CAPTURE:
@@ -470,17 +518,29 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
                 goto done;
             }
 
-            CREATE_ELEMENT(capsfilter, "capsfilter", "video-source-capsfilter");
-            source_caps = gst_caps_copy(caps);
-            source_structure = gst_caps_get_structure(source_caps, 0);
-            gst_structure_remove_field(source_structure, "format");
+            /* First try to see if we can just get the format we want directly */
 
-            /* If possible try to limit the framerate at the source already */
-            if (gst_structure_get_fraction(source_structure, "framerate", &fps_n, &fps_d)) {
-                GstStructure *tmp = gst_structure_copy(source_structure);
-                gst_structure_remove_field(tmp, "framerate");
-                gst_caps_append_structure(source_caps, tmp);
+            /* Framerate is handled at intervideosrc */
+            source_caps = gst_caps_new_empty();
+            gst_caps_foreach(caps, fix_video_caps_framerate, source_caps);
+
+            /* Now see what the device can really produce */
+            srcpad = gst_element_get_static_pad(source, "src");
+            gst_element_set_state(source, GST_STATE_READY);
+            device_caps = gst_pad_query_caps(srcpad, source_caps);
+
+            if (gst_caps_is_empty(device_caps)) {
+                /* Let's see if it works when we drop format constraints (which can be dealt with downsteram) */
+                GstCaps *tmp = source_caps;
+                source_caps = gst_caps_new_empty();
+                gst_caps_foreach(tmp, fix_video_caps_format, source_caps);
+                gst_caps_unref(tmp);
             }
+
+            gst_caps_unref(device_caps);
+            gst_object_unref(srcpad);
+
+            CREATE_ELEMENT(capsfilter, "capsfilter", "video-source-capsfilter");
             g_object_set(capsfilter, "caps", source_caps, NULL);
             gst_caps_unref(source_caps);
             gst_bin_add(GST_BIN(source_pipeline), capsfilter);
