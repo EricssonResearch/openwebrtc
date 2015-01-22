@@ -35,33 +35,33 @@ var consentRequestQueue;
 var extensionServer = new WebSocketServer(10719, "127.0.0.1");
 
 extensionServer.onaccept = function (event) {
-    consentRequestQueue = new function () {
-        var validExtensionOrigin = "safari-extension://com.ericsson.research.owr";
-        var queue = [];
-        var extws = event.socket;
+    if (event.origin.slice(0, 44) == "safari-extension://com.ericsson.research.owr") {
+        consentRequestQueue = new function () {
+            var queue = [];
+            var extws = event.socket;
 
-        if (event.origin.slice(0, 44) != validExtensionOrigin)
-            console.log("Warning, the origin of the extension was not approved. No use of input devices will be allowed.");
+            this.add = function (message, client) {
+                queue.push({reqMsg: message, client: client}) //only push if the extension origin is OK
+                if (queue.length == 1) 
+                    extws.send(JSON.stringify(message)); //send only if there was no queue                
+            };
 
-        this.add = function (message, client) {
-            queue.push({reqMsg: message, client: client}) //only push if the extension origin is OK
-            if (queue.length == 1) 
-                extws.send(JSON.stringify(message)); //send only if there was no queue                
-        };
-        function handleResponse (evt) {
-            var outstandingRequest = queue.shift();
-            var response = JSON.parse(evt.data);
-            if (response.name == "accept" && response.Id == outstandingRequest.reqMsg.Id && event.origin.slice(0, 44) == validExtensionOrigin)
-                outstandingRequest.client.gotSources(response.acceptSourceInfos);
-            if (queue.length > 0)
-                extws.send(JSON.stringify(queue[0].reqMsg));
+            function handleResponse (evt) {
+                var outstandingRequest = queue.shift();
+                var response = JSON.parse(evt.data);
+                if (response.name == "accept" && response.Id == outstandingRequest.reqMsg.Id)
+                    outstandingRequest.client.gotSources(response.acceptSourceInfos);
+                if (queue.length > 0)
+                    extws.send(JSON.stringify(queue[0].reqMsg));
+            }
+            extws.onmessage = handleResponse;
+            extws.onclose = function () {
+                console.log("extws unexpectedly closed");
+                consentRequestQueue = null;
+            }
         }
-        extws.onmessage = handleResponse;
-        extws.onclose = function () {
-            console.log("extws unexpectedly closed");
-            consentRequestQueue = null;
-        }
-    }
+    } else
+        console.log("Origin of extension not correct");
 }
 
 var server = new WebSocketServer(10717, "127.0.0.1");
