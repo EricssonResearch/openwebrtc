@@ -12,7 +12,8 @@ AM_CPPFLAGS = \
 AM_CFLAGS = \
     -Wall \
     -Wextra \
-    -Werror
+    -Werror \
+    $(DEBUG_CFLAGS)
 
 noinst_LTLIBRARIES = libopenwebrtc_local.la
 
