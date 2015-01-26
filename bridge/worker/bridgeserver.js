@@ -35,7 +35,7 @@ var consentRequestQueue;
 var extensionServer = new WebSocketServer(10719, "127.0.0.1");
 
 extensionServer.onaccept = function (event) {
-    if (event.origin.slice(0, 44) == "safari-extension://com.ericsson.research.owr") {
+    if (event.origin.slice(0, 44) == "safari-extension://com.ericsson.research.owr" && !consentRequestQueue) {
         consentRequestQueue = new function () {
             var queue = [];
             var extws = event.socket;
@@ -60,8 +60,10 @@ extensionServer.onaccept = function (event) {
                 consentRequestQueue = null;
             }
         }
-    } else
-        console.log("Origin of extension not correct");
+    } else {
+        console.log("Origin of extension incorrect, or a socket to the extension did already exist; closing");
+        event.socket.close();
+    }
 }
 
 var server = new WebSocketServer(10717, "127.0.0.1");
