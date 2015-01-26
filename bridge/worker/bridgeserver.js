@@ -30,6 +30,41 @@
 var imageServers = {};
 var imageServerBasePort = 10000 + Math.floor(Math.random() * 40000);
 var nextImageServerPort = imageServerBasePort;
+var consentRequestQueue;
+
+var extensionServer = new WebSocketServer(10719, "127.0.0.1");
+
+extensionServer.onaccept = function (event) {
+    if (event.origin.slice(0, 44) == "safari-extension://com.ericsson.research.owr" && !consentRequestQueue) {
+        consentRequestQueue = new function () {
+            var queue = [];
+            var extws = event.socket;
+
+            this.add = function (message, client) {
+                queue.push({reqMsg: message, client: client}) //only push if the extension origin is OK
+                if (queue.length == 1) 
+                    extws.send(JSON.stringify(message)); //send only if there was no queue                
+            };
+
+            function handleResponse (evt) {
+                var outstandingRequest = queue.shift();
+                var response = JSON.parse(evt.data);
+                if (response.name == "accept" && response.Id == outstandingRequest.reqMsg.Id)
+                    outstandingRequest.client.gotSources(response.acceptSourceInfos);
+                if (queue.length > 0)
+                    extws.send(JSON.stringify(queue[0].reqMsg));
+            }
+            extws.onmessage = handleResponse;
+            extws.onclose = function () {
+                console.log("extws unexpectedly closed");
+                consentRequestQueue = null;
+            }
+        }
+    } else {
+        console.log("Origin of extension incorrect, or a socket to the extension did already exist; closing");
+        event.socket.close();
+    }
+}
 
 var server = new WebSocketServer(10717, "127.0.0.1");
 server.onaccept = function (event) {
@@ -111,7 +146,20 @@ server.onaccept = function (event) {
                     }
                 }
             }
-            client.gotSources(sourceInfos);
+
+            if (consentRequestQueue) { //If an extension ever did try to connect
+                var requestId = Math.floor(Math.random() * 40000);
+                var requestMessage = {
+                    "name": "request",
+                    "origin": origin,
+                    "Id": requestId,
+                    "requestSourceInfos": sourceInfos
+                };
+                consentRequestQueue.add(requestMessage, client);
+            } else {
+                //This option should be removed eventually - only extensions that ask for consent should be allowed to use owr
+                client.gotSources(sourceInfos);
+            }
         });
     };
 
