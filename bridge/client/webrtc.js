@@ -650,12 +650,11 @@
             var candidateAttribute = candidate.candidate;
             if (candidateAttribute.substr(0, 2) != "a=")
                 candidateAttribute = "a=" + candidateAttribute;
-            var candidateInfo = SDP.parse("m=application 0 NONE\r\n" + candidateAttribute + "\r\n");
+            var iceInfo = SDP.parse("m=application 0 NONE\r\n" +
+                candidateAttribute + "\r\n").mediaDescriptions[0].ice;
+            var parsedCandidate = iceInfo && iceInfo.candidates && iceInfo.candidates[0];
 
-            if (!candidateInfo.mediaDescriptions[0]
-                || !candidateInfo.mediaDescriptions[0].ice
-                || !candidateInfo.mediaDescriptions[0].ice.candidates
-                || !candidateInfo.mediaDescriptions[0].ice.candidates[0]) {
+            if (!parsedCandidate) {
                 completeQueuedOperation(function () {
                     failureCallback(createError("SyntaxError",
                         "addIceCandidate: failed to parse candidate attribute"));
@@ -673,9 +672,13 @@
                 return;
             }
 
+            if (!mdesc.ice.candidates)
+                mdesc.ice.candidates = [];
+            mdesc.ice.candidates.push(parsedCandidate);
+
             whenPeerHandler(function () {
-                peerHandler.addRemoteCandidate(candidateInfo.mediaDescriptions[0].ice.candidates[0],
-                    candidate.sdpMLineIndex, mdesc.ice.ufrag, mdesc.ice.password);
+                peerHandler.addRemoteCandidate(parsedCandidate, candidate.sdpMLineIndex,
+                    mdesc.ice.ufrag, mdesc.ice.password);
                 completeQueuedOperation(successCallback);
             });
         };
