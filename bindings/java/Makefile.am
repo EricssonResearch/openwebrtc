@@ -40,7 +40,7 @@ OWR_GIR = Owr-0.1.gir
 endif
 
 owr_jni.c: $(OWR_GIR) $(top_srcdir)/bindings/java/
-	$(top_srcdir)/bindings/java/gen_jni.py \
+	PYTHONDONTWRITEBYTECODE=x $(top_srcdir)/bindings/java/gen_jni.py \
 	--gir=$< \
 	--c-out=$(top_builddir)/bindings/java/owr_jni.c \
 	--j-out=$(top_builddir)/bindings/java/owr

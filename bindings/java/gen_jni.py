@@ -1,4 +1,4 @@
-#!/usr/bin/env python -B
+#!/usr/bin/env python
 
 # Copyright (c) 2014, Ericsson AB. All rights reserved.
 #
