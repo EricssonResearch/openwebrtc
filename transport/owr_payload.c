@@ -102,9 +102,7 @@ static void owr_payload_set_property(GObject *object, guint property_id, const G
         priv->codec_type = g_value_get_enum(value);
         break;
     case PROP_PAYLOAD_TYPE:
-        pt = g_value_get_uint(value);
-        g_return_if_fail(pt == -1 || pt >= 96);
-        priv->payload_type = pt;
+        priv->payload_type = g_value_get_uint(value);
         break;
     case PROP_CLOCK_RATE:
         priv->clock_rate = g_value_get_uint(value);
@@ -116,7 +114,9 @@ static void owr_payload_set_property(GObject *object, guint property_id, const G
         priv->bitrate = g_value_get_uint(value);
         break;
     case PROP_RTX_PAYLOAD_TYPE:
-        priv->rtx_payload_type = g_value_get_int(value);
+        pt = g_value_get_int(value);
+        g_return_if_fail(pt == -1 || pt >= 96);
+        priv->rtx_payload_type = pt;
         break;
     case PROP_RTX_TIME:
         priv->rtx_time = g_value_get_uint(value);
