@@ -85,7 +85,6 @@ static void owr_media_renderer_finalize(GObject *object)
 
     if (priv->pipeline) {
         gst_element_set_state(priv->pipeline, GST_STATE_NULL);
-        gst_bin_remove(GST_BIN(priv->pipeline), priv->sink);
         gst_object_unref(priv->pipeline);
         priv->pipeline = NULL;
         priv->sink = NULL;
