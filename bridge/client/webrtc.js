@@ -345,9 +345,11 @@
         var lastSetLocalDescriptionType;
         var lastSetRemoteDescriptionType;
         var queuedOperations = [];
+        var stateChangingOperationsQueued = false;
 
-        function enqueueOperation(operation) {
+        function enqueueOperation(operation, isStateChanger) {
             queuedOperations.push(operation);
+            stateChangingOperationsQueued = !!isStateChanger;
             if (queuedOperations.length == 1)
                 setTimeout(queuedOperations[0]);
         }
@@ -365,8 +367,10 @@
                 });
             }
 
-            if (!queuedOperations.length)
+            if (!queuedOperations.length && stateChangingOperationsQueued) {
                 maybeDispatchNegotiationNeeded();
+                stateChangingOperationsQueued = false;
+            }
         }
 
         function updateMediaDescriptionsWithTracks(mediaDescriptions, trackInfos) {
@@ -521,7 +525,7 @@
 
             enqueueOperation(function () {
                 queuedSetLocalDescription(description, successCallback, failureCallback);
-            });
+            }, true);
         };
 
         function queuedSetLocalDescription(description, successCallback, failureCallback) {
@@ -569,7 +573,7 @@
 
             enqueueOperation(function () {
                 queuedSetRemoteDescription(description, successCallback, failureCallback);
-            });
+            }, true);
         };
 
         function queuedSetRemoteDescription(description, successCallback, failureCallback) {
