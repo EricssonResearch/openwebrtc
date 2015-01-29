@@ -46,7 +46,7 @@ owr_jni.c: $(OWR_GIR) $(top_srcdir)/bindings/java/
 	--j-out=$(top_builddir)/bindings/java/owr
 
 Owr-0.1.gir:
-	cat `find $(top_srcdir)/out -name Owr-0.1.gir || echo "Owr-0.1.gir"` | sed 's/libopenwebrtc\.[0-9]*\.dylib/libopenwebrtc_jni.so/' > Owr-0.1.gir
+	cat `find $(top_srcdir)/out -name Owr-0.1.gir || echo "Owr-0.1.gir"` | sed 's/shared-library="[^"]*"/shared-library="libopenwebrtc_jni.so"/' > Owr-0.1.gir
 
 gen/bridge/%: bridge/%
 	mkdir -p gen/bridge
