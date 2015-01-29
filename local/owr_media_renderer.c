@@ -367,7 +367,6 @@ void _owr_media_renderer_set_sink(OwrMediaRenderer *renderer, gpointer sink_ptr)
     if (priv->sink) {
         gst_element_set_state(priv->pipeline, GST_STATE_NULL);
         gst_bin_remove(GST_BIN(priv->pipeline), priv->sink);
-        gst_object_unref(priv->sink);
         priv->sink = NULL;
     }
 
