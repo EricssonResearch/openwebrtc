@@ -52,7 +52,7 @@
         ],
         "video": [
             { "encodingName": "H264", "type": 103, "clockRate": 90000,
-                "ccmfir": true, "nackpli": true },
+                "ccmfir": true, "nackpli": true, "parameters": { "packetizationMode": 1 } },
             { "encodingName": "VP8", "type": 100, "clockRate": 90000,
                 "ccmfir": true, "nackpli": true }
         ]
