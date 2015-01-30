@@ -41,6 +41,8 @@ if (typeof(SDP) == "undefined")
         "mblock": "^m=(audio|video|application) ([\\d]+) ([A-Z/]+)([\\d ]*)$\\r?\\n",
         "mode": "^a=(sendrecv|sendonly|recvonly|inactive).*$",
         "rtpmap": "^a=rtpmap:${type} ([\\w\\-]+)/([\\d]+)/?([\\d]+)?.*$",
+        "fmtp": "^a=fmtp:${type} ([\\w\\-=;]+).*$",
+        "param": "([\\w\\-]+)=([\\w\\-]+);?",
         "nack": "^a=rtcp-fb:${type} nack$",
         "nackpli": "^a=rtcp-fb:${type} nack pli$",
         "ccmfir": "^a=rtcp-fb:${type} ccm fir$",
@@ -75,6 +77,7 @@ if (typeof(SDP) == "undefined")
             "${rtcpMuxLine}" +
             "a=${mode}\r\n" +
             "${rtpMapLines}" +
+            "${fmtpLines}" +
             "${nackLines}" +
             "${nackpliLines}" +
             "${ccmfirLines}" +
@@ -90,6 +93,7 @@ if (typeof(SDP) == "undefined")
         "rtcpMux": "a=rtcp-mux\r\n",
 
         "rtpMap": "a=rtpmap:${type} ${encodingName}/${clockRate}${[/]channels}\r\n",
+        "fmtp": "a=fmtp:${type} ${parameters}\r\n",
         "nack": "a=rtcp-fb:${type} nack\r\n",
         "nackpli": "a=rtcp-fb:${type} nack pli\r\n",
         "ccmfir": "a=rtcp-fb:${type} ccm fir\r\n",
@@ -219,6 +223,18 @@ if (typeof(SDP) == "undefined")
                     payload.encodingName = payloadType == 8 ? "PCMA" : "PCMU";
                     payload.clockRate = 8000;
                     payload.channels = 1;
+                }
+                var fmtpLine = fillTemplate(regexps.fmtp, payload);
+                var fmtp = match(mblock, fmtpLine, "m");
+                if (fmtp) {
+                    payload.parameters = {};
+                    fmtp[1].replace(new RegExp(regexps.param, "g"),
+                        function(_, key, value) {
+                            key = key.replace(/-([a-z])/g, function (_, c) {
+                                return c.toUpperCase();
+                            });
+                            payload.parameters[key] = isNaN(+value) ? value : +value;
+                    });
                 }
                 mediaDescription.payloads.push(payload);
             });
@@ -382,7 +398,7 @@ if (typeof(SDP) == "undefined")
             });
             var mblock = fillTemplate(templates.mblock, mediaDescription);
 
-            var payloadInfo = {"rtpMapLines": "", "nackLines": "",
+            var payloadInfo = {"rtpMapLines": "", "fmtpLines": "", "nackLines": "",
                 "nackpliLines": "", "ccmfirLines": ""};
             mediaDescription.payloads.forEach(function (payload) {
                 if (payloadInfo.fmt)
@@ -392,6 +408,18 @@ if (typeof(SDP) == "undefined")
                 if (!payload.channels || payload.channels == 1)
                     payload.channels = null;
                 payloadInfo.rtpMapLines += fillTemplate(templates.rtpMap, payload);
+                if (payload.parameters) {
+                    var fmtpInfo = { "type": payload.type, "parameters": "" };
+                    for (var p in payload.parameters) {
+                        var param = p.replace(/([A-Z])([a-z])/g, function (_, a, b) {
+                            return "-" + a.toLowerCase() + b;
+                        });
+                        if (fmtpInfo.parameters)
+                            fmtpInfo.parameters += ";";
+                        fmtpInfo.parameters += param + "=" + payload.parameters[p];
+                    }
+                    payloadInfo.fmtpLines += fillTemplate(templates.fmtp, fmtpInfo);
+                }
                 if (payload.nack)
                     payloadInfo.nackLines += fillTemplate(templates.nack, payload);
                 if (payload.nackpli)
