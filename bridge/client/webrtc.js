@@ -597,8 +597,11 @@
             var allTracks = getAllTracks(localStreams);
             remoteSessionInfo.mediaDescriptions.forEach(function (mdesc) {
                 var filteredPayloads = mdesc.payloads.filter(function (payload) {
-                    return indexOfByProperty(defaultPayloads[mdesc.type],
-                        "encodingName", payload.encodingName.toUpperCase()) != -1;
+                    var index = indexOfByProperty(defaultPayloads[mdesc.type],
+                        "encodingName", payload.encodingName.toUpperCase());
+                    var dp = defaultPayloads[mdesc.type][index];
+                    return dp && (!dp.parameters || !payload.parameters
+                        || payload.parameters.packetizationMode == dp.parameters.packetizationMode);
 
                 });
                 mdesc.payloads = filteredPayloads;
