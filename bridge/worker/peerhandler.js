@@ -113,6 +113,9 @@ function PeerHandler(configuration, client, jsonRpc) {
             });
 
             mdesc.payloads.forEach(function (payload) {
+                if (payload.encodingName.toUpperCase() == "RTX")
+                    return;
+                var rtxPayload = findRtxPayload(mdesc.payloads, payload.type);
                 var receivePayload = (mdesc.type == "audio") ?
                     new owr.AudioPayload({
                         "payload_type": payload.type,
@@ -125,7 +128,9 @@ function PeerHandler(configuration, client, jsonRpc) {
                         "codec_type": owr.CodecType[payload.encodingName.toUpperCase()],
                         "clock_rate": payload.clockRate,
                         "ccm_fir": payload.ccmfir,
-                        "nack_pli": payload.nackpli
+                        "nack_pli": payload.nackpli,
+                        "rtx_payload_type": rtxPayload ? rtxPayload.type : -1,
+                        "rtx_time": rtxPayload && rtxPayload.parameters.rtxTime || 0
                     });
                 mediaSession.add_receive_payload(receivePayload);
             });
@@ -160,22 +165,33 @@ function PeerHandler(configuration, client, jsonRpc) {
                 });
             }
 
-            if (!mdesc.source || i < numberOfSendPreparedMediaSessions)
+            var payload;
+            mdesc.payloads.some(function (p) {
+                if (p.encodingName.toUpperCase() != "RTX") {
+                    payload = p;
+                    return true;
+                }
+            });
+
+            if (!mdesc.source || i < numberOfSendPreparedMediaSessions || !payload)
                 continue;
 
+            var rtxPayload = findRtxPayload(mdesc.payloads, payload.type);
             var sendPayload = (mdesc.type == "audio") ?
                 new owr.AudioPayload({
-                    "payload_type": mdesc.payloads[0].type,
-                    "codec_type": owr.CodecType[mdesc.payloads[0].encodingName.toUpperCase()],
-                    "clock_rate": mdesc.payloads[0].clockRate,
-                    "channels": mdesc.payloads[0].channels
+                    "payload_type": payload.type,
+                    "codec_type": owr.CodecType[payload.encodingName.toUpperCase()],
+                    "clock_rate": payload.clockRate,
+                    "channels": payload.channels
                 }) :
                 new owr.VideoPayload({
-                    "payload_type": mdesc.payloads[0].type,
-                    "codec_type": owr.CodecType[mdesc.payloads[0].encodingName.toUpperCase()],
-                    "clock_rate": mdesc.payloads[0].clockRate,
-                    "ccm_fir": !!mdesc.payloads[0].ccmfir,
-                    "nack_pli": !!mdesc.payloads[0].nackpli
+                    "payload_type": payload.type,
+                    "codec_type": owr.CodecType[payload.encodingName.toUpperCase()],
+                    "clock_rate": payload.clockRate,
+                    "ccm_fir": !!payload.ccmfir,
+                    "nack_pli": !!payload.nackpli,
+                    "rtx_payload_type": rtxPayload ? rtxPayload.type : -1,
+                    "rtx_time": rtxPayload && rtxPayload.parameters.rtxTime || 0
                 });
             mediaSession.set_send_payload(sendPayload);
             mediaSession.set_send_source(mdesc.source);
@@ -203,6 +219,18 @@ function PeerHandler(configuration, client, jsonRpc) {
         mediaSessions = null;
         transportAgent = null;
     };
+
+    function findRtxPayload(payloads, apt) {
+        var rtxPayload;
+        payloads.some(function (payload) {
+            if (payload.encodingName.toUpperCase() == "RTX"
+                && payload.parameters && payload.parameters.apt == apt) {
+                rtxPayload = payload;
+                return true;
+            }
+        });
+        return rtxPayload;
+    }
 
     function internalAddRemoteCandidate(mediaSession, candidate, ufrag, password) {
         if (mediaSession.rtcp_mux && candidate.componentId == owr.ComponentType.RTCP)
