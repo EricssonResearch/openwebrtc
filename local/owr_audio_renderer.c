@@ -33,10 +33,10 @@
 #include "config.h"
 #endif
 #include "owr_audio_renderer.h"
-#include "owr_media_renderer_private.h"
-#include "owr_utils.h"
 
+#include "owr_media_renderer_private.h"
 #include "owr_private.h"
+#include "owr_utils.h"
 
 
 #ifdef __APPLE__

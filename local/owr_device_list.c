@@ -34,29 +34,29 @@
 #include "config.h"
 #endif
 
-#include <gst/gstinfo.h>
-
 #include "owr_device_list_private.h"
 #include "owr_local_media_source_private.h"
 #include "owr_media_source.h"
+#include "owr_private.h"
 #include "owr_types.h"
 #include "owr_utils.h"
-#include "owr_private.h"
+
+#include <gst/gstinfo.h>
 
 #ifdef __APPLE__
-#include <TargetConditionals.h>
 #include "owr_device_list_avf_private.h"
+#include <TargetConditionals.h>
 
 #elif defined(__ANDROID__)
 #include <assert.h>
+#include <dlfcn.h>
 #include <jni.h>
 #include <stdlib.h>
-#include <dlfcn.h>
 
 #elif defined(__linux__)
 #include <fcntl.h>
-#include <linux/videodev2.h>
 #include <libv4l2.h>
+#include <linux/videodev2.h>
 
 #endif /* defined(__linux__) */
 
@@ -96,9 +96,8 @@ void _owr_get_capture_devices(OwrMediaType types, GClosure *callback)
 
     g_return_if_fail(callback);
 
-    if (G_CLOSURE_NEEDS_MARSHAL(callback)) {
+    if (G_CLOSURE_NEEDS_MARSHAL(callback))
         g_closure_set_marshal(callback, g_cclosure_marshal_generic);
-    }
 
     merger = _owr_utils_list_closure_merger_new(callback, (GDestroyNotify) g_object_unref);
 
@@ -214,9 +213,8 @@ static void on_pulse_context_state_change(pa_context *pa_context, AudioListConte
 {
     gint error;
     error = pa_context_errno(pa_context);
-    if (error) {
+    if (error)
         g_warning("PulseAudio: error: %s", pa_strerror(error));
-    }
     switch (pa_context_get_state(pa_context)) {
     case PA_CONTEXT_READY:
         pa_context_get_source_info_list(pa_context, (pa_source_info_cb_t) source_info_iterator, context);
@@ -247,7 +245,7 @@ static void source_info_iterator(pa_context *pa_context, const pa_source_info *i
     if (!eol) {
         OwrLocalMediaSource *source;
 
-        if (info->monitor_of_sink_name != NULL) {
+        if (info->monitor_of_sink_name) {
             /* We don't want to list monitor sources */
             return;
         }
@@ -289,6 +287,7 @@ static gchar *get_v4l2_device_name(gchar *filename)
 {
     gchar *device_name;
     int fd = 0;
+    struct v4l2_capability vcap;
 
     fd = open(filename, O_RDWR);
 
@@ -298,17 +297,14 @@ static gchar *get_v4l2_device_name(gchar *filename)
         device_name = g_strdup(filename);
 
         return NULL;
-    } else {
-        struct v4l2_capability vcap;
-
-        if (v4l2_ioctl(fd, VIDIOC_QUERYCAP, &vcap) < 0) {
-            g_warning("v4l: failed to query %s", filename);
-
-            device_name = g_strdup(filename);
-        } else {
-            device_name = g_strdup((const gchar *)vcap.card);
-        }
     }
+
+    if (v4l2_ioctl(fd, VIDIOC_QUERYCAP, &vcap) < 0) {
+        g_warning("v4l: failed to query %s", filename);
+
+        device_name = g_strdup(filename);
+    } else
+        device_name = g_strdup((const gchar *)vcap.card);
 
     g_warning("v4l: found device: %s", device_name);
 
@@ -344,8 +340,8 @@ static OwrLocalMediaSource *maybe_create_source_from_filename(const gchar *name)
         g_free(filename);
         filename = NULL;
 
-	if (!device_name)
-            return NULL;
+    if (!device_name)
+        return NULL;
 
         source = _owr_local_media_source_new_cached(index, device_name,
             OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE);
@@ -373,9 +369,8 @@ static gboolean enumerate_video_source_devices(GClosure *callback)
     while ((filename = g_dir_read_name(dev_dir))) {
         source = maybe_create_source_from_filename(filename);
 
-        if (source) {
+        if (source)
             sources = g_list_prepend(sources, source);
-        }
     }
 
     g_dir_close(dev_dir);
@@ -464,14 +459,12 @@ static JNIEnv* get_jni_env_from_jvm(JavaVM *jvm)
 
         g_debug("attached thread (%ld) to jvm", pthread_self());
 
-        if (pthread_key_create(&detach_key, (void (*)(void *)) on_java_detach)) {
+        if (pthread_key_create(&detach_key, (void (*)(void *)) on_java_detach))
             g_warning("android device list: failed to set on_java_detach");
-        }
 
         pthread_setspecific(detach_key, env);
-    } else if (JNI_OK != err) {
+    } else if (JNI_OK != err)
         g_warning("jvm->GetEnv() failed");
-    }
 
     return env;
 }
@@ -508,15 +501,13 @@ static JavaVM *get_java_vm(void)
         handle = dlopen(android_runtime_libs[lib_index], RTLD_LOCAL | RTLD_LAZY);
         error_string = dlerror();
 
-        if (error_string) {
+        if (error_string)
             g_debug("failed to load %s: %s", android_runtime_libs[lib_index], error_string);
-        }
 
-        if (handle) {
+        if (handle)
             g_debug("Android runtime loaded from %s", android_runtime_libs[lib_index]);
-        } else {
+        else
             ++lib_index;
-        }
     }
 
     if (handle) {
@@ -531,19 +522,16 @@ static JavaVM *get_java_vm(void)
 
         get_created_java_vms(&jvm, 1, &num_jvms);
 
-        if (num_jvms < 1) {
+        if (num_jvms < 1)
             g_debug("get_created_java_vms returned %d jvms", num_jvms);
-        } else {
+        else
             g_debug("found existing jvm");
-        }
 
         err = dlclose(handle);
-        if (err) {
+        if (err)
             g_warning("dlclose() of android runtime handle failed");
-        }
-    } else {
+    } else
         g_error("Failed to get jvm");
-    }
 
     return jvm;
 }

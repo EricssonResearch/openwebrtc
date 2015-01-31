@@ -33,17 +33,16 @@
 #include "config.h"
 #endif
 #include "owr_video_renderer.h"
-#include "owr_video_renderer_private.h"
 
 #include "owr_media_renderer_private.h"
-
 #include "owr_private.h"
+#include "owr_video_renderer_private.h"
 #include "owr_window_registry.h"
 #include "owr_window_registry_private.h"
 
-#include <string.h>
-
 #include <gst/video/videooverlay.h>
+
+#include <string.h>
 
 #ifdef __APPLE__
 #include <TargetConditionals.h>
@@ -270,11 +269,10 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer, gu
     if (priv->tag) {
         GstElement *sink_element = GST_IS_BIN(sink) ?
             gst_bin_get_by_interface(GST_BIN(sink), GST_TYPE_VIDEO_OVERLAY) : sink;
-        if (GST_IS_ELEMENT(sink_element) && GST_IS_VIDEO_OVERLAY(sink)) {
+        if (GST_IS_ELEMENT(sink_element) && GST_IS_VIDEO_OVERLAY(sink))
             gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(sink), window_handle);
-        } else {
+        else
             g_warn_if_reached();
-        }
         if (GST_IS_BIN(sink))
             g_object_unref(sink_element);
     }
@@ -302,9 +300,8 @@ static void owr_video_renderer_constructed(GObject *object)
     priv = video_renderer->priv;
 
     /* If we have no tag, just directly create the sink */
-    if (!priv->tag) {
+    if (!priv->tag)
         _owr_media_renderer_set_sink(OWR_MEDIA_RENDERER(video_renderer), owr_video_renderer_get_element(OWR_MEDIA_RENDERER(video_renderer), 0));
-    }
 
     G_OBJECT_CLASS(owr_video_renderer_parent_class)->constructed(object);
 }
@@ -344,10 +341,11 @@ void _owr_video_renderer_notify_tag_changed(OwrVideoRenderer *video_renderer, co
     g_return_if_fail(tag);
 
     priv = video_renderer->priv;
-    g_return_if_fail(priv->tag && strcmp(priv->tag, tag) == 0);
+    g_return_if_fail(priv->tag && !strcmp(priv->tag, tag));
 
     _owr_media_renderer_set_sink(OWR_MEDIA_RENDERER(video_renderer), NULL);
-    if (have_handle)
+    if (have_handle) {
         _owr_media_renderer_set_sink(OWR_MEDIA_RENDERER(video_renderer),
             owr_video_renderer_get_element(OWR_MEDIA_RENDERER(video_renderer), new_handle));
+    }
 }

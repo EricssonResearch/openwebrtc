@@ -34,6 +34,7 @@
 #include "config.h"
 #endif
 #include "owr_local_media_source.h"
+
 #include "owr_local_media_source_private.h"
 
 #include "owr_media_source.h"
@@ -106,10 +107,10 @@ static void owr_local_media_source_class_init(OwrLocalMediaSourceClass *klass)
     media_source_class->request_source = (void *(*)(OwrMediaSource *, void *))owr_local_media_source_request_source;
 
     g_object_class_install_property(gobject_class, PROP_DEVICE_INDEX,
-            g_param_spec_int("device-index", "Device index",
-                "Index of the device to be used for this source (-1 => auto)",
-                -1, G_MAXINT16, -1,
-                G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+        g_param_spec_int("device-index", "Device index",
+            "Index of the device to be used for this source (-1 => auto)",
+            -1, G_MAXINT16, -1,
+            G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 }
 
 static void owr_local_media_source_init(OwrLocalMediaSource *source)
@@ -125,13 +126,13 @@ static void owr_local_media_source_set_property(GObject *object, guint property_
     OwrLocalMediaSource *source = OWR_LOCAL_MEDIA_SOURCE(object);
 
     switch (property_id) {
-        case PROP_DEVICE_INDEX:
-            source->priv->device_index = g_value_get_int(value);
-            break;
+    case PROP_DEVICE_INDEX:
+        source->priv->device_index = g_value_get_int(value);
+        break;
 
-        default:
-            G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
-            break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
+        break;
     }
 }
 
@@ -141,13 +142,13 @@ static void owr_local_media_source_get_property(GObject *object, guint property_
     OwrLocalMediaSource *source = OWR_LOCAL_MEDIA_SOURCE(object);
 
     switch (property_id) {
-        case PROP_DEVICE_INDEX:
-            g_value_set_int(value, source->priv->device_index);
-            break;
+    case PROP_DEVICE_INDEX:
+        g_value_set_int(value, source->priv->device_index);
+        break;
 
-        default:
-            G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
-            break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
+        break;
     }
 }
 
@@ -274,13 +275,13 @@ static void tee_pad_removed_cb(GstElement *tee, GstPad *old_pad, gpointer user_d
 
     /* Only the fakesink is left, shutdown */
     if (tee->numsrcpads == 1) {
-      GHashTable *args;
+        GHashTable *args;
 
-      args = g_hash_table_new(g_str_hash, g_str_equal);
-      g_hash_table_insert(args, "media_source", media_source);
-      g_object_ref (media_source);
+        args = g_hash_table_new(g_str_hash, g_str_equal);
+        g_hash_table_insert(args, "media_source", media_source);
+        g_object_ref(media_source);
 
-      _owr_schedule_with_hash_table((GSourceFunc)shutdown_media_source, args);
+        _owr_schedule_with_hash_table((GSourceFunc)shutdown_media_source, args);
     }
 }
 
@@ -336,9 +337,9 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
     priv = local_source->priv;
 
     /* only create the source bin for this media source once */
-    if ((source_pipeline = _owr_media_source_get_source_bin(media_source))) {
+    if ((source_pipeline = _owr_media_source_get_source_bin(media_source)))
         GST_DEBUG_OBJECT(media_source, "Re-using existing source element/bin");
-    } else {
+    else {
         OwrMediaType media_type = OWR_MEDIA_TYPE_UNKNOWN;
         OwrSourceType source_type = OWR_SOURCE_TYPE_UNKNOWN;
         GstElement *source, *capsfilter = NULL, *tee;
@@ -455,9 +456,8 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
                     gst_bin_add(GST_BIN(source), time);
                     gst_element_link(src, time);
                     srcpad = gst_element_get_static_pad(time, "src");
-                } else {
+                } else
                     srcpad = gst_element_get_static_pad(src, "src");
-                }
 
                 gst_element_add_pad(source, gst_ghost_pad_new("src", srcpad));
                 gst_object_unref(srcpad);
@@ -477,9 +477,9 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
 
             /* If possible try to limit the framerate at the source already */
             if (gst_structure_get_fraction(source_structure, "framerate", &fps_n, &fps_d)) {
-              GstStructure *tmp = gst_structure_copy(source_structure);
-              gst_structure_remove_field(tmp, "framerate");
-              gst_caps_append_structure(source_caps, tmp);
+                GstStructure *tmp = gst_structure_copy(source_structure);
+                gst_structure_remove_field(tmp, "framerate");
+                gst_caps_append_structure(source_caps, tmp);
             }
             g_object_set(capsfilter, "caps", source_caps, NULL);
             gst_caps_unref(source_caps);
@@ -542,7 +542,7 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
     }
     gst_object_unref(source_pipeline);
 
-    source_element = OWR_MEDIA_SOURCE_CLASS(owr_local_media_source_parent_class)->request_source (media_source, caps);
+    source_element = OWR_MEDIA_SOURCE_CLASS(owr_local_media_source_parent_class)->request_source(media_source, caps);
 
 done:
     return source_element;
@@ -585,7 +585,7 @@ OwrLocalMediaSource *_owr_local_media_source_new_cached(gint device_index, const
     i = media_type == OWR_MEDIA_TYPE_AUDIO ? 0 : 1;
 
     if (source_type == OWR_SOURCE_TYPE_TEST) {
-        if (test_sources[i] == NULL)
+        if (!test_sources[i])
             test_sources[i] = _owr_local_media_source_new(device_index, name, media_type, source_type);
 
         ret = test_sources[i];
@@ -613,7 +613,7 @@ OwrLocalMediaSource *_owr_local_media_source_new_cached(gint device_index, const
     } else
         g_assert_not_reached();
 
-    G_UNLOCK (source_cache);
+    G_UNLOCK(source_cache);
 
     return g_object_ref(ret);
 }

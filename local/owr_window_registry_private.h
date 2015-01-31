@@ -32,8 +32,8 @@
 #ifndef _OWR_WINDOW_REGISTRY_PRIVATE_H_
 #define _OWR_WINDOW_REGISTRY_PRIVATE_H_
 
-#include "owr_window_registry.h"
 #include "owr_video_renderer.h"
+#include "owr_window_registry.h"
 
 G_BEGIN_DECLS
 
