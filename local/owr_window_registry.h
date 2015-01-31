@@ -54,16 +54,14 @@ typedef struct _OwrWindowRegistry        OwrWindowRegistry;
 typedef struct _OwrWindowRegistryClass   OwrWindowRegistryClass;
 typedef struct _OwrWindowRegistryPrivate OwrWindowRegistryPrivate;
 
-struct _OwrWindowRegistry
-{
+struct _OwrWindowRegistry {
     GObject parent_instance;
 
     /*< private >*/
     OwrWindowRegistryPrivate *priv;
 };
 
-struct _OwrWindowRegistryClass
-{
+struct _OwrWindowRegistryClass {
     GObjectClass parent_class;
 };
 

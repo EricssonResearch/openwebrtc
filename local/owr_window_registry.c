@@ -32,11 +32,11 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
-
 #include "owr_window_registry.h"
-#include "owr_window_registry_private.h"
+
 #include "owr_video_renderer.h"
 #include "owr_video_renderer_private.h"
+#include "owr_window_registry_private.h"
 
 #define OWR_WINDOW_REGISTRY_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), \
     OWR_TYPE_WINDOW_REGISTRY, OwrWindowRegistryPrivate))
@@ -47,8 +47,7 @@ static OwrWindowRegistry *owr_window_registry_instance = NULL;
 
 G_LOCK_DEFINE_STATIC(owr_window_registry_mutex);
 
-struct _OwrWindowRegistryPrivate
-{
+struct _OwrWindowRegistryPrivate {
     GHashTable *registry_hash_table;
 };
 
@@ -79,7 +78,7 @@ static void owr_window_registry_finalize(GObject *object)
 
 static void owr_window_registry_class_init(OwrWindowRegistryClass *klass)
 {
-    GObjectClass* gobject_class = G_OBJECT_CLASS(klass);
+    GObjectClass *gobject_class = G_OBJECT_CLASS(klass);
 
     g_type_class_add_private(klass, sizeof(OwrWindowRegistryPrivate));
 
@@ -119,9 +118,8 @@ void owr_window_registry_register(OwrWindowRegistry *window_registry,
         data->window_handle_set = TRUE;
 
         /* Notify the renderer */
-        if (data->renderer) {
+        if (data->renderer)
             _owr_video_renderer_notify_tag_changed(data->renderer, tag, TRUE, (guintptr) handle);
-        }
     } else {
         data = g_new0(WindowHandleData, 1);
         data->window_handle = (guintptr) handle;
@@ -150,9 +148,8 @@ void owr_window_registry_unregister(OwrWindowRegistry *window_registry,
         data->window_handle_set = FALSE;
 
         _owr_video_renderer_notify_tag_changed(data->renderer, tag, FALSE, 0);
-    } else {
+    } else
         g_hash_table_remove(priv->registry_hash_table, tag);
-    }
 }
 
 void _owr_window_registry_register_renderer(OwrWindowRegistry *window_registry,
@@ -173,9 +170,8 @@ void _owr_window_registry_register_renderer(OwrWindowRegistry *window_registry,
         data->renderer = video_renderer;
 
         /* Notify the renderer */
-        if (data->window_handle_set) {
+        if (data->window_handle_set)
             _owr_video_renderer_notify_tag_changed(video_renderer, tag, TRUE, data->window_handle);
-        }
     } else {
         data = g_new0(WindowHandleData, 1);
         data->window_handle = 0;
@@ -222,9 +218,8 @@ OwrWindowRegistry *owr_window_registry_get(void)
 {
     G_LOCK(owr_window_registry_mutex);
 
-    if (!owr_window_registry_instance) {
+    if (!owr_window_registry_instance)
         owr_window_registry_instance = g_object_new(OWR_TYPE_WINDOW_REGISTRY, NULL);
-    }
 
     G_UNLOCK(owr_window_registry_mutex);
 

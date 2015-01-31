@@ -33,6 +33,7 @@
 #include "config.h"
 #endif
 #include "owr_media_renderer.h"
+
 #include "owr_media_renderer_private.h"
 
 #include "owr_media_source.h"

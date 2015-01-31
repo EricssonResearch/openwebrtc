@@ -215,9 +215,9 @@ void owr_image_server_add_image_renderer(OwrImageServer *image_server,
 
     g_mutex_lock(&priv->image_renderers_mutex);
 
-    if (!g_hash_table_contains(priv->image_renderers, tag)) {
+    if (!g_hash_table_contains(priv->image_renderers, tag))
         g_hash_table_insert(priv->image_renderers, g_strdup(tag), image_renderer);
-    } else {
+    else {
         g_object_unref(image_renderer);
         g_warning("Image renderer not added, an image renderer is already added for this tag");
     }

@@ -33,15 +33,15 @@
 #include <config.h>
 #endif
 
-#include "owr_media_source.h"
-#include "owr_local_media_source_private.h"
 #include "owr_device_list_private.h"
+#include "owr_local_media_source_private.h"
+#include "owr_media_source.h"
 
 #include <TargetConditionals.h>
 
-#import <Foundation/Foundation.h>
 #import <AVFoundation/AVFoundation.h>
 #import <CoreFoundation/CFString.h>
+#import <Foundation/Foundation.h>
 
 typedef OwrLocalMediaSource *(^DeviceMapFunc)(AVCaptureDevice *, gint);
 
@@ -71,7 +71,8 @@ static GList *generate_source_device_list(NSString *mediaType, DeviceMapFunc map
 GList *_owr_get_avf_video_sources()
 {
     GList *list = generate_source_device_list(AVMediaTypeVideo,
-            ^(AVCaptureDevice *av_device, gint index) {
+        ^(AVCaptureDevice *av_device, gint index)
+            {
         OwrLocalMediaSource *source;
         const gchar *name;
 
@@ -111,34 +112,30 @@ static OwrLocalMediaSource * make_source_from_device(AudioObjectID device)
         kAudioObjectPropertyElementMaster,
     };
 
-    status = AudioObjectGetPropertyDataSize(device, &streams_prop_addr, 0,
-            NULL, &psize);
+    status = AudioObjectGetPropertyDataSize(device, &streams_prop_addr, 0, NULL, &psize);
     if (status != noErr) {
         g_warning("Could not get 'device streams' property");
         goto out;
     }
 
-    if (psize == 0) {
+    if (!psize) {
         /* No input streams, skip this device */
         goto out;
     }
 
-    status = AudioObjectGetPropertyDataSize(device, &name_prop_addr, 0, NULL,
-            &psize);
+    status = AudioObjectGetPropertyDataSize(device, &name_prop_addr, 0, NULL, &psize);
     if (status != noErr) {
         g_warning("Could not get 'device name' property size");
         goto out;
     }
 
-    status = AudioObjectGetPropertyData(device, &name_prop_addr, 0, NULL,
-            &psize, &cf_name);
+    status = AudioObjectGetPropertyData(device, &name_prop_addr, 0, NULL, &psize, &cf_name);
     if (status != noErr) {
         g_warning("Could not get 'device name' property");
         goto out;
     }
 
-    if (!CFStringGetCString(cf_name, name, sizeof(name),
-                CFStringGetSystemEncoding())) {
+    if (!CFStringGetCString(cf_name, name, sizeof(name), CFStringGetSystemEncoding())) {
         g_warning("Could not get device name as a string");
         CFRelease(cf_name);
         goto out;
@@ -146,7 +143,7 @@ static OwrLocalMediaSource * make_source_from_device(AudioObjectID device)
     CFRelease(cf_name);
 
     source = _owr_local_media_source_new_cached(device, name,
-            OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_CAPTURE);
+        OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_CAPTURE);
 
 out:
     return source;
@@ -168,7 +165,7 @@ GList *_owr_get_core_audio_sources()
     };
 
     status = AudioObjectGetPropertyDataSize(kAudioObjectSystemObject,
-            &devices_prop_addr, 0, NULL, &psize);
+        &devices_prop_addr, 0, NULL, &psize);
     if (status != noErr) {
         g_warning("Could not get 'audio devices' property size");
         goto error;
@@ -178,7 +175,7 @@ GList *_owr_get_core_audio_sources()
     devices = g_new(AudioObjectID, n);
 
     status = AudioObjectGetPropertyData(kAudioObjectSystemObject,
-            &devices_prop_addr, 0, NULL, &psize, devices);
+        &devices_prop_addr, 0, NULL, &psize, devices);
     if (status != noErr) {
         g_warning("Could not get 'audio devices' property");
         goto error;
@@ -205,7 +202,7 @@ GList *_owr_get_core_audio_sources()
     OwrLocalMediaSource *source;
 
     source = _owr_local_media_source_new_cached(-1, "Default audio input",
-            OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_CAPTURE);
+        OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_CAPTURE);
 
     return g_list_prepend(NULL, source);
 }

@@ -34,13 +34,13 @@
 #endif
 #include "owr_local.h"
 
+#include "owr_device_list_private.h"
 #include "owr_local_media_source.h"
 #include "owr_local_media_source_private.h"
 #include "owr_media_source.h"
 #include "owr_media_source_private.h"
-#include "owr_device_list_private.h"
-#include "owr_utils.h"
 #include "owr_private.h"
+#include "owr_utils.h"
 
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
@@ -66,11 +66,11 @@ static GList *get_test_sources(OwrMediaType types)
     if (g_once_init_enter(&cached_sources)) {
         GList *sources = NULL;
 
-	source = _owr_local_media_source_new_cached(-1, "Audio test source", OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_TEST);
-	sources = g_list_append(sources, OWR_MEDIA_SOURCE(source));
+        source = _owr_local_media_source_new_cached(-1, "Audio test source", OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_TEST);
+        sources = g_list_append(sources, OWR_MEDIA_SOURCE(source));
 
-	source = _owr_local_media_source_new_cached(-1, "Video test source", OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_TEST);
-	sources = g_list_append(sources, OWR_MEDIA_SOURCE(source));
+        source = _owr_local_media_source_new_cached(-1, "Video test source", OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_TEST);
+        sources = g_list_append(sources, OWR_MEDIA_SOURCE(source));
 
         g_once_init_leave(&cached_sources, sources);
     }
@@ -127,7 +127,6 @@ void owr_get_capture_sources(OwrMediaType types, OwrCaptureSourcesCallback callb
         _owr_utils_call_closure_with_list(merger, get_test_sources(types));
 
         g_closure_unref(merger);
-    } else {
+    } else
         _owr_get_capture_devices(types, closure);
-    }
 }
