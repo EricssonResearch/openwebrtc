@@ -400,8 +400,13 @@
             });
         }
 
-        this.createOffer = function (successCallback, failureCallback, options) {
+        this.createOffer = function () {
             checkArguments("createOffer", "function, function, object", 2, arguments);
+
+            internalCreateOffer(arguments[2]).then(arguments[0]).catch(arguments[1]);
+        };
+
+        function internalCreateOffer(options) {
             if (options) {
                 checkDictionary("RTCOfferOptions", options, {
                     "offerToReceiveVideo": "number | boolean",
@@ -410,12 +415,14 @@
             }
             checkClosedState("createOffer");
 
-            enqueueOperation(function () {
-                queuedCreateOffer(successCallback, failureCallback, options);
+            return new Promise(function (resolve, reject) {
+                enqueueOperation(function () {
+                    queuedCreateOffer(resolve, reject, options);
+                });
             });
-        };
+        }
 
-        function queuedCreateOffer(successCallback, failureCallback, options) {
+        function queuedCreateOffer(resolve, reject, options) {
             options = options || {};
             options.offerToReceiveAudio = +options.offerToReceiveAudio || 0;
             options.offerToReceiveVideo = +options.offerToReceiveVideo || 0;
@@ -452,15 +459,20 @@
             });
 
             completeQueuedOperation(function () {
-                successCallback(new RTCSessionDescription({
+                resolve(new RTCSessionDescription({
                     "type": "offer",
                     "sdp": SDP.generate(localSessionInfoSnapshot)
                 }));
             });
         }
 
-        this.createAnswer = function (successCallback, failureCallback, options) {
+        this.createAnswer = function () {
             checkArguments("createAnswer", "function, function, object", 2, arguments);
+
+            internalCreateAnswer(arguments[2]).then(arguments[0]).catch(arguments[1]);
+        };
+
+        function internalCreateAnswer(options) {
             if (options) {
                 checkDictionary("RTCOfferOptions", options, {
                     "offerToReceiveVideo": "number | boolean",
@@ -469,16 +481,18 @@
             }
             checkClosedState("createAnswer");
 
-            enqueueOperation(function () {
-                queuedCreateAnswer(successCallback, failureCallback, options);
+            return new Promise(function (resolve, reject) {
+                enqueueOperation(function () {
+                    queuedCreateAnswer(resolve, reject, options);
+                });
             });
-        };
+        }
 
-        function queuedCreateAnswer(successCallback, failureCallback, options) {
+        function queuedCreateAnswer(resolve, reject, options) {
 
             if (!remoteSessionInfo) {
                 completeQueuedOperation(function () {
-                    failureCallback(createError("InvalidStateError",
+                    reject(createError("InvalidStateError",
                         "createAnswer: no remote description set"));
                 });
                 return;
@@ -510,7 +524,7 @@
                 localTrackInfos);
 
             completeQueuedOperation(function () {
-                successCallback(new RTCSessionDescription({
+                resolve(new RTCSessionDescription({
                     "type": "answer",
                     "sdp": SDP.generate(localSessionInfoSnapshot)
                 }));
@@ -519,20 +533,27 @@
 
         var latestLocalDescriptionCallback;
 
-        this.setLocalDescription = function (description, successCallback, failureCallback) {
+        this.setLocalDescription = function () {
             checkArguments("setLocalDescription", "RTCSessionDescription, function, function", 3, arguments);
-            checkClosedState("setLocalDescription");
 
-            enqueueOperation(function () {
-                queuedSetLocalDescription(description, successCallback, failureCallback);
-            }, true);
+            internalSetLocalDescription(arguments[0]).then(arguments[1]).catch(arguments[2]);
         };
 
-        function queuedSetLocalDescription(description, successCallback, failureCallback) {
+        function internalSetLocalDescription(description) {
+            checkClosedState("setLocalDescription");
+
+            return new Promise(function (resolve, reject) {
+                enqueueOperation(function () {
+                    queuedSetLocalDescription(description, resolve, reject);
+                }, true);
+            });
+        }
+
+        function queuedSetLocalDescription(description, resolve, reject) {
             var targetState = signalingStateMap[a.signalingState]["setLocal:" + description.type];
             if (!targetState) {
                 completeQueuedOperation(function () {
-                    failureCallback(createError("InvalidSessionDescriptionError",
+                    reject(createError("InvalidSessionDescriptionError",
                         "setLocalDescription: description type \"" +
                         entityReplace(description.type) + "\" invalid for the current state \"" +
                         a.signalingState + "\""));
@@ -553,7 +574,7 @@
             whenPeerHandler(function () {
                 latestLocalDescriptionCallback = function () {
                     a.signalingState = targetState;
-                    successCallback();
+                    resolve();
                 };
 
                 if (hasNewMediaDescriptions)
@@ -567,20 +588,27 @@
             });
         }
 
-        this.setRemoteDescription = function (description, successCallback, failureCallback) {
+        this.setRemoteDescription = function () {
             checkArguments("setRemoteDescription", "RTCSessionDescription, function, function", 3, arguments);
-            checkClosedState("setRemoteDescription");
 
-            enqueueOperation(function () {
-                queuedSetRemoteDescription(description, successCallback, failureCallback);
-            }, true);
+            internalSetRemoteDescription(arguments[0]).then(arguments[1]).catch(arguments[2]);
         };
 
-        function queuedSetRemoteDescription(description, successCallback, failureCallback) {
+        function internalSetRemoteDescription(description) {
+            checkClosedState("setRemoteDescription");
+
+            return new Promise(function (resolve, reject) {
+                enqueueOperation(function () {
+                    queuedSetRemoteDescription(description, resolve, reject);
+                }, true);
+            });
+        }
+
+        function queuedSetRemoteDescription(description, resolve, reject) {
             var targetState = signalingStateMap[a.signalingState]["setRemote:" + description.type];
             if (!targetState) {
                 completeQueuedOperation(function () {
-                    failureCallback(createError("InvalidSessionDescriptionError",
+                    reject(createError("InvalidSessionDescriptionError",
                         "setRemoteDescription: description type \"" +
                         entityReplace(description.type) + "\" invalid for the current state \"" +
                         a.signalingState + "\""));
@@ -628,7 +656,7 @@
                 peerHandler.prepareToSend(remoteSessionInfo, isInitiator);
                 completeQueuedOperation(function () {
                     a.signalingState = targetState;
-                    successCallback();
+                    resolve();
                 });
             });
         };
@@ -639,19 +667,26 @@
             checkClosedState("updateIce");
         };
 
-        this.addIceCandidate = function (candidate, successCallback, failureCallback) {
+        this.addIceCandidate = function () {
             checkArguments("addIceCandidate", "RTCIceCandidate, function, function", 3, arguments);
+
+            internalAddIceCandidate(arguments[0]).then(arguments[1]).catch(arguments[2]);
+        };
+
+        function internalAddIceCandidate(candidate) {
             checkClosedState("addIceCandidate");
 
-            enqueueOperation(function () {
-                queuedAddIceCandidate(candidate, successCallback, failureCallback);
+            return new Promise(function (resolve, reject) {
+                enqueueOperation(function () {
+                    queuedAddIceCandidate(candidate, resolve, reject);
+                });
             });
         };
 
-        function queuedAddIceCandidate(candidate, successCallback, failureCallback) {
+        function queuedAddIceCandidate(candidate, resolve, reject) {
             if (!remoteSessionInfo) {
                 completeQueuedOperation(function () {
-                    failureCallback(createError("InvalidStateError",
+                    reject(createError("InvalidStateError",
                         "addIceCandidate: no remote description set"));
                 });
                 return;
@@ -669,7 +704,7 @@
 
             if (!parsedCandidate) {
                 completeQueuedOperation(function () {
-                    failureCallback(createError("SyntaxError",
+                    reject(createError("SyntaxError",
                         "addIceCandidate: failed to parse candidate attribute"));
                 });
                 return;
@@ -678,7 +713,7 @@
             var mdesc = remoteSessionInfo.mediaDescriptions[candidate.sdpMLineIndex];
             if (!mdesc) {
                 completeQueuedOperation(function () {
-                    failureCallback(createError("SyntaxError",
+                    reject(createError("SyntaxError",
                         "addIceCandidate: no matching media description for sdpMLineIndex: " +
                         entityReplace(candidate.sdpMLineIndex)));
                 });
@@ -692,7 +727,7 @@
             whenPeerHandler(function () {
                 peerHandler.addRemoteCandidate(parsedCandidate, candidate.sdpMLineIndex,
                     mdesc.ice.ufrag, mdesc.ice.password);
-                completeQueuedOperation(successCallback);
+                completeQueuedOperation(resolve);
             });
         };
 
