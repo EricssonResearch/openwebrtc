@@ -133,6 +133,7 @@ setup_sink_for_aec(GstElement *sink)
 
 #elif defined(__ANDROID__)
     /* openslessink */
+    g_object_set(G_OBJECT(sink), "stream-type", 0 /* voice */, NULL);
 
 #elif defined(__APPLE__) && !TARGET_IPHONE_SIMULATOR
     /* osxaudiosink */

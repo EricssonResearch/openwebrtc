@@ -425,6 +425,7 @@ setup_source_for_aec(GstElement *src)
 
 #elif defined(__ANDROID__)
     /* openslessrc */
+    g_object_set(G_OBJECT(src), "preset", 4 /* voice-communication */, NULL);
 
 #elif defined(__APPLE__) && !TARGET_IPHONE_SIMULATOR
     /* osxaudiosrc */
