@@ -426,14 +426,14 @@ static void handle_offer(gchar *message, gsize message_length)
     JsonReader *reader;
     gint i, number_of_media_descriptions;
     const gchar *mtype;
-    OwrMediaType media_type;
+    OwrMediaType media_type = OWR_MEDIA_TYPE_UNKNOWN;
     gboolean rtcp_mux;
     OwrMediaSession *media_session;
     GObject *session;
     gint j, number_of_payloads, number_of_candidates;
-    gint64 payload_type, clock_rate, channels;
+    gint64 payload_type, clock_rate, channels = 0;
     const gchar *encoding_name;
-    gboolean ccm_fir, nack_pli;
+    gboolean ccm_fir = FALSE, nack_pli = FALSE;
     OwrCodecType codec_type;
     OwrCandidate *remote_candidate;
     OwrComponentType component_type;
