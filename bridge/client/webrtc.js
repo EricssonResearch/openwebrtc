@@ -110,6 +110,11 @@
 
     function getUserMedia(options, successCallback, errorCallback) {
         checkArguments("getUserMedia", "object, function, function", 3, arguments);
+
+        internalGetUserMedia(options).then(successCallback).catch(errorCallback);
+    }
+
+    function internalGetUserMedia(options) {
         checkDictionary("MediaStreamConstraints", options, {
             "audio": "object | boolean",
             "video": "object | boolean"
@@ -122,16 +127,18 @@
             });
         }
 
-        var client = {};
-        client.gotSources = function (sourceInfos) {
-            var trackList = sourceInfos.map(function (sourceInfo) {
-                return new MediaStreamTrack(sourceInfo);
-            });
-            bridge.removeObjectRef(client);
-            setTimeout(successCallback, 0, new MediaStream(trackList));
-        };
+        return new Promise(function (resolve, reject) {
+            var client = {};
+            client.gotSources = function (sourceInfos) {
+                var trackList = sourceInfos.map(function (sourceInfo) {
+                    return new MediaStreamTrack(sourceInfo);
+                });
+                bridge.removeObjectRef(client);
+                resolve(new MediaStream(trackList));
+            };
 
-        bridge.requestSources(options, bridge.createObjectRef(client, "gotSources"));
+            bridge.requestSources(options, bridge.createObjectRef(client, "gotSources"));
+        });
     }
 
     getUserMedia.toString = function () {
