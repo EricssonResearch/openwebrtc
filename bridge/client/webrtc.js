@@ -401,9 +401,18 @@
         }
 
         this.createOffer = function () {
-            checkArguments("createOffer", "function, function, object", 2, arguments);
+            // backwards compatibility with callback based method
+            var callbackArgsError = getArgumentsError("function, function, object", 2, arguments);
+            if (!callbackArgsError) {
+                internalCreateOffer(arguments[2]).then(arguments[0]).catch(arguments[1]);
+                return;
+            }
 
-            internalCreateOffer(arguments[2]).then(arguments[0]).catch(arguments[1]);
+            var promiseArgsError = getArgumentsError("object", 0, arguments);
+            if (!promiseArgsError)
+                return internalCreateOffer(arguments[0]);
+
+            throwNoMatchingSignature("createOffer", promiseArgsError, callbackArgsError);
         };
 
         function internalCreateOffer(options) {
@@ -467,9 +476,18 @@
         }
 
         this.createAnswer = function () {
-            checkArguments("createAnswer", "function, function, object", 2, arguments);
+            // backwards compatibility with callback based method
+            var callbackArgsError = getArgumentsError("function, function, object", 2, arguments);
+            if (!callbackArgsError) {
+                internalCreateAnswer(arguments[2]).then(arguments[0]).catch(arguments[1]);
+                return;
+            }
 
-            internalCreateAnswer(arguments[2]).then(arguments[0]).catch(arguments[1]);
+            var promiseArgsError = getArgumentsError("object", 0, arguments);
+            if (!promiseArgsError)
+                return internalCreateAnswer(arguments[0]);
+
+            throwNoMatchingSignature("createAnswer", promiseArgsError, callbackArgsError);
         };
 
         function internalCreateAnswer(options) {
@@ -534,9 +552,18 @@
         var latestLocalDescriptionCallback;
 
         this.setLocalDescription = function () {
-            checkArguments("setLocalDescription", "RTCSessionDescription, function, function", 3, arguments);
+            // backwards compatibility with callback based method
+            var callbackArgsError = getArgumentsError("RTCSessionDescription, function, function", 3, arguments);
+            if (!callbackArgsError) {
+                internalSetLocalDescription(arguments[0]).then(arguments[1]).catch(arguments[2]);
+                return;
+            }
 
-            internalSetLocalDescription(arguments[0]).then(arguments[1]).catch(arguments[2]);
+            var promiseArgsError = getArgumentsError("RTCSessionDescription", 1, arguments);
+            if (!promiseArgsError)
+                return internalSetLocalDescription(arguments[0]);
+
+            throwNoMatchingSignature("setLocalDescription", promiseArgsError, callbackArgsError);
         };
 
         function internalSetLocalDescription(description) {
@@ -589,9 +616,18 @@
         }
 
         this.setRemoteDescription = function () {
-            checkArguments("setRemoteDescription", "RTCSessionDescription, function, function", 3, arguments);
+            // backwards compatibility with callback based method
+            var callbackArgsError = getArgumentsError("RTCSessionDescription, function, function", 3, arguments);
+            if (!callbackArgsError) {
+                internalSetRemoteDescription(arguments[0]).then(arguments[1]).catch(arguments[2]);
+                return;
+            }
 
-            internalSetRemoteDescription(arguments[0]).then(arguments[1]).catch(arguments[2]);
+            var promiseArgsError = getArgumentsError("RTCSessionDescription", 1, arguments);
+            if (!promiseArgsError)
+                return internalSetRemoteDescription(arguments[0]);
+
+            throwNoMatchingSignature("setRemoteDescription", promiseArgsError, callbackArgsError);
         };
 
         function internalSetRemoteDescription(description) {
@@ -668,9 +704,18 @@
         };
 
         this.addIceCandidate = function () {
-            checkArguments("addIceCandidate", "RTCIceCandidate, function, function", 3, arguments);
+            // backwards compatibility with callback based method
+            var callbackArgsError = getArgumentsError("RTCIceCandidate, function, function", 3, arguments);
+            if (!callbackArgsError) {
+                internalAddIceCandidate(arguments[0]).then(arguments[1]).catch(arguments[2]);
+                return;
+            }
 
-            internalAddIceCandidate(arguments[0]).then(arguments[1]).catch(arguments[2]);
+            var promiseArgsError = getArgumentsError("RTCIceCandidate", 1, arguments);
+            if (!promiseArgsError)
+                return internalAddIceCandidate(arguments[0]);
+
+            throwNoMatchingSignature("addIceCandidate", promiseArgsError, callbackArgsError);
         };
 
         function internalAddIceCandidate(candidate) {
@@ -822,6 +867,11 @@
         function checkClosedState(name) {
             if (a.signalingState == "closed")
                 throw createError("InvalidStateError", name + ": signalingState is \"closed\"");
+        }
+
+        function throwNoMatchingSignature(name, primaryError, legacyError) {
+            throw createError("TypeError", name + ": no matching method signature. " +
+                "Alternative 1: " + primaryError + ", Alternative 2 (legacy): " + legacyError);
         }
 
         function maybeDispatchNegotiationNeeded() {
