@@ -26,10 +26,10 @@ libopenwebrtc_la_SOURCES = \
 libopenwebrtc_la_LIBADD = \
     $(top_builddir)/local/libopenwebrtc_local.la \
     $(top_builddir)/transport/libopenwebrtc_transport.la \
+    $(OPENWEBRTC_GST_PLUGINS_LIBS) \
     $(GSTREAMER_LIBS) \
     $(GLIB_LIBS) \
     $(ORC_LIBS) \
-    $(OPENWEBRTC_GST_PLUGINS_LIBS) \
     -lm
 
 libopenwebrtc_la_DEPENDENCIES = \
@@ -103,6 +103,10 @@ Owr_0_1_gir_FILES = \
     ../transport/owr_candidate.c \
     ../transport/owr_session.h \
     ../transport/owr_session.c \
+    ../transport/owr_data_channel.h \
+    ../transport/owr_data_channel.c \
+    ../transport/owr_data_session.h \
+    ../transport/owr_data_session.c \
     ../transport/owr_media_session.h \
     ../transport/owr_media_session.c \
     ../transport/owr_payload.h \

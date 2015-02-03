@@ -132,6 +132,8 @@ build(){
         export GSTREAMER_LIBS="-L${src_dir}/openwebrtc-deps-${target}/lib -L${src_dir}/openwebrtc-deps-${target}/lib/gstreamer-1.0 -lgstaudiotestsrc -lgstvideotestsrc -lgstcoreelements -lgstalaw -lgstmulaw -lgstopus -lopus -lgstapp -lgstaudioconvert -lgstaudioresample -lgstvolume -lgstvideoconvert -lgstvpx -lvpx -lgstopengl -lgstinter -lgstgl-1.0"
         export GSTREAMER_LIBS="$GSTREAMER_LIBS $PLATFORM_GSTREAMER_LIBS -lgstrtpmanager -lgstrtp -lgstsrtp -lsrtp -lgstvideocrop -lgstvideofilter -lgstvideoparsersbad -lgstvideorate -lgstvideoscale -lgstnice -lgstcontroller-1.0 -lgstpbutils-1.0 -lgstnet-1.0 -lgstrtp-1.0 -lgstbadvideo-1.0 -lgstbadbase-1.0"
         export GSTREAMER_LIBS="$GSTREAMER_LIBS -lgsttag-1.0 -lgstapp-1.0 -lgstaudio-1.0 -lgstvideo-1.0 -lgstcodecparsers-1.0 -lgstbase-1.0 -lgstreamer-1.0 -lm"
+        export GSTREAMER_SCTP_CFLAGS="-I${src_dir}/openwebrtc-deps-${target}/include/gstreamer-1.0"
+        export GSTREAMER_SCTP_LIBS="-L${src_dir}/openwebrtc-deps-${target}/lib -lgstsctp-1.0"
         export SEED_CFLAGS="-isystem ${src_dir}/openwebrtc-deps-${target}/include/seed-gtk3 -isystem ${src_dir}/openwebrtc-deps-${target}/include/gobject-introspection-1.0"
         export SEED_LIBS="-L${src_dir}/openwebrtc-deps-${target}/lib/seed-gtk3 -lseed-gtk3 -lseed_sandbox $seed_platform_libs -lgirepository-1.0 -lgirepository-internals $PLATFORM_CXX_LIBS"
         export JSON_GLIB_CFLAGS="-I${src_dir}/openwebrtc-deps-${target}/include/json-glib-1.0"
@@ -142,8 +144,8 @@ build(){
         export ELIB_LIBS="-L${src_dir}/openwebrtc-deps-${target}/lib -lelib"
         export ESDP_CFLAGS="-I${src_dir}/openwebrtc-deps-${target}/include/esdp"
         export ESDP_LIBS="-L${src_dir}/openwebrtc-deps-${target}/lib -lesdp"
-        export OPENWEBRTC_GST_PLUGINS_CFLAGS="-I${src_dir}/openwebrtc-deps-${target}/include/plugins"
-        export OPENWEBRTC_GST_PLUGINS_LIBS="-L${src_dir}/openwebrtc-deps-${target}/lib/gstreamer-1.0 -lgsterdtls -lssl -lcrypto -lgstvideorepair -lgstopenh264 -lopenh264 $PLATFORM_OWR_GST_PLUGINS_LIBS $PLATFORM_CXX_LIBS"
+        export OPENWEBRTC_GST_PLUGINS_CFLAGS="-I${src_dir}/openwebrtc-deps-${target}/include/plugins -I${src_dir}/openwebrtc-deps-${target}/include"
+        export OPENWEBRTC_GST_PLUGINS_LIBS="-L${src_dir}/openwebrtc-deps-${target}/lib/gstreamer-1.0 -lgsterdtls -lssl -lcrypto -lgstvideorepair -lgstopenh264 -lopenh264 -lgstsctp -lusrsctp $PLATFORM_OWR_GST_PLUGINS_LIBS $PLATFORM_CXX_LIBS"
         $REPO_ROOT/autogen.sh \
             --prefix=${installdir} \
             --host=${target_triple} \

@@ -3,6 +3,7 @@
  * Copyright (c) 2014, Centricular Ltd
  *     Author: Sebastian Dröge <sebastian@centricular.com>
  *     Author: Arun Raghavan <arun@centricular.com>
+ * Copyright (c) 2015, Collabora Ltd.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -37,6 +38,11 @@
 
 #include "owr_audio_payload.h"
 #include "owr_candidate_private.h"
+#include "owr_data_channel.h"
+#include "owr_data_channel_private.h"
+#include "owr_data_channel_protocol.h"
+#include "owr_data_session.h"
+#include "owr_data_session_private.h"
 #include "owr_media_session.h"
 #include "owr_media_session_private.h"
 #include "owr_media_source.h"
@@ -52,9 +58,13 @@
 #include "owr_video_payload.h"
 
 #include <agent.h>
+#include <gst/app/gstappsink.h>
+#include <gst/app/gstappsrc.h>
 #include <gst/gst.h>
 #include <gst/rtp/gstrtcpbuffer.h>
 #include <gst/rtp/gstrtpbuffer.h>
+#include <gst/sctp/sctpreceivemeta.h>
+#include <gst/sctp/sctpsendmeta.h>
 
 #include <math.h>
 #include <stdio.h>
@@ -74,6 +84,22 @@ static guint next_transport_agent_id = 1;
 #define OWR_TRANSPORT_AGENT_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_TRANSPORT_AGENT, OwrTransportAgentPrivate))
 
 G_DEFINE_TYPE(OwrTransportAgent, owr_transport_agent, G_TYPE_OBJECT)
+
+typedef struct {
+    OwrDataChannelState state;
+    GstElement *data_sink, *data_src;
+    guint session_id;
+
+    gboolean ordered;
+    gint max_packet_life_time;
+    gint max_packet_retransmits;
+    gchar *protocol;
+    gboolean negotiated;
+    guint16 id;
+    gchar *label;
+    GRWLock rw_mutex;
+    guint ctrl_bytes_sent;
+} DataChannel;
 
 typedef struct {
     GstElement *dtls_srtp_bin_rtp;
@@ -102,6 +128,10 @@ struct _OwrTransportAgentPrivate {
 
     guint deferred_helper_server_adds;
     GList *helper_server_infos;
+
+    GHashTable *data_channels;
+    GRWLock data_channels_rw_mutex;
+    gboolean data_session_added, data_session_established;
 };
 
 typedef struct {
@@ -119,11 +149,15 @@ static void owr_transport_agent_get_property(GObject *object, guint property_id,
 
 static void add_helper_server_info(GResolver *resolver, GAsyncResult *result, GHashTable *info);
 static void update_helper_servers(OwrTransportAgent *transport_agent, guint stream_id);
-static gboolean add_media_session(GHashTable *args);
+static gboolean add_session(GHashTable *args);
 static guint get_stream_id(OwrTransportAgent *transport_agent, OwrSession *session);
-static OwrMediaSession * get_media_session(OwrTransportAgent *transport_agent, guint stream_id);
+static OwrSession * get_session(OwrTransportAgent *transport_agent, guint stream_id);
 static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_agent, guint stream_id, gboolean rtcp_mux);
 static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_agent, guint stream_id, gboolean rtcp_mux);
+static void prepare_transport_bin_data_receive_elements(OwrTransportAgent *transport_agent,
+    guint stream_id);
+static void prepare_transport_bin_data_send_elements(OwrTransportAgent *transport_agent,
+    guint stream_id);
 static void set_send_ssrc_and_cname(OwrTransportAgent *agent, OwrMediaSession *media_session);
 static void on_new_candidate(NiceAgent *nice_agent, NiceCandidate *nice_candidate, OwrTransportAgent *transport_agent);
 static void on_candidate_gathering_done(NiceAgent *nice_agent, guint stream_id, OwrTransportAgent *transport_agent);
@@ -143,11 +177,51 @@ static void on_ssrc_active(GstElement *rtpbin, guint session_id, guint ssrc, Owr
 static void on_new_jitterbuffer(GstElement *rtpbin, GstElement *jitterbuffer, guint session_id, guint ssrc, OwrTransportAgent *transport_agent);
 static void prepare_rtcp_stats(OwrMediaSession *media_session, GObject *rtp_source);
 
+static void data_channel_free(DataChannel *data_channel);
+static gboolean create_datachannel(OwrTransportAgent *transport_agent, guint32 session_id,
+    OwrDataChannel *data_channel);
+static void sctpdec_pad_added(GstElement *sctpdec, GstPad *sctpdec_srcpad,
+    OwrTransportAgent *transport_agent);
+static void sctpdec_pad_removed(GstElement *sctpdec, GstPad *sctpdec_srcpad,
+    OwrTransportAgent *transport_agent);
+static void on_sctp_association_established(GstElement *sctpenc, gboolean established,
+    OwrTransportAgent *transport_agent);
+static GstFlowReturn new_data_callback(GstAppSink *appsink, OwrTransportAgent *transport_agent);
+static gboolean create_datachannel_appsrc(OwrTransportAgent *transport_agent,
+    OwrDataChannel *data_channel);
+static gboolean is_valid_sctp_stream_id(OwrTransportAgent *transport_agent, guint32 session_id,
+    guint16 sctp_stream_id, gboolean remotly_initiated);
+static guint8 * create_datachannel_open_request(OwrDataChannelChannelType channel_type,
+    guint32 reliability_param, guint16 priority, const gchar *label, guint16 label_len,
+    const gchar *protocol, guint16 protocol_len, guint32 *buf_size);
+static guint8 * create_datachannel_ack(guint32 *buf_size);
+static void handle_data_channel_control_message(OwrTransportAgent *transport_agent, guint8 *data,
+    guint32 size, guint16 sctp_stream_id);
+static void handle_data_channel_open_request(OwrTransportAgent *transport_agent, guint8 *data,
+    guint32 size, guint16 sctp_stream_id);
+static gboolean emit_data_channel_requested(GHashTable *args);
+static void handle_data_channel_ack(OwrTransportAgent *transport_agent, guint8 *data, guint32 size,
+    guint16 sctp_stream_id);
+static void handle_data_channel_message(OwrTransportAgent *transport_agent, guint8 *data,
+    guint32 size, guint16 sctp_stream_id, gboolean is_binary);
+static gboolean emit_incoming_data(GHashTable *args);
+static guint64 on_datachannel_request_bytes_sent(OwrTransportAgent *transport_agent,
+    OwrDataChannel *data_channel);
+static void on_datachannel_close(OwrTransportAgent *transport_agent, OwrDataChannel *data_channel);
+static gboolean is_same_session(gpointer stream_id_p, OwrSession *session1, OwrSession *session2);
+static void on_new_datachannel(OwrTransportAgent *transport_agent, OwrDataChannel *data_channel,
+    OwrDataSession *data_session);
+static void complete_data_channel_and_ack(OwrTransportAgent *transport_agent,
+    OwrDataChannel *data_channel);
+static void on_datachannel_send(OwrTransportAgent *transport_agent, guint8 *data, guint len,
+    gboolean is_binary, OwrDataChannel *data_channel);
+static void maybe_close_data_channel(OwrTransportAgent *transport_agent, DataChannel *data_channel_info);
+
 static void owr_transport_agent_finalize(GObject *object)
 {
     OwrTransportAgent *transport_agent = NULL;
     OwrTransportAgentPrivate *priv = NULL;
-    OwrMediaSession *media_session = NULL;
+    OwrSession *session = NULL;
     GList *sessions_list = NULL, *item = NULL;
 
     g_return_if_fail(_owr_is_initialized());
@@ -160,13 +234,19 @@ static void owr_transport_agent_finalize(GObject *object)
 
     sessions_list = g_hash_table_get_values(priv->sessions);
     for (item = sessions_list; item; item = item->next) {
-        media_session = item->data;
-        _owr_media_session_clear_closures(media_session);
+        session = item->data;
+        if (OWR_IS_MEDIA_SESSION(session))
+            _owr_media_session_clear_closures(OWR_MEDIA_SESSION(session));
+        else if (OWR_IS_DATA_SESSION(session))
+            _owr_data_session_clear_closures(OWR_DATA_SESSION(session));
     }
     g_list_free(sessions_list);
 
     g_hash_table_destroy(priv->sessions);
     g_mutex_clear(&priv->sessions_lock);
+
+    g_hash_table_destroy(priv->data_channels);
+    g_rw_lock_clear(&priv->data_channels_rw_mutex);
 
     g_object_unref(priv->nice_agent);
 
@@ -326,6 +406,11 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
     priv->deferred_helper_server_adds = 0;
     priv->helper_server_infos = NULL;
 
+    priv->data_channels = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, (GDestroyNotify)data_channel_free);
+    g_rw_lock_init(&priv->data_channels_rw_mutex);
+    priv->data_session_added = FALSE;
+    priv->data_session_established = FALSE;
+
     priv->send_bins = g_hash_table_new_full(NULL, NULL, NULL, g_free);
 }
 
@@ -449,7 +534,7 @@ void owr_transport_agent_add_session(OwrTransportAgent *agent, OwrSession *sessi
     GHashTable *args;
 
     g_return_if_fail(agent);
-    g_return_if_fail(OWR_IS_MEDIA_SESSION(session));
+    g_return_if_fail(OWR_IS_MEDIA_SESSION(session) || OWR_IS_DATA_SESSION(session));
 
     args = g_hash_table_new(g_str_hash, g_str_equal);
     g_hash_table_insert(args, "transport_agent", agent);
@@ -457,7 +542,7 @@ void owr_transport_agent_add_session(OwrTransportAgent *agent, OwrSession *sessi
 
     g_object_ref(agent);
 
-    _owr_schedule_with_hash_table((GSourceFunc)add_media_session, args);
+    _owr_schedule_with_hash_table((GSourceFunc)add_session, args);
 }
 
 
@@ -746,101 +831,103 @@ static void on_new_send_source(OwrTransportAgent *transport_agent,
         maybe_handle_new_send_source_with_payload(transport_agent, media_session);
 }
 
-static gboolean add_media_session(GHashTable *args)
+static gboolean add_session(GHashTable *args)
 {
     OwrTransportAgent *transport_agent;
-    OwrMediaSession *media_session, *s;
-    GHashTable *sessions;
-    GHashTableIter iter;
-    gboolean media_session_found = FALSE;
-    gboolean rtcp_mux = FALSE;
+    OwrTransportAgentPrivate *priv;
+    OwrSession *session;
     guint stream_id;
-    GObject *session;
+    gboolean rtcp_mux = TRUE;
+    GObject *rtp_session;
     GstStateChangeReturn state_change_status;
 
     g_return_val_if_fail(args, FALSE);
 
     transport_agent = g_hash_table_lookup(args, "transport_agent");
-    media_session = OWR_MEDIA_SESSION(g_hash_table_lookup(args, "session"));
+    session = OWR_SESSION(g_hash_table_lookup(args, "session"));
 
     g_return_val_if_fail(transport_agent, FALSE);
-    g_return_val_if_fail(media_session, FALSE);
+    g_return_val_if_fail(session, FALSE);
 
-    sessions = transport_agent->priv->sessions;
-
-    g_mutex_lock(&transport_agent->priv->sessions_lock);
-    g_hash_table_iter_init(&iter, sessions);
-    while (g_hash_table_iter_next(&iter, NULL, (gpointer)&s)) {
-        if (s == media_session) {
-            media_session_found = TRUE;
-            break;
-        }
-    }
-
-    if (media_session_found) {
+    priv = transport_agent->priv;
+    g_mutex_lock(&priv->sessions_lock);
+    if (g_hash_table_find(priv->sessions, (GHRFunc)is_same_session, session)) {
         g_warning("An already existing media session was added to the transport agent. Action aborted.");
-        g_mutex_unlock(&transport_agent->priv->sessions_lock);
+        g_mutex_unlock(&priv->sessions_lock);
         goto end;
     }
-    g_mutex_unlock(&transport_agent->priv->sessions_lock);
+    g_mutex_unlock(&priv->sessions_lock);
 
-    g_object_get(media_session, "rtcp-mux", &rtcp_mux, NULL);
-    stream_id = nice_agent_add_stream(transport_agent->priv->nice_agent, rtcp_mux ? 1 : 2);
+    if (OWR_IS_MEDIA_SESSION(session))
+        g_object_get(OWR_MEDIA_SESSION(session), "rtcp-mux", &rtcp_mux, NULL);
+
+    stream_id = nice_agent_add_stream(priv->nice_agent, rtcp_mux ? 1 : 2);
     if (!stream_id) {
         g_warning("Failed to add media session.");
         goto end;
     }
 
-    g_mutex_lock(&transport_agent->priv->sessions_lock);
-    g_hash_table_insert(sessions, GUINT_TO_POINTER(stream_id), media_session);
-    g_object_ref(media_session);
-    g_mutex_unlock(&transport_agent->priv->sessions_lock);
+    g_mutex_lock(&priv->sessions_lock);
+    g_hash_table_insert(priv->sessions, GUINT_TO_POINTER(stream_id), session);
+    g_object_ref(session);
+    g_mutex_unlock(&priv->sessions_lock);
 
     update_helper_servers(transport_agent, stream_id);
 
-    _owr_media_session_set_on_send_source(media_session,
-        g_cclosure_new_object_swap(G_CALLBACK(on_new_send_source), G_OBJECT(transport_agent)));
-
-    _owr_media_session_set_on_send_payload(media_session,
-        g_cclosure_new_object_swap(G_CALLBACK(on_new_send_payload), G_OBJECT(transport_agent)));
-
-    _owr_session_set_on_remote_candidate(OWR_SESSION(media_session),
+    _owr_session_set_on_remote_candidate(session,
         g_cclosure_new_object_swap(G_CALLBACK(on_new_remote_candidate), G_OBJECT(transport_agent)));
 
-    prepare_transport_bin_receive_elements(transport_agent, stream_id, rtcp_mux);
-    prepare_transport_bin_send_elements(transport_agent, stream_id, rtcp_mux);
+    if (OWR_IS_MEDIA_SESSION(session)) {
+        _owr_media_session_set_on_send_source(OWR_MEDIA_SESSION(session),
+            g_cclosure_new_object_swap(G_CALLBACK(on_new_send_source), G_OBJECT(transport_agent)));
 
-    set_send_ssrc_and_cname(transport_agent, media_session);
+        _owr_media_session_set_on_send_payload(OWR_MEDIA_SESSION(session),
+            g_cclosure_new_object_swap(G_CALLBACK(on_new_send_payload), G_OBJECT(transport_agent)));
 
-    if (transport_agent->priv->local_max_port > 0) {
-        nice_agent_set_port_range(transport_agent->priv->nice_agent, stream_id, NICE_COMPONENT_TYPE_RTP,
-            transport_agent->priv->local_min_port, transport_agent->priv->local_max_port);
+        prepare_transport_bin_receive_elements(transport_agent, stream_id, rtcp_mux);
+        prepare_transport_bin_send_elements(transport_agent, stream_id, rtcp_mux);
+
+        set_send_ssrc_and_cname(transport_agent, OWR_MEDIA_SESSION(session));
+    } else if (OWR_IS_DATA_SESSION(session)) {
+        _owr_data_session_set_on_datachannel_added(OWR_DATA_SESSION(session),
+            g_cclosure_new_object_swap(G_CALLBACK(on_new_datachannel),
+            G_OBJECT(transport_agent)));
+        prepare_transport_bin_data_receive_elements(transport_agent, stream_id);
+        prepare_transport_bin_data_send_elements(transport_agent, stream_id);
+    }
+
+    if (priv->local_max_port > 0) {
+        nice_agent_set_port_range(priv->nice_agent, stream_id, NICE_COMPONENT_TYPE_RTP,
+            priv->local_min_port, priv->local_max_port);
         if (!rtcp_mux) {
-            nice_agent_set_port_range(transport_agent->priv->nice_agent, stream_id, NICE_COMPONENT_TYPE_RTCP,
-                transport_agent->priv->local_min_port, transport_agent->priv->local_max_port);
+            nice_agent_set_port_range(priv->nice_agent, stream_id, NICE_COMPONENT_TYPE_RTCP,
+                priv->local_min_port, priv->local_max_port);
         }
     }
 
-    if (!transport_agent->priv->deferred_helper_server_adds)
-        nice_agent_gather_candidates(transport_agent->priv->nice_agent, stream_id);
+    if (!priv->deferred_helper_server_adds)
+        nice_agent_gather_candidates(priv->nice_agent, stream_id);
 
-    /* stream_id is used as the rtpbin session id */
-    g_signal_emit_by_name(transport_agent->priv->rtpbin, "get-internal-session", stream_id, &session);
-    g_object_set_data(session, "session_id", GUINT_TO_POINTER(stream_id));
-    g_signal_connect_after(session, "on-sending-rtcp", G_CALLBACK(on_sending_rtcp), transport_agent);
-    g_object_unref(session);
+    if (OWR_IS_MEDIA_SESSION(session)) {
+        /* stream_id is used as the rtpbin session id */
+        g_signal_emit_by_name(priv->rtpbin, "get-internal-session", stream_id, &rtp_session);
+        g_object_set_data(rtp_session, "session_id", GUINT_TO_POINTER(stream_id));
+        g_signal_connect_after(rtp_session, "on-sending-rtcp", G_CALLBACK(on_sending_rtcp), transport_agent);
+        g_object_unref(rtp_session);
 
-    maybe_handle_new_send_source_with_payload(transport_agent, media_session);
-    if (_owr_session_get_remote_candidates(OWR_SESSION(media_session)))
-        on_new_remote_candidate(transport_agent, FALSE, OWR_SESSION(media_session));
-    if (_owr_session_get_forced_remote_candidates(OWR_SESSION(media_session)))
-        on_new_remote_candidate(transport_agent, TRUE, OWR_SESSION(media_session));
+        maybe_handle_new_send_source_with_payload(transport_agent, OWR_MEDIA_SESSION(session));
+    }
+
+    if (_owr_session_get_remote_candidates(session))
+        on_new_remote_candidate(transport_agent, FALSE, session);
+    if (_owr_session_get_forced_remote_candidates(session))
+        on_new_remote_candidate(transport_agent, TRUE, session);
 
     state_change_status = gst_element_set_state(transport_agent->priv->pipeline, GST_STATE_PLAYING);
     g_warn_if_fail(state_change_status != GST_STATE_CHANGE_FAILURE);
 
 end:
-    g_object_unref(media_session);
+    g_object_unref(session);
     g_object_unref(transport_agent);
     g_hash_table_unref(args);
     return FALSE;
@@ -938,7 +1025,7 @@ static GstElement *add_dtls_srtp_bin(OwrTransportAgent *transport_agent, guint s
     gboolean is_encoder, gboolean is_rtcp, GstElement *bin)
 {
     OwrTransportAgentPrivate *priv;
-    OwrMediaSession *media_session;
+    OwrSession *session;
     GstElement *dtls_srtp_bin = NULL;
     gchar *element_name, *connection_id;
     gchar *cert, *key, *cert_key;
@@ -957,43 +1044,43 @@ static GstElement *add_dtls_srtp_bin(OwrTransportAgent *transport_agent, guint s
     g_object_set(dtls_srtp_bin, "connection-id", connection_id, NULL);
     g_free(connection_id);
 
-    media_session = get_media_session(transport_agent, stream_id);
-    g_warn_if_fail(OWR_IS_MEDIA_SESSION(media_session));
+    session = get_session(transport_agent, stream_id);
 
     if (!is_encoder) {
-        g_object_get(media_session, "dtls-certificate", &cert, NULL);
-        g_object_get(media_session, "dtls-key", &key, NULL);
+        g_object_get(session, "dtls-certificate", &cert, NULL);
+        g_object_get(session, "dtls-key", &key, NULL);
 
         if (!g_strcmp0(cert, "(auto)")) {
             g_object_get(dtls_srtp_bin, "pem", &cert, NULL);
-            g_object_set(media_session, "dtls-certificate", cert, NULL);
-            g_object_set(media_session, "dtls-key", NULL, NULL);
+            g_object_set(session, "dtls-certificate", cert, NULL);
+            g_object_set(session, "dtls-key", NULL, NULL);
         } else {
             cert_key = (cert && key) ? g_strdup_printf("%s%s", cert, key) : NULL;
             g_object_set(dtls_srtp_bin, "pem", cert_key, NULL);
             g_free(cert_key);
         }
         g_signal_connect_object(dtls_srtp_bin, "notify::peer-pem",
-            G_CALLBACK(on_dtls_peer_certificate), media_session, 0);
+            G_CALLBACK(on_dtls_peer_certificate), session, 0);
         g_free(cert);
         g_free(key);
     } else {
         gboolean dtls_client_mode;
-        g_object_get(media_session, "dtls-client-mode", &dtls_client_mode, NULL);
+        g_object_get(session, "dtls-client-mode", &dtls_client_mode, NULL);
         g_object_set(dtls_srtp_bin, "is-client", dtls_client_mode, NULL);
     }
 
-    g_signal_connect_object(media_session, is_encoder ? "notify::outgoing-srtp-key"
-        : "notify::incoming-srtp-key", G_CALLBACK(set_srtp_key), dtls_srtp_bin, 0);
-    g_signal_connect_object(G_OBJECT(media_session), "notify::dtls-certificate",
-        G_CALLBACK(maybe_disable_dtls), dtls_srtp_bin, 0);
-    maybe_disable_dtls(media_session, NULL, dtls_srtp_bin);
-
+    if (OWR_IS_MEDIA_SESSION(session)) {
+        g_signal_connect_object(OWR_MEDIA_SESSION(session), is_encoder ? "notify::outgoing-srtp-key"
+            : "notify::incoming-srtp-key", G_CALLBACK(set_srtp_key), dtls_srtp_bin, 0);
+        g_signal_connect_object(OWR_MEDIA_SESSION(session), "notify::dtls-certificate",
+            G_CALLBACK(maybe_disable_dtls), dtls_srtp_bin, 0);
+        maybe_disable_dtls(OWR_MEDIA_SESSION(session), NULL, dtls_srtp_bin);
+    }
     added_ok = gst_bin_add(GST_BIN(bin), dtls_srtp_bin);
     g_warn_if_fail(added_ok);
 
     g_free(element_name);
-    g_object_unref(media_session);
+    g_object_unref(session);
 
     return dtls_srtp_bin;
 }
@@ -1058,75 +1145,75 @@ static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, g
 
     /* RTP */
     if (rtp) {
-	rtpbin_pad_name = g_strdup_printf("send_rtp_src_%u", stream_id);
-	dtls_srtp_pad_name = g_strdup_printf("rtp_sink_%u", stream_id);
+        rtpbin_pad_name = g_strdup_printf("send_rtp_src_%u", stream_id);
+        dtls_srtp_pad_name = g_strdup_printf("rtp_sink_%u", stream_id);
 
-	sink_pad = gst_element_get_request_pad(dtls_srtp_bin_rtp, dtls_srtp_pad_name);
-	g_assert(GST_IS_PAD(sink_pad));
-	ghost_pad_and_add_to_bin(sink_pad, send_output_bin, dtls_srtp_pad_name);
-	gst_object_unref(sink_pad);
+        sink_pad = gst_element_get_request_pad(dtls_srtp_bin_rtp, dtls_srtp_pad_name);
+        g_assert(GST_IS_PAD(sink_pad));
+        ghost_pad_and_add_to_bin(sink_pad, send_output_bin, dtls_srtp_pad_name);
+        gst_object_unref(sink_pad);
 
-	linked_ok = gst_element_link_pads(transport_agent->priv->rtpbin, rtpbin_pad_name,
-		send_output_bin, dtls_srtp_pad_name);
-	g_warn_if_fail(linked_ok);
+        linked_ok = gst_element_link_pads(transport_agent->priv->rtpbin, rtpbin_pad_name,
+            send_output_bin, dtls_srtp_pad_name);
+        g_warn_if_fail(linked_ok);
 
-	g_free(rtpbin_pad_name);
-	g_free(dtls_srtp_pad_name);
+        g_free(rtpbin_pad_name);
+        g_free(dtls_srtp_pad_name);
     }
 
     /* RTCP */
     if (rtcp && !send_bin_info->linked_rtcp) {
-	output_selector_name = g_strdup_printf("rtcp_output_selector_%u", stream_id);
-	output_selector = gst_element_factory_make("output-selector", output_selector_name);
-	g_free(output_selector_name);
-	g_object_set(output_selector, "pad-negotiation-mode", 0, NULL);
-	gst_bin_add(GST_BIN(send_output_bin), output_selector);
-	gst_element_sync_state_with_parent(output_selector);
+        output_selector_name = g_strdup_printf("rtcp_output_selector_%u", stream_id);
+        output_selector = gst_element_factory_make("output-selector", output_selector_name);
+        g_free(output_selector_name);
+        g_object_set(output_selector, "pad-negotiation-mode", 0, NULL);
+        gst_bin_add(GST_BIN(send_output_bin), output_selector);
+        gst_element_sync_state_with_parent(output_selector);
 
-	rtpbin_pad_name = g_strdup_printf("send_rtcp_src_%u", stream_id);
-	dtls_srtp_pad_name = g_strdup_printf("rtcp_sink_%u",  stream_id);
+        rtpbin_pad_name = g_strdup_printf("send_rtcp_src_%u", stream_id);
+        dtls_srtp_pad_name = g_strdup_printf("rtcp_sink_%u",  stream_id);
 
-	/* RTCP muxing */
-	sink_pad = gst_element_get_request_pad(dtls_srtp_bin_rtp, dtls_srtp_pad_name);
-	g_assert(GST_IS_PAD(sink_pad));
-	src_pad = gst_element_get_request_pad(output_selector, "src_%u");
-	g_assert(GST_IS_PAD(src_pad));
-	linked_ok = gst_pad_link(src_pad, sink_pad) == GST_PAD_LINK_OK;
-	g_warn_if_fail(linked_ok);
-	g_object_set(output_selector, "active-pad", src_pad, NULL);
-	gst_object_unref(src_pad);
-	gst_object_unref(sink_pad);
+        /* RTCP muxing */
+        sink_pad = gst_element_get_request_pad(dtls_srtp_bin_rtp, dtls_srtp_pad_name);
+        g_assert(GST_IS_PAD(sink_pad));
+        src_pad = gst_element_get_request_pad(output_selector, "src_%u");
+        g_assert(GST_IS_PAD(src_pad));
+        linked_ok = gst_pad_link(src_pad, sink_pad) == GST_PAD_LINK_OK;
+        g_warn_if_fail(linked_ok);
+        g_object_set(output_selector, "active-pad", src_pad, NULL);
+        gst_object_unref(src_pad);
+        gst_object_unref(sink_pad);
 
-	if (dtls_srtp_bin_rtcp) {
-	    /* RTCP standalone */
-	    sink_pad = gst_element_get_request_pad(dtls_srtp_bin_rtcp, dtls_srtp_pad_name);
-	    g_assert(GST_IS_PAD(sink_pad));
-	    src_pad = gst_element_get_request_pad(output_selector, "src_%u");
-	    g_assert(GST_IS_PAD(src_pad));
-	    linked_ok = gst_pad_link(src_pad, sink_pad) == GST_PAD_LINK_OK;
-	    g_warn_if_fail(linked_ok);
-	    g_object_set(output_selector, "active-pad", src_pad, NULL);
-	    gst_object_unref(src_pad);
-	    gst_object_unref(sink_pad);
+        if (dtls_srtp_bin_rtcp) {
+            /* RTCP standalone */
+            sink_pad = gst_element_get_request_pad(dtls_srtp_bin_rtcp, dtls_srtp_pad_name);
+            g_assert(GST_IS_PAD(sink_pad));
+            src_pad = gst_element_get_request_pad(output_selector, "src_%u");
+            g_assert(GST_IS_PAD(src_pad));
+            linked_ok = gst_pad_link(src_pad, sink_pad) == GST_PAD_LINK_OK;
+            g_warn_if_fail(linked_ok);
+            g_object_set(output_selector, "active-pad", src_pad, NULL);
+            gst_object_unref(src_pad);
+            gst_object_unref(sink_pad);
 
-	    media_session = get_media_session(transport_agent, stream_id);
-	    g_signal_connect_object(media_session, "notify::rtcp-mux", G_CALLBACK(on_rtcp_mux_changed),
-		    output_selector, 0);
-	    g_object_unref(media_session);
-	}
+            media_session = OWR_MEDIA_SESSION(get_session(transport_agent, stream_id));
+            g_signal_connect_object(media_session, "notify::rtcp-mux", G_CALLBACK(on_rtcp_mux_changed),
+                output_selector, 0);
+            g_object_unref(media_session);
+        }
 
-	sink_pad = gst_element_get_static_pad(output_selector, "sink");
-	ghost_pad_and_add_to_bin(sink_pad, send_output_bin, dtls_srtp_pad_name);
-	gst_object_unref(sink_pad);
+        sink_pad = gst_element_get_static_pad(output_selector, "sink");
+        ghost_pad_and_add_to_bin(sink_pad, send_output_bin, dtls_srtp_pad_name);
+        gst_object_unref(sink_pad);
 
-	linked_ok = gst_element_link_pads(transport_agent->priv->rtpbin, rtpbin_pad_name,
-		send_output_bin, dtls_srtp_pad_name);
-	g_warn_if_fail(linked_ok);
+        linked_ok = gst_element_link_pads(transport_agent->priv->rtpbin, rtpbin_pad_name,
+            send_output_bin, dtls_srtp_pad_name);
+        g_warn_if_fail(linked_ok);
 
-	g_free(rtpbin_pad_name);
-	g_free(dtls_srtp_pad_name);
+        g_free(rtpbin_pad_name);
+        g_free(dtls_srtp_pad_name);
 
-	send_bin_info->linked_rtcp = TRUE;
+        send_bin_info->linked_rtcp = TRUE;
     }
 }
 
@@ -1263,6 +1350,103 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
     }
 }
 
+
+static void prepare_transport_bin_data_receive_elements(OwrTransportAgent *transport_agent,
+    guint stream_id)
+{
+    OwrTransportAgentPrivate *priv;
+    GstElement *nice_element, *dtls_srtp_bin, *sctpdec;
+    GstElement *receive_input_bin;
+    gchar *name;
+    OwrDataSession *data_session;
+    gboolean link_ok, sync_ok;
+
+    g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
+    priv = transport_agent->priv;
+
+    data_session = OWR_DATA_SESSION(g_hash_table_lookup(priv->sessions,
+        GUINT_TO_POINTER(stream_id)));
+    g_return_if_fail(data_session);
+
+    name = g_strdup_printf("receive-input-bin-%u", stream_id);
+    receive_input_bin = gst_bin_new(name);
+    g_free(name);
+
+    if (!gst_bin_add(GST_BIN(priv->transport_bin), receive_input_bin)) {
+        GST_ERROR("Failed to add receive-input-bin-%u to parent bin", stream_id);
+        return;
+    }
+    if (!gst_element_sync_state_with_parent(receive_input_bin)) {
+        GST_ERROR("Failed to sync receive-input-bin-%u to parent bin", stream_id);
+        return;
+    }
+
+    nice_element = add_nice_element(transport_agent, stream_id, FALSE, FALSE, receive_input_bin);
+    dtls_srtp_bin = add_dtls_srtp_bin(transport_agent, stream_id, FALSE, FALSE, receive_input_bin);
+    sctpdec = _owr_data_session_create_decoder(data_session);
+    g_return_if_fail(nice_element && dtls_srtp_bin && sctpdec);
+
+    g_object_set_data(G_OBJECT(sctpdec), "session-id", GUINT_TO_POINTER(stream_id));
+    gst_bin_add(GST_BIN(receive_input_bin), sctpdec);
+    g_signal_connect(sctpdec, "pad-added", (GCallback)sctpdec_pad_added, transport_agent);
+    g_signal_connect(sctpdec, "pad-removed", (GCallback)sctpdec_pad_removed, transport_agent);
+
+    link_ok = gst_element_link_pads(dtls_srtp_bin, "data_src", sctpdec, "sink");
+    link_ok &= gst_element_link(nice_element, dtls_srtp_bin);
+    g_warn_if_fail(link_ok);
+
+    sync_ok = gst_element_sync_state_with_parent(sctpdec);
+    sync_ok &= gst_element_sync_state_with_parent(dtls_srtp_bin);
+    sync_ok &= gst_element_sync_state_with_parent(nice_element);
+    g_warn_if_fail(sync_ok);
+}
+
+static void prepare_transport_bin_data_send_elements(OwrTransportAgent *transport_agent,
+    guint stream_id)
+{
+    OwrTransportAgentPrivate *priv;
+    GstElement *nice_element, *dtls_srtp_bin, *sctpenc, *send_output_bin;
+    OwrDataSession *data_session;
+    gboolean linked_ok, sync_ok;
+    gchar *name;
+
+    g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
+    priv = transport_agent->priv;
+    data_session = OWR_DATA_SESSION(g_hash_table_lookup(priv->sessions, GUINT_TO_POINTER(stream_id)));
+
+    name = g_strdup_printf("send-output-bin-%u", stream_id);
+    send_output_bin = gst_bin_new(name);
+    g_free(name);
+
+    if (!gst_bin_add(GST_BIN(transport_agent->priv->transport_bin), send_output_bin)) {
+        GST_ERROR("Failed to add send-output-bin-%u to parent bin", stream_id);
+        return;
+    }
+    if (!gst_element_sync_state_with_parent(send_output_bin)) {
+        GST_ERROR("Failed to sync send-output-bin-%u to parent bin", stream_id);
+        return;
+    }
+
+    nice_element = add_nice_element(transport_agent, stream_id, TRUE, FALSE, send_output_bin);
+    dtls_srtp_bin = add_dtls_srtp_bin(transport_agent, stream_id, TRUE, FALSE, send_output_bin);
+    sctpenc = _owr_data_session_create_encoder(data_session);
+    g_warn_if_fail(sctpenc);
+
+    g_object_set_data(G_OBJECT(sctpenc), "session-id", GUINT_TO_POINTER(stream_id));
+    gst_bin_add(GST_BIN(send_output_bin), sctpenc);
+    g_signal_connect(sctpenc, "sctp-association-established",
+        G_CALLBACK(on_sctp_association_established), transport_agent);
+
+    linked_ok = gst_element_link(dtls_srtp_bin, nice_element);
+    linked_ok &= gst_element_link_pads(sctpenc, "src", dtls_srtp_bin, "data_sink");
+    g_warn_if_fail(linked_ok);
+
+    sync_ok = gst_element_sync_state_with_parent(nice_element);
+    sync_ok &= gst_element_sync_state_with_parent(dtls_srtp_bin);
+    sync_ok &= gst_element_sync_state_with_parent(sctpenc);
+    g_warn_if_fail(sync_ok);
+}
+
 static void set_send_ssrc_and_cname(OwrTransportAgent *transport_agent, OwrMediaSession *media_session)
 {
     guint stream_id;
@@ -1289,7 +1473,7 @@ static gboolean emit_new_candidate(GHashTable *args)
 {
     OwrTransportAgent *transport_agent;
     OwrTransportAgentPrivate *priv;
-    OwrMediaSession *media_session;
+    OwrSession *session;
     NiceCandidate *nice_candidate;
     OwrCandidate *owr_candidate;
     gchar *ufrag = NULL, *password = NULL;
@@ -1301,8 +1485,8 @@ static gboolean emit_new_candidate(GHashTable *args)
 
     nice_candidate = (NiceCandidate *)g_hash_table_lookup(args, "nice_candidate");
     g_return_val_if_fail(nice_candidate, FALSE);
-    media_session = get_media_session(transport_agent, nice_candidate->stream_id);
-    g_return_val_if_fail(OWR_IS_MEDIA_SESSION(media_session), FALSE);
+    session = get_session(transport_agent, nice_candidate->stream_id);
+    g_return_val_if_fail(OWR_IS_SESSION(session), FALSE);
 
     if (!nice_candidate->username || !nice_candidate->password) {
         got_credentials = nice_agent_get_local_credentials(priv->nice_agent,
@@ -1324,10 +1508,10 @@ static gboolean emit_new_candidate(GHashTable *args)
     g_return_val_if_fail(owr_candidate, FALSE);
     nice_candidate_free(nice_candidate);
 
-    g_signal_emit_by_name(media_session, "on-new-candidate", owr_candidate);
+    g_signal_emit_by_name(session, "on-new-candidate", owr_candidate);
     g_object_unref(owr_candidate);
 
-    g_object_unref(media_session);
+    g_object_unref(session);
     g_hash_table_destroy(args);
     g_object_unref(transport_agent);
 
@@ -1353,32 +1537,30 @@ static void on_new_candidate(NiceAgent *nice_agent, NiceCandidate *nice_candidat
 
 static gboolean emit_candidate_gathering_done(GHashTable *args)
 {
-    OwrMediaSession *media_session;
+    OwrSession *session;
 
-    media_session = OWR_MEDIA_SESSION(g_hash_table_lookup(args, "media_session"));
-    g_return_val_if_fail(OWR_IS_MEDIA_SESSION(media_session), FALSE);
-
-    g_signal_emit_by_name(media_session, "on-candidate-gathering-done", NULL);
+    session = g_hash_table_lookup(args, "session");
+    g_signal_emit_by_name(session, "on-candidate-gathering-done", NULL);
 
     g_hash_table_destroy(args);
-    g_object_unref(media_session);
+    g_object_unref(session);
 
     return FALSE;
 }
 
 static void on_candidate_gathering_done(NiceAgent *nice_agent, guint stream_id, OwrTransportAgent *transport_agent)
 {
-    OwrMediaSession *media_session;
+    OwrSession *session;
     GHashTable *args;
 
     g_return_if_fail(nice_agent);
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
 
-    media_session = get_media_session(transport_agent, stream_id);
-    g_return_if_fail(OWR_IS_MEDIA_SESSION(media_session));
+    session = get_session(transport_agent, stream_id);
+    g_return_if_fail(OWR_IS_SESSION(session));
 
     args = g_hash_table_new(g_str_hash, g_str_equal);
-    g_hash_table_insert(args, "media_session", media_session);
+    g_hash_table_insert(args, "session", session);
 
     _owr_schedule_with_hash_table((GSourceFunc)emit_candidate_gathering_done, args);
 }
@@ -1403,14 +1585,14 @@ static guint get_stream_id(OwrTransportAgent *transport_agent, OwrSession *sessi
     return 0;
 }
 
-static OwrMediaSession * get_media_session(OwrTransportAgent *transport_agent, guint stream_id)
+static OwrSession * get_session(OwrTransportAgent *transport_agent, guint stream_id)
 {
-    OwrMediaSession *s;
+    OwrSession *s;
 
     g_mutex_lock(&transport_agent->priv->sessions_lock);
-    s = OWR_MEDIA_SESSION(g_hash_table_lookup(transport_agent->priv->sessions, GUINT_TO_POINTER(stream_id)));
+    s = OWR_SESSION(g_hash_table_lookup(transport_agent->priv->sessions, GUINT_TO_POINTER(stream_id)));
     if (s)
-      g_object_ref (s);
+        g_object_ref(s);
     g_mutex_unlock(&transport_agent->priv->sessions_lock);
 
     return s;
@@ -1652,7 +1834,7 @@ static void signal_incoming_source(OwrMediaType type, OwrTransportAgent *transpo
 
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
 
-    media_session = get_media_session(transport_agent, stream_id);
+    media_session = OWR_MEDIA_SESSION(get_session(transport_agent, stream_id));
 
     source = _owr_remote_media_source_new(type, stream_id, codec_type,
         transport_agent->priv->transport_bin);
@@ -1711,7 +1893,7 @@ static void on_rtpbin_pad_added(GstElement *rtpbin, GstPad *new_pad, OwrTranspor
 
         sscanf(new_pad_name, "recv_rtp_src_%u_%u_%u", &session_id, &ssrc, &pt);
 
-        media_session = get_media_session(transport_agent, session_id);
+        media_session = OWR_MEDIA_SESSION(get_session(transport_agent, session_id));
         payload = _owr_media_session_get_receive_payload(media_session, pt);
 
         g_return_if_fail(OWR_IS_MEDIA_SESSION(media_session));
@@ -1877,7 +2059,7 @@ static GstCaps * on_rtpbin_request_pt_map(GstElement *rtpbin, guint session_id, 
     g_return_val_if_fail(rtpbin, NULL);
     g_return_val_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent), NULL);
 
-    media_session = get_media_session(transport_agent, session_id);
+    media_session = OWR_MEDIA_SESSION(get_session(transport_agent, session_id));
     g_return_val_if_fail(OWR_IS_MEDIA_SESSION(media_session), NULL);
 
     payload = _owr_media_session_get_receive_payload(media_session, pt);
@@ -1930,7 +2112,7 @@ static GstElement * on_rtpbin_request_aux_sender(G_GNUC_UNUSED GstElement *rtpbi
     guint pt, rtx_time;
     gchar *tmp;
 
-    media_session = get_media_session(transport_agent, session_id);
+    media_session = OWR_MEDIA_SESSION(get_session(transport_agent, session_id));
     g_return_val_if_fail(media_session, NULL);
 
     payload = _owr_media_session_get_send_payload(media_session);
@@ -1972,7 +2154,7 @@ static GstElement * on_rtpbin_request_aux_receiver(G_GNUC_UNUSED GstElement *rtp
     GstElement *rtxrecv;
     GstStructure *pt_map;
 
-    media_session = get_media_session(transport_agent, session_id);
+    media_session = OWR_MEDIA_SESSION(get_session(transport_agent, session_id));
     g_return_val_if_fail(media_session, NULL);
 
     pt_map = _owr_media_session_get_receive_rtx_pt_map(media_session);
@@ -2025,7 +2207,7 @@ static gboolean on_sending_rtcp(GObject *session, GstBuffer *buffer, gboolean ea
     g_return_val_if_fail(OWR_IS_TRANSPORT_AGENT(agent), do_not_suppress);
 
     session_id = GPOINTER_TO_UINT(g_object_get_data(session, "session_id"));
-    media_session = get_media_session(agent, session_id);
+    media_session = OWR_MEDIA_SESSION(get_session(agent, session_id));
     g_return_val_if_fail(OWR_IS_MEDIA_SESSION(media_session), do_not_suppress);
     send_payload = _owr_media_session_get_send_payload(media_session);
     if (send_payload) {
@@ -2107,7 +2289,7 @@ static void on_ssrc_active(GstElement *rtpbin, guint session_id, guint ssrc,
     GObject *rtp_session, *rtp_source;
 
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
-    media_session = get_media_session(transport_agent, session_id);
+    media_session = OWR_MEDIA_SESSION(get_session(transport_agent, session_id));
     g_return_if_fail(OWR_IS_MEDIA_SESSION(media_session));
 
     g_signal_emit_by_name(rtpbin, "get-internal-session", session_id, &rtp_session);
@@ -2123,12 +2305,1008 @@ static void on_new_jitterbuffer(G_GNUC_UNUSED GstElement *rtpbin, GstElement *ji
     OwrMediaSession *media_session;
 
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
-    media_session = get_media_session(transport_agent, session_id);
+    media_session = OWR_MEDIA_SESSION(get_session(transport_agent, session_id));
     g_return_if_fail(OWR_IS_MEDIA_SESSION(media_session));
 
     if (_owr_media_session_want_receive_rtx(media_session))
         g_object_set(jitterbuffer, "do-retransmission", TRUE, NULL);
     g_object_unref(media_session);
+}
+
+static void data_channel_free(DataChannel *data_channel_info)
+{
+    if (data_channel_info->data_sink)
+        gst_object_unref(data_channel_info->data_sink);
+    if (data_channel_info->data_src)
+        gst_object_unref(data_channel_info->data_src);
+    g_free(data_channel_info->protocol);
+    g_free(data_channel_info->label);
+    g_rw_lock_clear(&data_channel_info->rw_mutex);
+    g_free(data_channel_info);
+}
+
+static gboolean create_datachannel(OwrTransportAgent *transport_agent, guint32 session_id, OwrDataChannel *data_channel)
+{
+    OwrTransportAgentPrivate *priv = transport_agent->priv;
+    guint8 *buf;
+    guint32 buf_size, reliability_param;
+    GstFlowReturn flow_ret;
+    GstBuffer *gstbuf;
+    gboolean result = FALSE;
+    OwrDataChannelChannelType channel_type;
+    guint priority = 0; /* TODO: Support priority.. it is not really well defined yet.. */
+    DataChannel *data_channel_info;
+    gboolean ordered, negotiated;
+    gint max_packet_life_time, max_packet_retransmits, sctp_stream_id;
+    gchar *protocol, *label;
+
+    g_object_get(data_channel, "ordered", &ordered, "max-packet-life-time", &max_packet_life_time,
+        "max-retransmits", &max_packet_retransmits, "protocol", &protocol, "negotiated", &negotiated,
+        "id", &sctp_stream_id, "label", &label, NULL);
+
+    if (max_packet_life_time != -1 && max_packet_retransmits != -1) {
+        g_warning("Invalid datachannel parameters");
+        g_free(protocol);
+        g_free(label);
+        goto end;
+    }
+
+    if (!negotiated && !is_valid_sctp_stream_id(transport_agent, session_id, sctp_stream_id, FALSE)) {
+        g_warning("Invalid stream_id");
+        g_free(protocol);
+        g_free(label);
+        goto end;
+    }
+
+    g_rw_lock_writer_lock(&priv->data_channels_rw_mutex);
+    if (g_hash_table_contains(priv->data_channels, GUINT_TO_POINTER(sctp_stream_id))) {
+        g_warning("Data channel with stream id %u already exists", sctp_stream_id);
+        g_free(protocol);
+        g_free(label);
+        goto end;
+    }
+
+    data_channel_info = g_new0(DataChannel, 1);
+    data_channel_info->state = OWR_DATA_CHANNEL_STATE_CONNECTING;
+    data_channel_info->id = sctp_stream_id;
+    data_channel_info->label = label;
+    data_channel_info->protocol = protocol;
+    data_channel_info->session_id = session_id;
+    data_channel_info->ctrl_bytes_sent = 0;
+    data_channel_info->negotiated = negotiated;
+    data_channel_info->ordered = ordered;
+    data_channel_info->max_packet_life_time = max_packet_life_time;
+    data_channel_info->max_packet_retransmits = max_packet_retransmits;
+
+    g_rw_lock_init(&data_channel_info->rw_mutex);
+    g_hash_table_insert(priv->data_channels, GUINT_TO_POINTER(sctp_stream_id),
+        (gpointer)data_channel_info);
+    g_rw_lock_writer_unlock(&priv->data_channels_rw_mutex);
+
+    if (!create_datachannel_appsrc(transport_agent, data_channel))
+        goto end;
+
+    if (!negotiated) {
+        channel_type = (ordered ? 0 : 0x80) | (max_packet_life_time  != -1 ? 0x02 : 0) |
+            (max_packet_retransmits != -1 ? 0x01 : 0);
+
+        reliability_param = 0;
+        if (max_packet_life_time != -1)
+            reliability_param += max_packet_life_time;
+        if (max_packet_retransmits != -1)
+            reliability_param += max_packet_retransmits;
+
+        buf = create_datachannel_open_request(channel_type, reliability_param, priority,
+            label, strlen(label), protocol, strlen(protocol), &buf_size);
+        gstbuf = gst_buffer_new_wrapped(buf, buf_size);
+        gst_sctp_buffer_add_send_meta(gstbuf, OWR_DATA_CHANNEL_PPID_CONTROL, TRUE,
+            GST_SCTP_SEND_META_PARTIAL_RELIABILITY_NONE, 0);
+        data_channel_info->ctrl_bytes_sent += buf_size;
+        flow_ret = gst_app_src_push_buffer(GST_APP_SRC(data_channel_info->data_src), gstbuf);
+
+        if (flow_ret != GST_FLOW_OK)
+            g_critical("Failed to push data buffer: %s", gst_flow_get_name(flow_ret));
+    }
+    result = TRUE;
+
+end:
+    return result;
+}
+
+
+static void sctpdec_pad_added(GstElement *sctpdec, GstPad *sctpdec_srcpad,
+    OwrTransportAgent *transport_agent)
+{
+    OwrTransportAgentPrivate *priv = transport_agent->priv;
+    GstElement *data_sink, *receive_input_bin;
+    GstPad *appsink_sinkpad;
+    GstPadLinkReturn link_ret;
+    guint sctp_stream_id, session_id;
+    gchar *name;
+    GstAppSinkCallbacks callbacks;
+    DataChannel *data_channel_info;
+    gboolean remotely_initiated = FALSE, valid_id;
+
+    name = gst_pad_get_name(sctpdec_srcpad);
+    sscanf(name, "src_%u", &sctp_stream_id);
+    g_free(name);
+    session_id = GPOINTER_TO_UINT(g_object_get_data(G_OBJECT(sctpdec), "session-id"));
+
+    g_rw_lock_writer_lock(&priv->data_channels_rw_mutex);
+    data_channel_info = (DataChannel *)g_hash_table_lookup(priv->data_channels,
+        GUINT_TO_POINTER(sctp_stream_id));
+    if (!data_channel_info) {
+        remotely_initiated = TRUE;
+        data_channel_info = g_new0(DataChannel, 1);
+        data_channel_info->state = OWR_DATA_CHANNEL_STATE_CONNECTING;
+        data_channel_info->session_id = session_id;
+        data_channel_info->label = NULL;
+        data_channel_info->protocol = NULL;
+        data_channel_info->negotiated = FALSE;
+        g_rw_lock_init(&data_channel_info->rw_mutex);
+        g_hash_table_insert(priv->data_channels, GUINT_TO_POINTER(sctp_stream_id),
+            (gpointer)data_channel_info);
+    }
+    g_rw_lock_writer_unlock(&priv->data_channels_rw_mutex);
+
+    valid_id = is_valid_sctp_stream_id(transport_agent, session_id, sctp_stream_id,
+        remotely_initiated);
+    if (!data_channel_info->negotiated && !valid_id) {
+        g_warning("Invalid stream_id");
+        g_hash_table_remove(priv->data_channels, GUINT_TO_POINTER(sctp_stream_id));
+        g_signal_emit_by_name(sctpdec, "reset-stream", sctp_stream_id);
+        return;
+    }
+
+    name = g_strdup_printf("data_sink_%u", sctp_stream_id);
+    data_sink = gst_element_factory_make("appsink", name);
+    g_assert(data_sink);
+    g_free(name);
+
+    g_object_set(G_OBJECT(data_sink), "emit-signals", FALSE, "drop", FALSE, "sync", FALSE, "async",
+        FALSE, NULL);
+
+    g_assert(data_channel_info->data_sink == NULL);
+
+    callbacks.eos = NULL;
+    callbacks.new_preroll = NULL;
+    callbacks.new_sample = (GstFlowReturn (*)(GstAppSink *, gpointer)) new_data_callback;
+    gst_app_sink_set_callbacks(GST_APP_SINK(data_sink), &callbacks,
+        transport_agent, NULL);
+
+    gst_object_ref(data_sink);
+    data_channel_info->data_sink = data_sink;
+    data_channel_info->id = sctp_stream_id;
+
+    name = g_strdup_printf("receive-input-bin-%u", session_id);
+    receive_input_bin = gst_bin_get_by_name(GST_BIN(priv->transport_bin), name);
+    g_free(name);
+
+    gst_bin_add(GST_BIN(receive_input_bin), data_sink);
+    gst_object_unref(receive_input_bin);
+
+    appsink_sinkpad = gst_element_get_static_pad(data_sink, "sink");
+
+    link_ret = gst_pad_link(sctpdec_srcpad, appsink_sinkpad);
+    g_assert(GST_PAD_LINK_SUCCESSFUL(link_ret));
+    gst_object_unref(appsink_sinkpad);
+
+    gst_element_sync_state_with_parent(data_sink);
+}
+
+static void sctpdec_pad_removed(GstElement *sctpdec, GstPad *sctpdec_srcpad,
+    OwrTransportAgent *transport_agent)
+{
+    OwrTransportAgentPrivate *priv = transport_agent->priv;
+    guint id;
+    DataChannel *data_channel_info;
+    GstPad *appsrc_srcpad, *sctpenc_sinkpad;
+    gboolean already_closing = FALSE;
+    gchar *name;
+    OwrDataSession *data_session;
+    OwrDataChannel *data_channel;
+    GstElement *receive_bin, *sctpenc, *send_bin;
+
+    name = gst_pad_get_name(sctpdec_srcpad);
+    if (!sscanf(name, "src_%u", &id)) {
+        g_free(name);
+        return;
+    }
+    g_free(name);
+
+    g_rw_lock_writer_lock(&priv->data_channels_rw_mutex);
+    data_channel_info = g_hash_table_lookup(priv->data_channels, GUINT_TO_POINTER(id));
+    g_assert(data_channel_info);
+    if (data_channel_info->state == OWR_DATA_CHANNEL_STATE_CLOSING) {
+        already_closing = TRUE;
+    } else {
+        data_channel_info->state = OWR_DATA_CHANNEL_STATE_CLOSING;
+        data_session = OWR_DATA_SESSION(
+            get_session(transport_agent, data_channel_info->session_id));
+        g_assert(OWR_IS_DATA_SESSION(data_session));
+        data_channel = _owr_data_session_get_datachannel(data_session,
+            data_channel_info->id);
+        g_assert(data_channel);
+    }
+    g_rw_lock_writer_unlock(&priv->data_channels_rw_mutex);
+
+    if (already_closing)
+        return;
+
+    _owr_data_channel_set_ready_state(data_channel, OWR_DATA_CHANNEL_READY_STATE_CLOSING);
+
+    receive_bin = GST_ELEMENT(gst_element_get_parent(data_channel_info->data_sink));
+    gst_element_set_state(data_channel_info->data_sink, GST_STATE_NULL);
+    gst_bin_remove(GST_BIN(receive_bin), data_channel_info->data_sink);
+    gst_object_unref(receive_bin);
+
+    gst_object_unref(data_channel_info->data_sink);
+    g_rw_lock_writer_lock(&data_channel_info->rw_mutex);
+    data_channel_info->data_sink = NULL;
+    g_rw_lock_writer_unlock(&data_channel_info->rw_mutex);
+
+    appsrc_srcpad = gst_element_get_static_pad(data_channel_info->data_src, "src");
+    sctpenc_sinkpad = gst_pad_get_peer(appsrc_srcpad);
+
+    sctpenc = gst_pad_get_parent_element(sctpenc_sinkpad);
+    send_bin = GST_ELEMENT(gst_element_get_parent(sctpenc));
+
+    gst_element_set_state(data_channel_info->data_src, GST_STATE_NULL);
+    gst_bin_remove(GST_BIN(send_bin), data_channel_info->data_src);
+    gst_object_unref(send_bin);
+
+    gst_object_unref(data_channel_info->data_src);
+    g_rw_lock_writer_lock(&data_channel_info->rw_mutex);
+    data_channel_info->data_src = NULL;
+    g_rw_lock_writer_unlock(&data_channel_info->rw_mutex);
+
+    gst_pad_unlink(appsrc_srcpad, sctpenc_sinkpad);
+    gst_element_release_request_pad(sctpenc, sctpenc_sinkpad);
+    gst_object_unref(sctpenc);
+
+    maybe_close_data_channel(transport_agent, data_channel_info);
+
+    gst_object_unref(appsrc_srcpad);
+
+    OWR_UNUSED(sctpdec);
+}
+
+static void on_sctp_association_established(GstElement *sctpenc, gboolean established,
+    OwrTransportAgent *transport_agent)
+{
+    guint session_id;
+    OwrDataSession *data_session;
+    GList *data_channels, *it;
+
+    transport_agent->priv->data_session_established = established;
+    if (established) {
+        g_log(G_LOG_DOMAIN, G_LOG_LEVEL_INFO, "An SCTP association has been established");
+        session_id = GPOINTER_TO_UINT(g_object_get_data(G_OBJECT(sctpenc), "session-id"));
+        data_session = OWR_DATA_SESSION(get_session(transport_agent, session_id));
+        g_assert(data_session);
+
+        data_channels = _owr_data_session_get_datachannels(data_session);
+
+        for (it = data_channels; it; it = it->next) {
+            OwrDataChannel *data_channel;
+
+            data_channel = OWR_DATA_CHANNEL(it->data);
+            on_new_datachannel(transport_agent, data_channel, data_session);
+        }
+
+        g_list_free(data_channels);
+    } else {
+        g_log(G_LOG_DOMAIN, G_LOG_LEVEL_INFO, "An SCTP association has been terminated");
+    }
+}
+
+static GstFlowReturn new_data_callback(GstAppSink *appsink, OwrTransportAgent *transport_agent)
+{
+    GstSample *sample;
+    GstBuffer *buffer;
+    GstMapInfo info = {NULL, 0, NULL, 0, 0, {NULL}, {0}};
+    guint16 ppid = 0;
+    gpointer state = NULL;
+    GstMeta *meta;
+    const GstMetaInfo *meta_info = GST_SCTP_RECEIVE_META_INFO;
+    gchar *name;
+    guint sctp_stream_id;
+    GstFlowReturn flow_ret = GST_FLOW_ERROR;
+
+    sample = gst_app_sink_pull_sample(GST_APP_SINK(appsink));
+    g_return_val_if_fail(sample, GST_FLOW_ERROR);
+
+    name = gst_element_get_name(GST_ELEMENT(appsink));
+    sscanf(name, "data_sink_%u", &sctp_stream_id);
+    g_free(name);
+
+    buffer = gst_sample_get_buffer(sample);
+    if (!buffer)
+        goto end;
+
+    if (!gst_buffer_map(buffer, &info, GST_MAP_READ))
+        goto end;
+
+    while ((meta = gst_buffer_iterate_meta(buffer, &state))) {
+        if (meta->info->api == meta_info->api) {
+            GstSctpReceiveMeta *sctp_receive_meta = (GstSctpReceiveMeta *)meta;
+            ppid = sctp_receive_meta->ppid;
+            break;
+        }
+    }
+
+    switch (ppid) {
+    case OWR_DATA_CHANNEL_PPID_CONTROL:
+        handle_data_channel_control_message(transport_agent, info.data, info.size, sctp_stream_id);
+        break;
+    case OWR_DATA_CHANNEL_PPID_STRING:
+        handle_data_channel_message(transport_agent, info.data, info.size, sctp_stream_id, FALSE);
+        break;
+    case OWR_DATA_CHANNEL_PPID_BINARY_PARTIAL:
+        g_warning("PPID: DATA_CHANNEL_PPID_BINARY_PARTIAL - Deprecated - Not supported");
+        /* TODO: Seems like chrome is using this.. maybe it should be supported to at least receive
+         * this kind of messages even if it is deprecated?. */
+        break;
+    case OWR_DATA_CHANNEL_PPID_BINARY:
+        handle_data_channel_message(transport_agent, info.data, info.size, sctp_stream_id, TRUE);
+        break;
+    case OWR_DATA_CHANNEL_PPID_STRING_PARTIAL:
+        g_warning("PPID: DATA_CHANNEL_PPID_STRING_PARTIAL - Deprecated - Not supported");
+        /* TODO: Seems like chrome is using this.. maybe it should be supported to at least receive
+         * this kind of messages even if it is deprecated? */
+        break;
+    default:
+        g_warning("Unsupported PPID received: %u", ppid);
+        break;
+    }
+
+    flow_ret = GST_FLOW_OK;
+end:
+    if (info.data)
+        gst_buffer_unmap(buffer, &info);
+    gst_sample_unref(sample);
+    return flow_ret;
+}
+
+static gboolean create_datachannel_appsrc(OwrTransportAgent *transport_agent,
+    OwrDataChannel *data_channel)
+{
+    OwrTransportAgentPrivate *priv = transport_agent->priv;
+    GstPadTemplate *pad_template;
+    GstPad *sctpenc_sinkpad, *appsrc_srcpad;
+    GstPadLinkReturn ret;
+    gboolean sync_ok = TRUE;
+    GstElement *data_src, *sctpenc, *send_output_bin;
+    gchar *name;
+    gboolean result = FALSE;
+    GstCaps *caps;
+    guint sctp_stream_id;
+    DataChannel *data_channel_info;
+    OwrDataSession *data_session;
+
+    g_object_get(data_channel, "id", &sctp_stream_id, NULL);
+    g_rw_lock_reader_lock(&priv->data_channels_rw_mutex);
+    data_channel_info = (DataChannel *)g_hash_table_lookup(priv->data_channels,
+        GUINT_TO_POINTER(sctp_stream_id));
+    g_rw_lock_reader_unlock(&priv->data_channels_rw_mutex);
+    g_assert(data_channel_info);
+
+    data_session = OWR_DATA_SESSION(get_session(transport_agent, data_channel_info->session_id));
+    g_return_val_if_fail(data_session, FALSE);
+
+    name = g_strdup_printf("send-output-bin-%u", data_channel_info->session_id);
+    send_output_bin = gst_bin_get_by_name(GST_BIN(priv->transport_bin), name);
+    g_return_val_if_fail(send_output_bin, FALSE);
+    g_free(name);
+
+    name = _owr_data_session_get_encoder_name(data_session);
+    sctpenc = gst_bin_get_by_name(GST_BIN(send_output_bin), name);
+    g_free(name);
+    g_return_val_if_fail(sctpenc, FALSE);
+
+    pad_template = gst_element_class_get_pad_template(GST_ELEMENT_GET_CLASS(sctpenc),
+        "sink_%u");
+    g_assert(pad_template);
+
+    caps = _owr_data_channel_create_caps(data_channel);
+    name = g_strdup_printf("sink_%u", sctp_stream_id);
+    sctpenc_sinkpad = gst_element_request_pad(sctpenc, pad_template, name, caps);
+    g_free(name);
+    if (!sctpenc_sinkpad) {
+        /* This should never happend because of other checks */
+        g_warning("Could not create channel. Channel probably already exist.");
+        goto end;
+    }
+
+    name = g_strdup_printf("datasrc_%u", sctp_stream_id);
+    data_src = gst_element_factory_make("appsrc", name);
+    g_free(name);
+    g_assert(data_src);
+    g_object_set(data_src, "caps", caps, "is-live", TRUE, "min-latency", 0,
+        "do-timestamp", TRUE, NULL);
+
+    data_channel_info->data_src = data_src;
+    g_object_ref(data_src);
+    g_object_set(data_src, "max-bytes", 0, "emit-signals", FALSE, NULL);
+
+    gst_bin_add(GST_BIN(send_output_bin), data_src);
+    appsrc_srcpad = gst_element_get_static_pad(data_src, "src");
+
+    ret = gst_pad_link(appsrc_srcpad, sctpenc_sinkpad);
+    gst_object_unref(sctpenc_sinkpad);
+    gst_object_unref(appsrc_srcpad);
+    g_warn_if_fail(GST_PAD_LINK_SUCCESSFUL(ret));
+    sync_ok &= gst_element_sync_state_with_parent(data_src);
+    g_warn_if_fail(sync_ok);
+    if (!GST_PAD_LINK_SUCCESSFUL(ret) || !sync_ok)
+        goto end;
+
+    result = TRUE;
+end:
+    gst_object_unref(sctpenc);
+    return result;
+}
+
+static gboolean is_valid_sctp_stream_id(OwrTransportAgent *transport_agent, guint32 session_id,
+    guint16 sctp_stream_id, gboolean remotly_initiated)
+{
+    gboolean is_client = FALSE;
+    gboolean result = TRUE;
+    OwrSession *session;
+
+    session = get_session(transport_agent, session_id);
+    g_return_val_if_fail(session, FALSE);
+    g_object_get(session, "dtls-client-mode", &is_client, NULL);
+    if ((sctp_stream_id == 65535) || ((sctp_stream_id % 2 == 0) && !is_client)
+        || ((sctp_stream_id % 2 == 1) && is_client)) {
+        result = FALSE;
+    }
+    return remotly_initiated ? !result : result;
+}
+
+
+static guint8 * create_datachannel_open_request(OwrDataChannelChannelType channel_type,
+    guint32 reliability_param, guint16 priority, const gchar *label, guint16 label_len,
+    const gchar *protocol, guint16 protocol_len, guint32 *buf_size)
+{
+    guint8 *buf;
+
+    *buf_size = 12 + label_len + protocol_len;
+    buf = g_malloc(*buf_size);
+    GST_WRITE_UINT8(buf, OWR_DATA_CHANNEL_MESSAGE_TYPE_OPEN_REQUEST);
+    GST_WRITE_UINT8(buf + 1, channel_type);
+    GST_WRITE_UINT16_BE(buf + 2, priority);
+    GST_WRITE_UINT32_BE(buf + 4, reliability_param);
+    GST_WRITE_UINT16_BE(buf + 8, label_len);
+    GST_WRITE_UINT16_BE(buf + 10, protocol_len);
+    memcpy(buf + 12, label, label_len);
+    memcpy(buf + 12 + label_len, protocol, protocol_len);
+
+    return buf;
+}
+
+static guint8 * create_datachannel_ack(guint32 *buf_size)
+{
+    guint8 *buf;
+
+    buf = g_malloc(1);
+    GST_WRITE_UINT8(buf, OWR_DATA_CHANNEL_MESSAGE_TYPE_ACK);
+    *buf_size = 1;
+    return buf;
+}
+
+static void handle_data_channel_control_message(OwrTransportAgent *transport_agent, guint8 *data,
+    guint32 size, guint16 sctp_stream_id)
+{
+    OwrDataChannelMessageType message_type;
+
+    if (size == 0) {
+        g_warning("Invalid size of data channel control message: %u, expected > 0", size);
+        return;
+    }
+
+    message_type = GST_READ_UINT8(data);
+    if (message_type == OWR_DATA_CHANNEL_MESSAGE_TYPE_OPEN_REQUEST)
+        handle_data_channel_open_request(transport_agent, data, size, sctp_stream_id);
+    else if (message_type == OWR_DATA_CHANNEL_MESSAGE_TYPE_ACK)
+        handle_data_channel_ack(transport_agent, data, size, sctp_stream_id);
+    else
+        g_warning("Received invalid data channel control message");
+}
+
+static void handle_data_channel_open_request(OwrTransportAgent *transport_agent, guint8 *data,
+    guint32 size, guint16 sctp_stream_id)
+{
+    OwrTransportAgentPrivate *priv = transport_agent->priv;
+    OwrDataChannelChannelType channel_type;
+    guint32 reliability_param;
+    guint16 priority;
+    DataChannel *data_channel_info;
+    guint label_len, protocol_len;
+    OwrDataSession *data_session;
+    GHashTable *args;
+
+    if (size < 12) {
+        g_warning("Invalid size of data channel control message: %u, expected > 12", size);
+        return;
+    }
+
+    g_rw_lock_reader_lock(&priv->data_channels_rw_mutex);
+    data_channel_info = (DataChannel *)g_hash_table_lookup(priv->data_channels,
+        GUINT_TO_POINTER(sctp_stream_id));
+    g_rw_lock_reader_unlock(&priv->data_channels_rw_mutex);
+
+    channel_type = GST_READ_UINT8(data + 1);
+    priority = GST_READ_UINT16_BE(data + 2);
+    reliability_param = GST_READ_UINT32_BE(data + 4);
+    label_len = GST_READ_UINT16_BE(data + 8);
+    protocol_len = GST_READ_UINT16_BE(data + 10);
+
+    if (size != (guint32)(12 + label_len + protocol_len)) {
+        g_warning("Invalid size of data channel control message: %u, expected %u", size,
+            (12 + label_len + protocol_len));
+    }
+
+    data_channel_info->label = g_strndup((const gchar *) data + 12, label_len);
+    data_channel_info->protocol= g_strndup((const gchar *) data + 12 + label_len, protocol_len);
+
+    OWR_UNUSED(priority);
+    data_channel_info->negotiated = FALSE;
+    data_channel_info->ordered = !(channel_type & 0x80);
+    data_channel_info->max_packet_life_time = -1;
+    data_channel_info->max_packet_retransmits = -1;
+    data_channel_info->ctrl_bytes_sent = 0;
+    if (channel_type == OWR_DATA_CHANNEL_CHANNEL_TYPE_PARTIAL_RELIABLE_REMIX
+        || channel_type == OWR_DATA_CHANNEL_CHANNEL_TYPE_PARTIAL_RELIABLE_REMIX_UNORDERED)
+        data_channel_info->max_packet_retransmits = reliability_param;
+    else if (channel_type == OWR_DATA_CHANNEL_CHANNEL_TYPE_PARTIAL_RELIABLE_TIMED
+        || channel_type == OWR_DATA_CHANNEL_CHANNEL_TYPE_PARTIAL_RELIABLE_TIMED_UNORDERED)
+        data_channel_info->max_packet_life_time = reliability_param;
+
+    g_log(G_LOG_DOMAIN, G_LOG_LEVEL_INFO, "Received data channel open request for data channel (%u)"
+        ":\nordered = %u\nmax_packets_life_time = %d\nmax_packet_retransmits = %d\nprotocols = %s"
+        "\nnegotiated=%u\nlabel= %s\n", data_channel_info->id, data_channel_info->ordered,
+        data_channel_info->max_packet_life_time, data_channel_info->max_packet_retransmits,
+        data_channel_info->protocol, data_channel_info->negotiated,
+        data_channel_info->label);
+
+    data_session = OWR_DATA_SESSION(get_session(transport_agent, data_channel_info->session_id));
+    g_object_ref(data_session);
+    args = g_hash_table_new(g_str_hash, g_str_equal);
+    g_hash_table_insert(args, "session", data_session);
+    g_hash_table_insert(args, "ordered", GUINT_TO_POINTER(data_channel_info->ordered));
+    g_hash_table_insert(args, "max_packet_life_time",
+        GINT_TO_POINTER(data_channel_info->max_packet_life_time));
+    g_hash_table_insert(args, "max_packet_retransmits",
+        GINT_TO_POINTER(data_channel_info->max_packet_retransmits));
+    g_hash_table_insert(args, "protocol", g_strdup(data_channel_info->protocol));
+    g_hash_table_insert(args, "negotiated", GUINT_TO_POINTER(data_channel_info->negotiated));
+    g_hash_table_insert(args, "id", GUINT_TO_POINTER(data_channel_info->id));
+    g_hash_table_insert(args, "label", g_strdup(data_channel_info->label));
+
+    _owr_schedule_with_hash_table((GSourceFunc)emit_data_channel_requested, args);
+}
+
+static gboolean emit_data_channel_requested(GHashTable *args)
+{
+    OwrDataSession *data_session;
+    gboolean ordered, negotiated;
+    guint id;
+    gint max_packet_life_time, max_packet_retransmits;
+    gchar *label, *protocol;
+
+    data_session = g_hash_table_lookup(args, "session");
+    ordered = GPOINTER_TO_UINT(g_hash_table_lookup(args, "ordered"));
+    max_packet_life_time = GPOINTER_TO_INT(g_hash_table_lookup(args, "max_packet_life_time"));
+    max_packet_retransmits = GPOINTER_TO_INT(g_hash_table_lookup(args, "max_packet_retransmits"));
+    protocol = g_hash_table_lookup(args, "protocol");
+    negotiated = GPOINTER_TO_UINT(g_hash_table_lookup(args, "negotiated"));
+    id = GPOINTER_TO_UINT(g_hash_table_lookup(args, "id"));
+    label = g_hash_table_lookup(args, "label");
+
+    g_signal_emit_by_name(data_session, "on-data-channel-requested", ordered, max_packet_life_time,
+        max_packet_retransmits, protocol, negotiated, id, label);
+    g_object_unref(data_session);
+    g_free(label);
+    g_free(protocol);
+    g_hash_table_unref(args);
+
+    return FALSE;
+}
+
+static void handle_data_channel_ack(OwrTransportAgent *transport_agent, guint8 *data, guint32 size,
+    guint16 sctp_stream_id)
+{
+    OwrTransportAgentPrivate *priv = transport_agent->priv;
+    DataChannel *data_channel_info;
+    OwrDataSession *data_session;
+    OwrDataChannel *data_channel;
+    OWR_UNUSED(data);
+    OWR_UNUSED(size);
+
+    g_log(G_LOG_DOMAIN, G_LOG_LEVEL_INFO, "Received ACK for data channel %u\n", sctp_stream_id);
+    g_rw_lock_reader_lock(&priv->data_channels_rw_mutex);
+    data_channel_info = g_hash_table_lookup(priv->data_channels, GUINT_TO_POINTER(sctp_stream_id));
+    g_assert(data_channel_info);
+    g_rw_lock_reader_unlock(&priv->data_channels_rw_mutex);
+
+    g_rw_lock_writer_lock(&data_channel_info->rw_mutex);
+    data_session = OWR_DATA_SESSION(get_session(transport_agent, data_channel_info->session_id));
+    g_assert(OWR_IS_DATA_SESSION(data_session));
+    data_channel = _owr_data_session_get_datachannel(data_session, data_channel_info->id);
+    g_assert(OWR_IS_DATA_CHANNEL(data_channel));
+    data_channel_info->state = OWR_DATA_CHANNEL_STATE_OPEN;
+    g_rw_lock_writer_unlock(&data_channel_info->rw_mutex);
+
+    _owr_data_channel_set_ready_state(data_channel, OWR_DATA_CHANNEL_READY_STATE_OPEN);
+}
+
+static void handle_data_channel_message(OwrTransportAgent *transport_agent, guint8 *data,
+    guint32 size, guint16 sctp_stream_id, gboolean is_binary)
+{
+    OwrTransportAgentPrivate *priv = transport_agent->priv;
+    DataChannel *data_channel_info;
+    OwrDataSession *data_session;
+    OwrDataChannel *owr_data_channel;
+    gchar *message;
+    GHashTable *args;
+
+    g_rw_lock_reader_lock(&priv->data_channels_rw_mutex);
+    data_channel_info = (DataChannel *)g_hash_table_lookup(priv->data_channels,
+        GUINT_TO_POINTER(sctp_stream_id));
+    g_rw_lock_reader_unlock(&priv->data_channels_rw_mutex);
+    g_assert(data_channel_info);
+
+    g_rw_lock_reader_lock(&data_channel_info->rw_mutex);
+    if (data_channel_info->state != OWR_DATA_CHANNEL_STATE_OPEN) {
+        /* This should never happen */
+        g_critical("Received message before datachannel was established.");
+        goto end;
+    }
+
+    data_session = OWR_DATA_SESSION(get_session(transport_agent, data_channel_info->session_id));
+    owr_data_channel = _owr_data_session_get_datachannel(data_session, data_channel_info->id);
+    g_assert(owr_data_channel);
+    g_rw_lock_reader_unlock(&data_channel_info->rw_mutex);
+
+    message = g_malloc(size + (is_binary ? 0 : 1));
+    memcpy(message, data, size);
+
+    if (!is_binary)
+        message[size] = '\0';
+
+    g_object_ref(owr_data_channel);
+    args = g_hash_table_new(g_str_hash, g_str_equal);
+    g_hash_table_insert(args, "data_channel", owr_data_channel);
+    g_hash_table_insert(args, "is_binary", GUINT_TO_POINTER(is_binary));
+    g_hash_table_insert(args, "message", message);
+    g_hash_table_insert(args, "size", GUINT_TO_POINTER(size));
+    _owr_schedule_with_hash_table((GSourceFunc)emit_incoming_data, args);
+
+end:
+    return;
+}
+
+static gboolean emit_incoming_data(GHashTable *args)
+{
+    OwrDataChannel *owr_data_channel;
+    gboolean is_binary;
+    gchar *message;
+    guint size;
+
+    owr_data_channel = g_hash_table_lookup(args, "data_channel");
+    is_binary = GPOINTER_TO_UINT(g_hash_table_lookup(args, "is_binary"));
+    message = g_hash_table_lookup(args, "message");
+    size = GPOINTER_TO_UINT(g_hash_table_lookup(args, "size"));
+
+    if (is_binary)
+        g_signal_emit_by_name(owr_data_channel, "on-binary-data", message, size);
+    else
+        g_signal_emit_by_name(owr_data_channel, "on-data", message);
+
+    g_object_unref(owr_data_channel);
+    g_hash_table_unref(args);
+    g_free(message);
+    return FALSE;
+}
+
+static void on_new_datachannel(OwrTransportAgent *transport_agent, OwrDataChannel *data_channel,
+    OwrDataSession *data_session)
+{
+    OwrTransportAgentPrivate *priv = transport_agent->priv;
+    DataChannel *data_channel_info;
+    guint id;
+    gboolean negotiated, remote_initiated;
+
+    if (!priv->data_session_established)
+        return;
+
+    g_object_get(data_channel, "id", &id, NULL);
+    g_rw_lock_reader_lock(&priv->data_channels_rw_mutex);
+    data_channel_info = (DataChannel *)g_hash_table_lookup(priv->data_channels,
+        GUINT_TO_POINTER(id));
+    g_rw_lock_reader_unlock(&priv->data_channels_rw_mutex);
+
+    remote_initiated = !!data_channel_info;
+    if (!remote_initiated) {
+        guint session_id = get_stream_id(transport_agent, OWR_SESSION(data_session));
+        if (!create_datachannel(transport_agent, session_id, data_channel)) {
+            g_warning("Failed to create new datachannel");
+            goto end;
+        }
+    } else {
+        /* This is when application has gotten a new datachannel from other side and it has been
+         * added to the session from the application. */
+        gboolean ordered, negotiated;
+        gint max_packet_life_time, max_packet_retransmits;
+        gchar *protocol, *label;
+
+        g_object_get(data_channel, "ordered", &ordered, "max-packet-life-time", &max_packet_life_time,
+            "max-retransmits", &max_packet_retransmits, "protocol", &protocol, "negotiated", &negotiated,
+            "label", &label, "id", &id, NULL);
+        /* It should not bee needed to get the id property again, but for some reason it is.. */
+
+        /* Check so that the channel is identical to the requested one */
+        g_rw_lock_reader_lock(&data_channel_info->rw_mutex);
+        if (ordered != data_channel_info->ordered
+            || negotiated != data_channel_info->negotiated
+            || max_packet_life_time != data_channel_info->max_packet_life_time
+            || max_packet_retransmits != data_channel_info->max_packet_retransmits
+            || g_strcmp0(protocol, data_channel_info->protocol)
+            || g_strcmp0(label, data_channel_info->label)
+            || id != data_channel_info->id) {
+            g_critical("The added datachannel does not match the remote datachannel");
+            g_free(protocol);
+            g_free(label);
+            goto end;
+        }
+        g_free(protocol);
+        g_free(label);
+
+        g_log(G_LOG_DOMAIN, G_LOG_LEVEL_INFO, "New data channel (%u) added\n", id);
+        g_rw_lock_reader_unlock(&data_channel_info->rw_mutex);
+    }
+
+    _owr_data_channel_set_on_send(data_channel, g_cclosure_new_object_swap(
+        G_CALLBACK(on_datachannel_send), G_OBJECT(transport_agent)));
+    _owr_data_channel_set_on_request_bytes_sent(data_channel,
+        g_cclosure_new_object_swap(G_CALLBACK(on_datachannel_request_bytes_sent),
+        G_OBJECT(transport_agent)));
+    _owr_data_channel_set_on_close(data_channel, g_cclosure_new_object_swap(
+        G_CALLBACK(on_datachannel_close), G_OBJECT(transport_agent)));
+
+    g_object_get(data_channel, "negotiated", &negotiated, NULL);
+    if (negotiated || remote_initiated) {
+        if (remote_initiated)
+            complete_data_channel_and_ack(transport_agent, data_channel);
+
+        g_object_get(data_channel, "id", &id, NULL);
+        g_rw_lock_reader_lock(&priv->data_channels_rw_mutex);
+        data_channel_info = (DataChannel *)g_hash_table_lookup(priv->data_channels,
+            GUINT_TO_POINTER(id));
+        g_rw_lock_reader_unlock(&priv->data_channels_rw_mutex);
+
+        g_rw_lock_writer_lock(&data_channel_info->rw_mutex);
+        data_channel_info->state = OWR_DATA_CHANNEL_STATE_OPEN;
+        g_rw_lock_writer_unlock(&data_channel_info->rw_mutex);
+
+        _owr_data_channel_set_ready_state(data_channel, OWR_DATA_CHANNEL_READY_STATE_OPEN);
+    }
+
+end:
+    return;
+}
+
+static void complete_data_channel_and_ack(OwrTransportAgent *transport_agent,
+    OwrDataChannel *data_channel)
+{
+    OwrTransportAgentPrivate *priv = transport_agent->priv;
+    guint8 *ackbuf;
+    GstBuffer *gstbuf;
+    guint32 buf_size;
+    GstFlowReturn flow_ret;
+    guint id;
+    DataChannel *data_channel_info;
+
+    if (!create_datachannel_appsrc(transport_agent, data_channel))
+        g_warning("Could not create appsrc");
+
+    g_object_get(data_channel, "id", &id, NULL);
+    g_rw_lock_reader_lock(&priv->data_channels_rw_mutex);
+    data_channel_info = (DataChannel *)g_hash_table_lookup(priv->data_channels,
+        GUINT_TO_POINTER(id));
+    g_rw_lock_reader_unlock(&priv->data_channels_rw_mutex);
+
+    /* Return ACK */
+    ackbuf = create_datachannel_ack(&buf_size);
+    gstbuf = gst_buffer_new_wrapped(ackbuf, buf_size);
+    gst_sctp_buffer_add_send_meta(gstbuf, OWR_DATA_CHANNEL_PPID_CONTROL, TRUE,
+        GST_SCTP_SEND_META_PARTIAL_RELIABILITY_NONE, 0);
+    data_channel_info->ctrl_bytes_sent += buf_size;
+    flow_ret = gst_app_src_push_buffer(GST_APP_SRC(data_channel_info->data_src), gstbuf);
+    if (flow_ret != GST_FLOW_OK)
+        g_critical("Failed to push data buffer: %s", gst_flow_get_name(flow_ret));
+}
+
+static void on_datachannel_send(OwrTransportAgent *transport_agent, guint8 *data, guint len,
+    gboolean is_binary, OwrDataChannel *data_channel)
+{
+    OwrTransportAgentPrivate *priv = transport_agent->priv;
+
+    DataChannel *data_channel_info;
+    guint id;
+    GstBuffer *gstbuf;
+    OwrDataChannelPPID ppid;
+    GstSctpSendMetaPartiallyReliability pr;
+    guint32 pr_param;
+    GstFlowReturn flow_ret;
+    GstElement *data_src;
+
+    g_return_if_fail(data);
+    g_return_if_fail(data_channel);
+
+    g_object_get(data_channel, "id", &id, NULL);
+    g_rw_lock_reader_lock(&priv->data_channels_rw_mutex);
+    data_channel_info = g_hash_table_lookup(priv->data_channels, GUINT_TO_POINTER(id));
+    g_rw_lock_reader_unlock(&priv->data_channels_rw_mutex);
+    gstbuf = gst_buffer_new_wrapped(data, len);
+
+    g_rw_lock_reader_lock(&data_channel_info->rw_mutex);
+    ppid = is_binary ? OWR_DATA_CHANNEL_PPID_BINARY : OWR_DATA_CHANNEL_PPID_STRING;
+    pr = GST_SCTP_SEND_META_PARTIAL_RELIABILITY_NONE;
+    pr_param = 0;
+    if (data_channel_info->max_packet_life_time == -1
+        && data_channel_info->max_packet_retransmits == -1) {
+        pr = GST_SCTP_SEND_META_PARTIAL_RELIABILITY_NONE;
+        pr_param = 0;
+    } else if (data_channel_info->max_packet_life_time != -1) {
+        pr = GST_SCTP_SEND_META_PARTIAL_RELIABILITY_TTL;
+        pr_param = data_channel_info->max_packet_life_time;
+    } else if (data_channel_info->max_packet_retransmits != -1) {
+        pr = GST_SCTP_SEND_META_PARTIAL_RELIABILITY_RTX;
+        pr_param = data_channel_info->max_packet_retransmits;
+    }
+
+    gst_sctp_buffer_add_send_meta(gstbuf, ppid, data_channel_info->ordered,
+        pr, pr_param);
+    data_src = data_channel_info->data_src;
+    g_rw_lock_reader_unlock(&data_channel_info->rw_mutex);
+    flow_ret = gst_app_src_push_buffer(GST_APP_SRC(data_src), gstbuf);
+    g_warn_if_fail(flow_ret == GST_FLOW_OK);
+}
+
+static guint64 on_datachannel_request_bytes_sent(OwrTransportAgent *transport_agent,
+    OwrDataChannel *data_channel)
+{
+    OwrTransportAgentPrivate *priv = transport_agent->priv;
+    guint data_channel_id;
+    guint64 bytes_sent = 0;
+    GstElement *sctpenc, *send_output_bin;
+    DataChannel *data_channel_info;
+    OwrDataSession *data_session;
+    gchar *name;
+    guint ctrl_bytes_sent, session_id;
+
+    g_object_get(data_channel, "id", &data_channel_id, NULL);
+    g_rw_lock_reader_lock(&priv->data_channels_rw_mutex);
+    data_channel_info = (DataChannel *)g_hash_table_lookup(priv->data_channels,
+        GUINT_TO_POINTER(data_channel_id));
+    g_rw_lock_reader_unlock(&priv->data_channels_rw_mutex);
+
+    g_rw_lock_reader_lock(&data_channel_info->rw_mutex);
+    ctrl_bytes_sent = data_channel_info->ctrl_bytes_sent;
+    session_id = data_channel_info->session_id;
+    g_rw_lock_reader_unlock(&data_channel_info->rw_mutex);
+
+    name = g_strdup_printf("send-output-bin-%u", session_id);
+    send_output_bin = gst_bin_get_by_name(GST_BIN(priv->transport_bin), name);
+    g_free(name);
+
+    data_session = OWR_DATA_SESSION(get_session(transport_agent, session_id));
+    name = _owr_data_session_get_encoder_name(data_session);
+    sctpenc = gst_bin_get_by_name(GST_BIN(send_output_bin), name);
+    g_free(name);
+    g_assert(sctpenc);
+    g_signal_emit_by_name(sctpenc, "bytes-sent", data_channel_id, &bytes_sent);
+
+    gst_object_unref(send_output_bin);
+    gst_object_unref(sctpenc);
+
+    return bytes_sent - ctrl_bytes_sent;
+}
+
+static void maybe_close_data_channel(OwrTransportAgent *transport_agent,
+    DataChannel *data_channel_info)
+{
+    OwrTransportAgentPrivate *priv = transport_agent->priv;
+    gboolean close = FALSE;
+
+    g_rw_lock_writer_lock(&data_channel_info->rw_mutex);
+    close = (!data_channel_info->data_sink && !data_channel_info->data_src);
+    if (close) {
+        OwrDataSession *data_session;
+        OwrDataChannel *data_channel;
+
+        data_session = OWR_DATA_SESSION(get_session(transport_agent,
+            data_channel_info->session_id));
+        data_channel = _owr_data_session_get_datachannel(data_session, data_channel_info->id);
+        _owr_data_channel_set_ready_state(data_channel, OWR_DATA_CHANNEL_READY_STATE_CLOSED);
+        g_hash_table_steal(priv->data_channels, GUINT_TO_POINTER(data_channel_info->id));
+        data_channel_free(data_channel_info);
+    }
+    g_rw_lock_writer_unlock(&data_channel_info->rw_mutex);
+}
+
+static void on_datachannel_close(OwrTransportAgent *transport_agent,
+    OwrDataChannel *data_channel)
+{
+    OwrTransportAgentPrivate *priv = transport_agent->priv;
+    guint id;
+    DataChannel *data_channel_info;
+    GstPad *appsink_sinkpad, *appsrc_srcpad, *sctpdec_srcpad;
+    GstPad *sctpenc_sinkpad;
+    GstElement *sctpdec, *sctpenc, *send_bin, *receive_bin;
+
+    _owr_data_channel_set_ready_state(data_channel, OWR_DATA_CHANNEL_READY_STATE_CLOSING);
+
+    g_object_get(data_channel, "id", &id, NULL);
+    g_rw_lock_writer_lock(&priv->data_channels_rw_mutex);
+    data_channel_info = g_hash_table_lookup(priv->data_channels, GUINT_TO_POINTER(id));
+    g_assert(data_channel_info);
+    data_channel_info->state = OWR_DATA_CHANNEL_STATE_CLOSING;
+    g_rw_lock_writer_unlock(&priv->data_channels_rw_mutex);
+
+    appsink_sinkpad = gst_element_get_static_pad(data_channel_info->data_sink, "sink");
+    appsrc_srcpad = gst_element_get_static_pad(data_channel_info->data_src, "src");
+    sctpdec_srcpad = gst_pad_get_peer(appsink_sinkpad);
+    sctpenc_sinkpad = gst_pad_get_peer(appsrc_srcpad);
+
+    /* Remove decoder part */
+    sctpdec = gst_pad_get_parent_element(sctpdec_srcpad);
+    receive_bin = GST_ELEMENT(gst_element_get_parent(sctpdec));
+
+    gst_element_set_state(data_channel_info->data_sink, GST_STATE_NULL);
+    gst_bin_remove(GST_BIN(receive_bin), data_channel_info->data_sink);
+    gst_object_unref(receive_bin);
+
+    g_rw_lock_writer_lock(&data_channel_info->rw_mutex);
+    gst_object_unref(data_channel_info->data_sink);
+    data_channel_info->data_sink = NULL;
+    g_rw_lock_writer_unlock(&data_channel_info->rw_mutex);
+
+    gst_pad_unlink(sctpdec_srcpad, appsink_sinkpad);
+    g_signal_emit_by_name(sctpdec, "reset-stream", GUINT_TO_POINTER(id));
+    gst_object_unref(sctpdec);
+
+    /* Remove encoder part */
+    sctpenc = gst_pad_get_parent_element(sctpenc_sinkpad);
+    send_bin = GST_ELEMENT(gst_element_get_parent(sctpenc));
+
+    gst_element_set_state(data_channel_info->data_src, GST_STATE_NULL);
+    gst_bin_remove(GST_BIN(send_bin), data_channel_info->data_src);
+    gst_object_unref(send_bin);
+
+    g_rw_lock_writer_lock(&data_channel_info->rw_mutex);
+    gst_object_unref(data_channel_info->data_src);
+    data_channel_info->data_src = NULL;
+    g_rw_lock_writer_unlock(&data_channel_info->rw_mutex);
+
+    gst_pad_unlink(appsrc_srcpad, sctpenc_sinkpad);
+    gst_element_release_request_pad(sctpenc, sctpenc_sinkpad);
+    gst_object_unref(sctpenc);
+
+    maybe_close_data_channel(transport_agent, data_channel_info);
+
+    gst_object_unref(appsrc_srcpad);
+    gst_object_unref(appsink_sinkpad);
+    gst_object_unref(sctpdec_srcpad);
+    gst_object_unref(sctpenc_sinkpad);
+}
+
+static gboolean is_same_session(gpointer stream_id_p, OwrSession *session1, OwrSession *session2)
+{
+    OWR_UNUSED(stream_id_p);
+    return session1 == session2;
 }
 
 gchar * owr_transport_agent_get_dot_data(OwrTransportAgent *transport_agent)

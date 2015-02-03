@@ -81,6 +81,7 @@ GST_PLUGIN_STATIC_DECLARE(openh264);
 GST_PLUGIN_STATIC_DECLARE(opus);
 GST_PLUGIN_STATIC_DECLARE(rtp);
 GST_PLUGIN_STATIC_DECLARE(rtpmanager);
+GST_PLUGIN_STATIC_DECLARE(sctp);
 GST_PLUGIN_STATIC_DECLARE(srtp);
 GST_PLUGIN_STATIC_DECLARE(videoconvert);
 GST_PLUGIN_STATIC_DECLARE(videocrop);
@@ -209,6 +210,7 @@ void owr_init()
     GST_PLUGIN_STATIC_REGISTER(opus);
     GST_PLUGIN_STATIC_REGISTER(rtp);
     GST_PLUGIN_STATIC_REGISTER(rtpmanager);
+    GST_PLUGIN_STATIC_REGISTER(sctp);
     GST_PLUGIN_STATIC_REGISTER(srtp);
     GST_PLUGIN_STATIC_REGISTER(videoconvert);
     GST_PLUGIN_STATIC_REGISTER(videocrop);
@@ -295,6 +297,7 @@ void _owr_schedule_with_user_data(GSourceFunc func, gpointer user_data)
     GSource *source = g_idle_source_new();
 
     g_source_set_callback(source, func, user_data, NULL);
+    g_source_set_priority(source, G_PRIORITY_DEFAULT);
     g_source_attach(source, owr_main_context);
 }
 

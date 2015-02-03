@@ -7,6 +7,7 @@ AM_CPPFLAGS = \
     $(GLIB_CFLAGS) \
     $(NICE_CFLAGS) \
     $(GSTREAMER_CFLAGS) \
+    $(GSTREAMER_SCTP_CFLAGS) \
     $(LIBOPENWEBRTC_CFLAGS) \
     -I$(top_srcdir)/owr
 
@@ -26,11 +27,14 @@ libopenwebrtc_transport_la_SOURCES = \
     owr_session.c \
     owr_media_session.c \
     owr_transport_agent.c \
-    owr_remote_media_source.c
+    owr_remote_media_source.c \
+    owr_data_channel.c \
+    owr_data_session.c
 
 libopenwebrtc_transport_la_LIBADD = \
     $(NICE_LIBS) \
     $(GSTREAMER_LIBS) \
+    $(GSTREAMER_SCTP_LIBS) \
     $(GLIB_LIBS)
 
 includedir = $(prefix)/include/owr
@@ -42,13 +46,17 @@ include_HEADERS = \
     owr_session.h \
     owr_media_session.h \
     owr_transport_agent.h \
-    owr_remote_media_source.h
+    owr_remote_media_source.h \
+    owr_data_channel.h \
+    owr_data_session.h
 
 noinst_HEADERS = \
     owr_candidate_private.h \
     owr_session_private.h \
     owr_media_session_private.h \
     owr_remote_media_source_private.h \
-    owr_payload_private.h
+    owr_payload_private.h \
+    owr_data_channel_private.h \
+    owr_data_session_private.h
 
 -include $(top_srcdir)/git.mk
