@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2014 Ericsson AB. All rights reserved.
+ * Copyright (C) 2015 Collabora Ltd.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -309,7 +310,8 @@
             "onsignalingstatechange": null,
             "onaddstream": null,
             "onremovestream": null,
-            "oniceconnectionstatechange": null
+            "oniceconnectionstatechange": null,
+            "ondatachannel": null
         });
 
         var a = { // attributes
@@ -333,7 +335,8 @@
         var peerHandler;
         var peerHandlerClient = createPeerHandlerClient();
         var clientRef = bridge.createObjectRef(peerHandlerClient, "gotSendSSRC",
-            "gotDtlsFingerprint", "gotIceCandidate", "candidateGatheringDone", "gotRemoteSource");
+            "gotDtlsFingerprint", "gotIceCandidate", "candidateGatheringDone", "gotRemoteSource",
+            "dataChannelsEnabled", "dataChannelRequested");
         var deferredPeerHandlerCalls = [];
 
         bridge.createPeerHandler(configuration, clientRef, function (ph) {
@@ -351,7 +354,18 @@
                 deferredPeerHandlerCalls.push(func);
         }
 
+        var canCreateDataChannels = false;
+        var deferredCreateDataChannelCalls = [];
+
+        function whenPeerHandlerCanCreateDataChannels(func) {
+            if (peerHandler && canCreateDataChannels)
+                func(peerHandler);
+            else
+                deferredCreateDataChannelCalls.push(func);
+        }
+
         var negotiationNeededTimerHandle;
+        var hasDataChannels = false;
         var localSessionInfo = null;
         var remoteSessionInfo = null;
         var remoteSourceStatus = [];
@@ -480,6 +494,21 @@
                 }
             });
 
+            if (hasDataChannels && indexOfByProperty(localSessionInfoSnapshot.mediaDescriptions,
+                "type", "application") == -1) {
+                localSessionInfoSnapshot.mediaDescriptions.push({
+                    "type": "application",
+                    "protocol": "DTLS/SCTP",
+                    "fmt": 5000,
+                    "dtls": { "setup": "actpass" },
+                    "sctp": {
+                        "port": 5000,
+                        "app": "webrtc-datachannel",
+                        "streams": 1024
+                    }
+                });
+            }
+
             completeQueuedOperation(function () {
                 resolve(new RTCSessionDescription({
                     "type": "offer",
@@ -538,14 +567,30 @@
                 if (!lmdesc) {
                     lmdesc = {
                         "type": rmdesc.type,
-                        "rtcp": {},
                         "dtls": { "setup": rmdesc.dtls.setup == "active" ? "passive" : "active" }
                     };
                     localSessionInfoSnapshot.mediaDescriptions.push(lmdesc);
                 }
 
-                lmdesc.payloads = rmdesc.payloads;
-                lmdesc.rtcp.mux = !!(rmdesc.rtcp && rmdesc.rtcp.mux);
+                if (lmdesc.type == "application") {
+                    lmdesc.protocol = "DTLS/SCTP";
+                    lmdesc.sctp = {
+                        "port": 5000,
+                        "app": "webrtc-datachannel"
+                    };
+                    if (rmdesc.sctp) {
+                        lmdesc.sctp.maxMessageSize = rmdesc.sctp.maxMessageSize;
+                        lmdesc.sctp.streams = rmdesc.sctp.streams;
+                    }
+                } else {
+                    lmdesc.payloads = rmdesc.payloads;
+
+                    if (!lmdesc.rtcp)
+                        lmdesc.rtcp = {};
+
+                    lmdesc.rtcp.mux = !!(rmdesc.rtcp && rmdesc.rtcp.mux);
+                }
+
                 if (lmdesc.dtls.setup == "actpass")
                     lmdesc.dtls.setup = "passive";
             }
@@ -683,6 +728,9 @@
 
             var allTracks = getAllTracks(localStreams);
             remoteSessionInfo.mediaDescriptions.forEach(function (mdesc) {
+                if (mdesc.type != "audio" && mdesc.type != "video")
+                    return;
+
                 var filteredPayloads = mdesc.payloads.filter(function (payload) {
                     var index = indexOfByProperty(defaultPayloads[mdesc.type],
                         "encodingName", payload.encodingName.toUpperCase());
@@ -831,6 +879,56 @@
             setTimeout(maybeDispatchNegotiationNeeded);
         };
 
+        this.createDataChannel = function (label, dataChannelDict) {
+            checkArguments("createDataChannel", "string", 1, arguments);
+            checkClosedState();
+
+            var initDict = dataChannelDict || {};
+
+            checkDictionary("RTCDataChannelInit", initDict, {
+                "ordered": "boolean",
+                "maxPacketLifeTime": "number",
+                "maxRetransmits": "number",
+                "protocol": "string",
+                "negotiated": "boolean",
+                "id": "number"
+            });
+
+            var settings = {
+                "label": String(label || ""),
+                "ordered": getDictionaryMember(initDict, "ordered", "boolean", true),
+                "maxPacketLifeTime": getDictionaryMember(initDict, "maxPacketLifeTime", "number", null),
+                "maxRetransmits": getDictionaryMember(initDict, "maxRetransmits", "number", null),
+                "protocol": getDictionaryMember(initDict, "protocol", "string", ""),
+                "negotiated": getDictionaryMember(initDict, "negotiated", "boolean", false),
+                "id": getDictionaryMember(initDict, "id", "number", 65535),
+                "readyState": "connecting",
+                "bufferedAmount": 0
+            };
+
+            if (settings.negotiated && (settings.id < 0 || settings.id > 65534)) {
+                throw createError("SyntaxError",
+                    "createDataChannel: a negotiated channel requires an id (with value 0 - 65534)");
+            }
+
+            if (!settings.negotiated && initDict.hasOwnProperty("id")) {
+                console.warn("createDataChannel: id should not be used with a non-negotiated channel");
+                settings.id = 65535;
+            }
+
+            if (settings.maxPacketLifeTime != null && settings.maxRetransmits != null) {
+                throw createError("SyntaxError",
+                    "createDataChannel: maxPacketLifeTime and maxRetransmits cannot both be set");
+            }
+
+            if (!hasDataChannels) {
+                hasDataChannels = true;
+                setTimeout(maybeDispatchNegotiationNeeded);
+            }
+
+            return new RTCDataChannel(settings, whenPeerHandlerCanCreateDataChannels);
+        };
+
         this.close = function () {
             if (a.signalingState == "closed")
                 return;
@@ -893,6 +991,10 @@
                 return;
 
             var mediaDescriptions = localSessionInfo ? localSessionInfo.mediaDescriptions : [];
+
+            var dataNegotiationNeeded = hasDataChannels
+                && indexOfByProperty(mediaDescriptions, "type", "application") == -1;
+
             var allTracks = getAllTracks(localStreams);
             var i = 0;
             for (; i < allTracks.length; i++) {
@@ -900,7 +1002,9 @@
                     allTracks[i].id) == -1)
                     break;
             }
-            if (i == allTracks.length)
+            var mediaNegotiationNeeded = i < allTracks.length;
+
+            if (!dataNegotiationNeeded && !mediaNegotiationNeeded)
                 return;
 
             negotiationNeededTimerHandle = setTimeout(function () {
@@ -969,8 +1073,12 @@
         function isLocalSessionInfoComplete() {
             for (var i = 0; i < localSessionInfo.mediaDescriptions.length; i++) {
                 var mdesc = localSessionInfo.mediaDescriptions[i];
-                if (!mdesc.dtls.fingerprint || !mdesc.ice || !mdesc.ssrcs || !mdesc.cname)
+                if (!mdesc.dtls.fingerprint || !mdesc.ice)
                     return false;
+                if (mdesc.type == "audio" || mdesc.type == "video") {
+                    if (!mdesc.ssrcs || !mdesc.cname)
+                        return false;
+                }
             }
             return true;
         }
@@ -1117,6 +1225,19 @@
                     dispatchMediaStreamEvent(legacyRemoteTrackInfos);
             };
 
+            client.dataChannelsEnabled = function () {
+                canCreateDataChannels = true;
+
+                var func;
+                while ((func = deferredCreateDataChannelCalls.shift()))
+                    func(peerHandler);
+            };
+
+            client.dataChannelRequested = function (settings) {
+                var dataChannel = new RTCDataChannel(settings, whenPeerHandlerCanCreateDataChannels);
+                _this.dispatchEvent({ "type": "datachannel", "channel": dataChannel, "target": _this });
+            };
+
             return client;
         }
     }
@@ -1173,6 +1294,97 @@
 
     RTCIceCandidate.toString = function () {
         return "[object RTCIceCandidate]";
+    };
+
+    //
+    // RTCDataChannel
+    //
+    RTCDataChannel.prototype = Object.create(EventTarget.prototype);
+    RTCDataChannel.prototype.constructor = RTCDataChannel;
+
+    function RTCDataChannel(settings, whenPeerHandlerCanCreateDataChannels) {
+        var _this = this;
+        var internalDataChannel;
+
+        EventTarget.call(this, {
+            "onopen": null,
+            "onerror": null,
+            "onclose": null,
+            "onmessage": null
+        });
+
+        var a = { // attributes
+            "label": settings.label,
+            "ordered": settings.ordered,
+            "maxPacketLifeTime": settings.maxPacketLifeTime,
+            "maxRetransmits": settings.maxRetransmits,
+            "protocol": settings.protocol,
+            "negotiated": settings.negotiated,
+            "id": settings.id,
+            "readyState": "connecting",
+            "bufferedAmount": 0
+        };
+        domObject.addReadOnlyAttributes(this, a);
+
+        var client = createInternalDataChannelClient();
+        var clientRef = bridge.createObjectRef(client, "readyStateChanged", "gotData",
+            "setBufferedAmount");
+
+        whenPeerHandlerCanCreateDataChannels(function (peerHandler) {
+            peerHandler.createDataChannel(a, clientRef, function (channelInfo) {
+                a.id = channelInfo.id;
+                internalDataChannel = channelInfo.channel;
+            });
+        });
+
+        this.send = function (data) {
+            if (a.readyState == "connecting")
+                throw createError("InvalidStateError", "send: readyState is \"connecting\"");
+
+            a.bufferedAmount += data.length;
+            if (a.readyState == "open")
+                internalDataChannel.send(data);
+        };
+
+        this.close = function () {
+            if (a.readyState == "closing" || a.readyState == "closed")
+                return;
+            a.readyState = "closing";
+            internalDataChannel.close();
+        };
+
+        this.toString = RTCDataChannel.toString;
+
+        function createInternalDataChannelClient() {
+            var client = {};
+
+            client.readyStateChanged = function (newState) {
+                a.readyState = newState;
+
+                var eventType;
+                if (a.readyState == "open")
+                    eventType = "open";
+                else if (a.readyState == "closed")
+                    eventType = "close";
+
+                if (eventType)
+                    _this.dispatchEvent({ "type": eventType, "target": _this });
+            };
+
+            client.setBufferedAmount = function (bufferedAmount) {
+                a.bufferedAmount = bufferedAmount;
+            };
+
+            client.gotData = function (data) {
+                _this.dispatchEvent({ "type": "message", "data": data, "target": _this });
+            };
+
+            return client;
+        }
+    }
+
+    RTCDataChannel.toString = function () {
+        return "[object RTCDataChannel]";
     };
 
     function MediaStreamURL(mediaStream) {
