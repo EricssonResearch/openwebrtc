@@ -72,6 +72,7 @@ struct _OwrMediaSessionPrivate {
     GClosure *on_send_source;
     GSList *remote_sources;
     GMutex remote_source_lock;
+    gint jitter_buffer_latency;
 };
 
 enum {
@@ -91,6 +92,7 @@ enum {
     PROP_OUTGOING_SRTP_KEY,
     PROP_SEND_SSRC,
     PROP_CNAME,
+    PROP_JITTER_BUFFER_LATENCY,
 
     N_PROPERTIES
 };
@@ -129,6 +131,10 @@ static void owr_media_session_set_property(GObject *object, guint property_id, c
         priv->outgoing_srtp_key = g_value_dup_string(value);
         break;
 
+    case PROP_JITTER_BUFFER_LATENCY:
+        priv->jitter_buffer_latency = g_value_get_uint(value);
+        break;
+
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
         break;
@@ -158,6 +164,10 @@ static void owr_media_session_get_property(GObject *object, guint property_id, G
 
     case PROP_CNAME:
         g_value_set_string(value, priv->cname);
+        break;
+
+    case PROP_JITTER_BUFFER_LATENCY:
+        g_value_set_uint(value, priv->jitter_buffer_latency);
         break;
 
     default:
@@ -277,6 +287,12 @@ static void owr_media_session_class_init(OwrMediaSessionClass *klass)
         "The canonical name identifying this endpoint",
         NULL, G_PARAM_STATIC_STRINGS | G_PARAM_READABLE | G_PARAM_STATIC_STRINGS);
 
+    obj_properties[PROP_JITTER_BUFFER_LATENCY] = g_param_spec_uint("jitter-buffer-latency",
+        "Session jitter buffer latency in ms",
+        "The latency introduced by the jitter buffer for this session in ms",
+        0, G_MAXUINT, 200,
+        G_PARAM_STATIC_STRINGS | G_PARAM_READWRITE);
+
     g_object_class_install_properties(gobject_class, N_PROPERTIES, obj_properties);
 
 }
@@ -297,6 +313,7 @@ static void owr_media_session_init(OwrMediaSession *media_session)
     priv->on_send_payload = NULL;
     priv->on_send_source = NULL;
     priv->remote_sources = NULL;
+    priv->jitter_buffer_latency = 200;
     g_mutex_init(&priv->remote_source_lock);
     g_rw_lock_init(&priv->rw_lock);
 }

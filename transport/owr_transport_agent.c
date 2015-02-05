@@ -2328,6 +2328,10 @@ static void on_new_jitterbuffer(G_GNUC_UNUSED GstElement *rtpbin, GstElement *ji
 
     if (_owr_media_session_want_receive_rtx(media_session))
         g_object_set(jitterbuffer, "do-retransmission", TRUE, NULL);
+
+    g_object_bind_property(media_session, "jitter-buffer-latency", jitterbuffer,
+        "latency", G_BINDING_SYNC_CREATE);
+
     g_object_unref(media_session);
 }
 
