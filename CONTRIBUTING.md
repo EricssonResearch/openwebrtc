@@ -44,7 +44,7 @@ project, we encourage you to reach out first so that we can avoid potential dupl
 * WebRTC Statistics API
 * Better support for constraints in JavaScript
 * createOffer compliance
-* ~~Promises in JavaScript~~
+* ~~Promises in JavaScript~~ (done)
 * Windows support
 * ORTC
 * Recording
