@@ -986,7 +986,7 @@
 
             var candidate = new RTCIceCandidate({
                 "candidate": candidateAttribute,
-                "sdpMid": null,
+                "sdpMid": "",
                 "sdpMLineIndex": mdescIndex
             });
             _this.dispatchEvent({ "type": "icecandidate", "candidate": candidate,
