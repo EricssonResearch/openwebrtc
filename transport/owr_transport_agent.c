@@ -100,6 +100,7 @@ struct _OwrTransportAgentPrivate {
     guint local_min_port;
     guint local_max_port;
 
+    guint deferred_helper_server_adds;
     GList *helper_server_infos;
 };
 
@@ -322,6 +323,7 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
     priv->local_min_port = 0;
     priv->local_max_port = 0;
 
+    priv->deferred_helper_server_adds = 0;
     priv->helper_server_infos = NULL;
 
     priv->send_bins = g_hash_table_new_full(NULL, NULL, NULL, g_free);
@@ -393,6 +395,9 @@ void owr_transport_agent_add_helper_server(OwrTransportAgent *transport_agent,
     GResolver *resolver;
 
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
+
+    transport_agent->priv->deferred_helper_server_adds++;
+
     helper_server_info = g_hash_table_new(g_str_hash, g_str_equal);
     g_hash_table_insert(helper_server_info, "transport_agent", transport_agent);
     g_hash_table_insert(helper_server_info, "type", GUINT_TO_POINTER(type));
@@ -470,6 +475,10 @@ static void add_helper_server_info(GResolver *resolver, GAsyncResult *result, GH
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
     g_hash_table_remove(info, "transport_agent");
 
+    priv = transport_agent->priv;
+
+    priv->deferred_helper_server_adds--;
+
     address_list = g_resolver_lookup_by_name_finish(resolver, result, &error);
 
     if (!address_list) {
@@ -484,7 +493,6 @@ static void add_helper_server_info(GResolver *resolver, GAsyncResult *result, GH
     g_hash_table_insert(info, "address", g_inet_address_to_string(address_list->data));
     g_resolver_free_addresses(address_list);
 
-    priv = transport_agent->priv;
     priv->helper_server_infos = g_list_append(priv->helper_server_infos, info);
 
     g_mutex_lock(&priv->sessions_lock);
@@ -493,6 +501,8 @@ static void add_helper_server_info(GResolver *resolver, GAsyncResult *result, GH
     for (item = stream_ids; item; item = item->next) {
         stream_id = GPOINTER_TO_UINT(item->data);
         update_helper_servers(transport_agent, stream_id);
+        if (!priv->deferred_helper_server_adds)
+            nice_agent_gather_candidates(priv->nice_agent, stream_id);
     }
     g_list_free(stream_ids);
 
@@ -811,7 +821,8 @@ static gboolean add_media_session(GHashTable *args)
         }
     }
 
-    nice_agent_gather_candidates(transport_agent->priv->nice_agent, stream_id);
+    if (!transport_agent->priv->deferred_helper_server_adds)
+        nice_agent_gather_candidates(transport_agent->priv->nice_agent, stream_id);
 
     /* stream_id is used as the rtpbin session id */
     g_signal_emit_by_name(transport_agent->priv->rtpbin, "get-internal-session", stream_id, &session);
