@@ -96,9 +96,6 @@ OwrMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
     priv->stream_id = stream_id;
     g_free(name);
 
-    /* take a ref on the transport bin as the media source element is
-     * unreffed on finalization */
-    g_object_ref(transport_bin);
     _owr_media_source_set_codec(OWR_MEDIA_SOURCE(source), codec_type);
 
     /* create source tee and everything */
