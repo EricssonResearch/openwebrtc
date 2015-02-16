@@ -348,14 +348,14 @@ done:
  * owr_local_media_source_get_pad
  *
  * The beginning of a media source chain in the pipeline looks like this:
- *                                               +------------+
- *                                           /---+ fakesink   |
- * +--------+   +------------+   +-----+    /    +------------+
- * | source +---+ capsfilter +---+ tee +---/
- * +--------+   +------------+   +-----+   \
- *                                          \    +------------+
- *                                           \---+ inter*sink |
- *                                               +------------+
+ *                                                             +------------+
+ *                                                         /---+ fakesink   |
+ * +--------+    +--------+   +------------+   +-----+    /    +------------+
+ * | source +----+ scale? +---+ capsfilter +---+ tee +---/
+ * +--------+    +--------+   +------------+   +-----+   \
+ *                                                        \    +------------+
+ *                                                         \---+ inter*sink |
+ *                                                             +------------+
  *
  * For each newly requested pad a new inter*sink is added to the tee.
  * Note that this is a completely independent pipeline, and the complete
@@ -390,7 +390,7 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
     else {
         OwrMediaType media_type = OWR_MEDIA_TYPE_UNKNOWN;
         OwrSourceType source_type = OWR_SOURCE_TYPE_UNKNOWN;
-        GstElement *source, *capsfilter = NULL, *tee;
+        GstElement *source, *source_process = NULL, *capsfilter = NULL, *tee;
         GstElement *queue, *fakesink;
         GstPad *sinkpad;
         GEnumClass *media_enum_class, *source_enum_class;
@@ -535,6 +535,15 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
                 source_caps = gst_caps_new_empty();
                 gst_caps_foreach(tmp, fix_video_caps_format, source_caps);
                 gst_caps_unref(tmp);
+
+                gst_caps_unref(device_caps);
+                device_caps = gst_pad_query_caps(srcpad, source_caps);
+
+                if (gst_caps_is_empty(device_caps)) {
+                    /* Accepting any format didn't work, we're going to hope that scaling fixes it */
+                    CREATE_ELEMENT(source_process, "videoscale", "video-source-scale");
+                    gst_bin_add(GST_BIN(source_pipeline), source_process);
+                }
             }
 
             gst_caps_unref(device_caps);
@@ -583,14 +592,25 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
 
         if (capsfilter) {
             LINK_ELEMENTS(capsfilter, tee);
-            gst_element_sync_state_with_parent(tee);
-            gst_element_sync_state_with_parent(capsfilter);
-            LINK_ELEMENTS(source, capsfilter);
+            if (source_process) {
+                LINK_ELEMENTS(source_process, capsfilter);
+                LINK_ELEMENTS(source, source_process);
+            } else
+                LINK_ELEMENTS(source, capsfilter);
+        } else if (source_process) {
+            LINK_ELEMENTS(source_process, tee);
+            LINK_ELEMENTS(source, source_process);
         } else {
-            gst_element_sync_state_with_parent(tee);
             LINK_ELEMENTS(source, tee);
         }
+
+        gst_element_sync_state_with_parent(tee);
+        if (capsfilter)
+            gst_element_sync_state_with_parent(capsfilter);
+        if (source_process)
+            gst_element_sync_state_with_parent(source_process);
         gst_element_sync_state_with_parent(source);
+
         _owr_media_source_set_source_bin(media_source, source_pipeline);
         _owr_media_source_set_source_tee(media_source, tee);
         if (gst_element_set_state(source_pipeline, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE) {
