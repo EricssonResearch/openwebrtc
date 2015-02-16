@@ -21,6 +21,7 @@ endif
 
 libopenwebrtc_jni_la_SOURCES = owr_jni.c
 libopenwebrtc_jni_la_LIBADD = \
+	-L$(ANDROID_NDK_PREFIX)/lib -landroid \
 	$(top_builddir)/owr/libopenwebrtc.la
 
 if OWR_BRIDGE

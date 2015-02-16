@@ -7,7 +7,8 @@ AM_CPPFLAGS = \
     -DPACKAGE_SRC_DIR=\""$(srcdir)"\" \
     -DPACKAGE_DATA_DIR=\""$(pkgdatadir)"\" \
     $(GLIB_CFLAGS) \
-    $(GSTREAMER_CFLAGS)
+    $(GSTREAMER_CFLAGS) \
+    $(OWR_DEVICE_LIST_EXT_CFLAGS)
 
 AM_CFLAGS = \
     -Wall \

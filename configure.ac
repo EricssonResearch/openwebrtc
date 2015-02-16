@@ -118,9 +118,34 @@ dnl pick dependencies and build flags based on OS
 case "$host_os" in
   darwin*)
     is_apple=yes
-    OWR_DEVICE_LIST_EXT_LIBS="-framework AVFoundation"
+    AC_CHECK_HEADER(AVFoundation/AVFoundation.h, ,
+                    AC_MSG_ERROR(AVFoundation is needed while building for OS X or iOS),
+                    [-])
+    AC_CHECK_HEADER(MobileCoreServices/MobileCoreServices.h, is_ios="yes",
+                    is_ios="no", [-])
+    if test "x$is_ios" == "xno"; then
+      dnl OS X frameworks
+      OWR_DEVICE_LIST_EXT_LIBS="-framework AVFoundation "
+    else
+      dnl iOS frameworks
+      m4_foreach([check_header],
+                 [[AssetsLibrary/AssetsLibrary.h], [CoreMedia/CoreMedia.h],
+                  [CoreVideo/CoreVideo.h], [OpenGLES/ES2/gl.h],
+                  [CoreAudio/CoreAudio.h], [AudioToolbox/AudioToolbox.h]],
+                 AC_CHECK_HEADER([check_header], ,
+                                 AC_MSG_ERROR([check_header is needed while
+					       building for iOS]),
+                                 [-]))
+      OWR_DEVICE_LIST_EXT_LIBS="-framework AssetsLibrary -framework CoreMedia \
+        -framework CoreVideo -framework AVFoundation -framework Foundation \
+        -framework OpenGLES -framework CoreAudio -framework AudioToolbox \
+        -weak_framework VideoToolbox -lc++ "
+    fi
     ;;
   linux-android*)
+    is_android=yes
+    OWR_DEVICE_LIST_EXT_CFLAGS=""
+    OWR_DEVICE_LIST_EXT_LIBS=""
     ;;
   linux*)
     PKG_CHECK_MODULES(PULSE, [libpulse libpulse-mainloop-glib])
@@ -128,8 +153,8 @@ case "$host_os" in
     OWR_DEVICE_LIST_EXT_LIBS="\$(PULSE_LIBS)"
     ;;
 esac
-AC_SUBST(OWR_DEVICE_LIST_EXT_LIBS)
 AM_CONDITIONAL(TARGET_APPLE, test x$is_apple = xyes)
+dnl We substitute OWR_DEVICE_LIST_EXT_LIBS in the end
 
 dnl generate java bindings or not
 AC_MSG_CHECKING([whether to generate java bindings or not])
@@ -144,6 +169,9 @@ AC_HELP_STRING(
 esac],[enable_owr_java=no])
 AC_MSG_RESULT([$enable_owr_java])
 if test "x$enable_owr_java" = xyes; then
+  if test "x$is_android" != xyes; then
+    AC_MSG_ERROR([--enable-owr-java is only valid when building for Android])
+  fi
   if test "x$enable_shared" != xyes; then
     AC_MSG_ERROR([--enable-owr-java needs --enabled-shared])
   fi
@@ -189,7 +217,7 @@ AC_ARG_WITH(android-sdk,
             androidsdkdir=${withval}, androidsdkdir=)
 if test "x$enable_owr_java" = xyes; then
   AC_MSG_CHECKING([for android.jar])
-  if test -a "x$androidsdkdir" = x; then
+  if test "x$androidsdkdir" = x; then
     AC_MSG_ERROR([Need path to the Android SDK when building Android bindings])
   fi
   ANDROID_CLASSPATH="$androidsdkdir/platforms/android-20/android.jar"
@@ -203,15 +231,15 @@ if test "x$enable_owr_java" = xyes; then
 fi
 AC_SUBST(ANDROID_CLASSPATH)
 
-dnl Android NDK path is needed when Java bindings are enabled
+dnl Android NDK path is needed when building for Android
 AC_ARG_WITH(android-ndk,
             AS_HELP_STRING([--with-android-ndk],
                            [path to the Android NDK]),
             androidndkdir=${withval}, androidndkdir=)
-if test "x$enable_owr_java" = xyes; then
+if test "x$is_android" = xyes; then
   AC_MSG_CHECKING([for the Android NDK prefix])
-  if test -a "x$androidndkdir" = x; then
-    AC_MSG_ERROR([Need path to the Android NDK when building Android bindings])
+  if test "x$androidndkdir" = x; then
+    AC_MSG_ERROR([Need path to the Android NDK when building for Android])
   fi
   case "$target" in
     i?86-*|x86_64-*)
@@ -233,6 +261,17 @@ if test "x$enable_owr_java" = xyes; then
   AC_MSG_RESULT([$ANDROID_NDK_PREFIX])
 fi
 AC_SUBST(ANDROID_NDK_PREFIX)
+
+if test "x$is_android" = xyes; then
+  dnl The GNU C++ STL is needed for JNI. This pkg-config file is
+  dnl only provided by Cerbero.
+  PKG_CHECK_MODULES(GNU_CXXSTL, [gnustl])
+
+  OWR_DEVICE_LIST_EXT_CFLAGS="$OWR_DEVICE_LIST_EXT_CFLAGS $GNU_CXXSTL_CFLAGS"
+  OWR_DEVICE_LIST_EXT_LIBS="$OWR_DEVICE_LIST_EXT_LIBS $GNU_CXXSTL_LIBS"
+fi
+AC_SUBST(OWR_DEVICE_LIST_EXT_CFLAGS)
+AC_SUBST(OWR_DEVICE_LIST_EXT_LIBS)
 
 AC_OUTPUT([
 Makefile
