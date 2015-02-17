@@ -47,6 +47,8 @@
 #include <gst/gst.h>
 
 #ifdef OWR_STATIC
+#include <stdlib.h>
+
 #include <gstnice.h>
 #endif
 
