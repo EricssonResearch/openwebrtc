@@ -48,8 +48,6 @@
 
 #ifdef OWR_STATIC
 #include <stdlib.h>
-
-#include <gstnice.h>
 #endif
 
 #ifdef __APPLE__
@@ -77,6 +75,7 @@ GST_PLUGIN_STATIC_DECLARE(coreelements);
 GST_PLUGIN_STATIC_DECLARE(erdtls);
 GST_PLUGIN_STATIC_DECLARE(inter);
 GST_PLUGIN_STATIC_DECLARE(mulaw);
+GST_PLUGIN_STATIC_DECLARE(nice);
 GST_PLUGIN_STATIC_DECLARE(opengl);
 GST_PLUGIN_STATIC_DECLARE(openh264);
 GST_PLUGIN_STATIC_DECLARE(opus);
@@ -107,7 +106,7 @@ GST_PLUGIN_STATIC_DECLARE(pulseaudio);
 GST_PLUGIN_STATIC_DECLARE(video4linux2);
 #endif
 
-#if defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR && !defined(__arm64__))
+#if (defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR && !defined(__arm64__))
 GST_PLUGIN_STATIC_DECLARE(ercolorspace);
 #endif
 #endif
@@ -204,6 +203,7 @@ void owr_init()
     GST_PLUGIN_STATIC_REGISTER(erdtls);
     GST_PLUGIN_STATIC_REGISTER(inter);
     GST_PLUGIN_STATIC_REGISTER(mulaw);
+    GST_PLUGIN_STATIC_REGISTER(nice);
     GST_PLUGIN_STATIC_REGISTER(opengl);
     GST_PLUGIN_STATIC_REGISTER(openh264);
     GST_PLUGIN_STATIC_REGISTER(opus);
@@ -233,12 +233,10 @@ void owr_init()
     GST_PLUGIN_STATIC_REGISTER(pulseaudio);
     GST_PLUGIN_STATIC_REGISTER(video4linux2);
 #endif
-#if defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR && !defined(__arm64__))
+#if (defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR && !defined(__arm64__))
     GST_PLUGIN_STATIC_REGISTER(ercolorspace);
 #endif
 
-    gst_element_register(NULL, "nicesrc", GST_RANK_NONE, GST_TYPE_NICE_SRC);
-    gst_element_register(NULL, "nicesink", GST_RANK_NONE, GST_TYPE_NICE_SINK);
 #endif
 
     owr_main_context_is_external = !!owr_main_context;
