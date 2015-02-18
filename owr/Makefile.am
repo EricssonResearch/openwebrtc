@@ -72,6 +72,10 @@ EXTRA_DIST = \
 INTROSPECTION_GIRS =
 INTROSPECTION_SCANNER_ARGS = --add-include-path=$(srcdir) --warn-all
 
+if !OWR_STATIC
+INTROSPECTION_SCANNER_ARGS += --pkg gstreamer-1.0 --pkg gstreamer-video-1.0 --pkg gstreamer-app-1.0
+endif
+
 INTROSPECTION_COMPILER_ARGS = --includedir=$(srcdir)
 if OWR_STATIC
 INTROSPECTION_COMPILER_ARGS += --shared-library=""
@@ -88,9 +92,6 @@ Owr_0_1_gir_CFLAGS = \
     -I$(top_srcdir)/transport \
     -I$(top_srcdir)/local
 Owr_0_1_gir_LIBS = libopenwebrtc.la
-if !OWR_STATIC
-Owr_0_1_gir_LIBS += gstreamer-1.0 gstvideo-1.0 gstapp-1.0
-endif
 Owr_0_1_gir_FILES = \
     owr.h \
     owr.c \
