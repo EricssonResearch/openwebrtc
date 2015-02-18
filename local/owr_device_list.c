@@ -306,7 +306,7 @@ static gchar *get_v4l2_device_name(gchar *filename)
     } else
         device_name = g_strdup((const gchar *)vcap.card);
 
-    g_warning("v4l: found device: %s", device_name);
+    g_debug("v4l: found device: %s", device_name);
 
     close(fd);
 
