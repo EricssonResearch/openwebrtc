@@ -48,13 +48,13 @@
 
 #if defined(__APPLE__) && !TARGET_IPHONE_SIMULATOR && !defined(__arm64__)
 #if TARGET_OS_IPHONE
-#define VIDEO_CONVERT "ercolorspace"
+#define VIDEO_CONVERT "videoconvert"
 #else
 #define VIDEO_CONVERT "videoconvert"
 #endif
 
 #elif defined(__ANDROID__)
-#define VIDEO_CONVERT "ercolorspace"
+#define VIDEO_CONVERT "videoconvert"
 
 #elif defined(__linux__)
 #define VIDEO_CONVERT "videoconvert"
