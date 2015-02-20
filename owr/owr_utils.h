@@ -39,7 +39,7 @@ G_BEGIN_DECLS
 
 #define OWR_UNUSED(x) (void)x
 
-int _owr_require_symbols(void);
+void *_owr_require_symbols(void);
 OwrCodecType _owr_caps_to_codec_type(GstCaps *caps);
 void _owr_utils_call_closure_with_list(GClosure *callback, GList *list);
 GClosure *_owr_utils_list_closure_merger_new(GClosure *final_callback, GDestroyNotify list_item_destroy);
