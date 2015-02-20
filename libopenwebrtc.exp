@@ -2538,7 +2538,6 @@ g_settings_range_check
 g_settings_reset
 g_settings_revert
 g_settings_schema_get_id
-g_settings_schema_get_key
 g_settings_schema_get_path
 g_settings_schema_get_type
 g_settings_schema_has_key
