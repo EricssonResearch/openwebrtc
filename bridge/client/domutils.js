@@ -195,6 +195,17 @@ function canConvert(value, expectedTypes) {
     return false;
 }
 
+function getDictionaryMember(dict, name, type, defaultValue) {
+    if (!dict.hasOwnProperty(name) || dict[name] == null)
+        return defaultValue;
+    if (type == "string")
+        return String(dict[name]);
+    if (type == "boolean")
+        return !!dict[name];
+    if (type == "number")
+        return +dict[name];
+}
+
 function randomString() {
     var randomValues = new Uint8Array(27);
     crypto.getRandomValues(randomValues);
