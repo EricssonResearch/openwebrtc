@@ -131,7 +131,7 @@ build(){
         export GSTREAMER_CFLAGS="-isystem ${src_dir}/openwebrtc-deps-${target}/include/gstreamer-1.0 -isystem ${src_dir}/openwebrtc-deps-${target}/include/private-gstreamer -isystem ${src_dir}/openwebrtc-deps-${target}/lib/gstreamer-1.0/include"
         export GSTREAMER_LIBS="-L${src_dir}/openwebrtc-deps-${target}/lib -L${src_dir}/openwebrtc-deps-${target}/lib/gstreamer-1.0 -lgstaudiotestsrc -lgstvideotestsrc -lgstcoreelements -lgstalaw -lgstmulaw -lgstopus -lopus -lgstapp -lgstaudioconvert -lgstaudioresample -lgstvolume -lgstvideoconvert -lgstvpx -lvpx -lgstopengl -lgstinter -lgstgl-1.0"
         export GSTREAMER_LIBS="$GSTREAMER_LIBS $PLATFORM_GSTREAMER_LIBS -lgstrtpmanager -lgstrtp -lgstsrtp -lsrtp -lgstvideocrop -lgstvideofilter -lgstvideoparsersbad -lgstvideorate -lgstvideoscale -lgstnice -lgstcontroller-1.0 -lgstpbutils-1.0 -lgstnet-1.0 -lgstrtp-1.0 -lgstbadvideo-1.0 -lgstbadbase-1.0"
-        export GSTREAMER_LIBS="$GSTREAMER_LIBS -lgsttag-1.0 -lgstapp-1.0 -lgstaudio-1.0 -lgstvideo-1.0 -lgstcodecparsers-1.0 -lgstbase-1.0 -lgstreamer-1.0"
+        export GSTREAMER_LIBS="$GSTREAMER_LIBS -lgsttag-1.0 -lgstapp-1.0 -lgstaudio-1.0 -lgstvideo-1.0 -lgstcodecparsers-1.0 -lgstbase-1.0 -lgstreamer-1.0 -lm"
         export SEED_CFLAGS="-isystem ${src_dir}/openwebrtc-deps-${target}/include/seed-gtk3 -isystem ${src_dir}/openwebrtc-deps-${target}/include/gobject-introspection-1.0"
         export SEED_LIBS="-L${src_dir}/openwebrtc-deps-${target}/lib/seed-gtk3 -lseed-gtk3 -lseed_sandbox $seed_platform_libs -lgirepository-1.0 -lgirepository-internals $PLATFORM_CXX_LIBS"
         export JSON_GLIB_CFLAGS="-I${src_dir}/openwebrtc-deps-${target}/include/json-glib-1.0"
