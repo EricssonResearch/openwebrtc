@@ -33,9 +33,9 @@ def symbols_to_source(infile_name, outfile_name, platform):
                 symbols.append(split[0].strip())
         outfile.write("#include <stdlib.h>\n")
         outfile.writelines(["extern void *%s;\n" % symbol for symbol in symbols])
-        outfile.write("\nint _%s(void)\n{\n    " % outfile_name.split(".")[0])
-        outfile.write("int ret = 0;\n    ")
-        lines = ["ret |= ((int) %s)" % symbol for symbol in symbols]
+        outfile.write("\nvoid *_%s(void)\n{\n    " % outfile_name.split(".")[0])
+        outfile.write("void *ret = 0;\n    ")
+        lines = ["ret |= %s" % symbol for symbol in symbols]
         outfile.writelines(";\n    ".join(lines))
         outfile.write(";\n    ")
         outfile.write("return ret;\n}\n\n")
