@@ -32,13 +32,14 @@ def symbols_to_source(infile_name, outfile_name, platform):
             if not split[1:] or platform in [p.strip() for p in split[1].split(' or ')]:
                 symbols.append(split[0].strip())
         outfile.write("#include <stdlib.h>\n")
+        outfile.write("#include <stdint.h>\n")
         outfile.writelines(["extern void *%s;\n" % symbol for symbol in symbols])
         outfile.write("\nvoid *_%s(void)\n{\n    " % outfile_name.split(".")[0])
-        outfile.write("void *ret = 0;\n    ")
-        lines = ["ret |= %s" % symbol for symbol in symbols]
+        outfile.write("uintptr_t ret = 0;\n    ")
+        lines = ["ret |= (uintptr_t) %s" % symbol for symbol in symbols]
         outfile.writelines(";\n    ".join(lines))
         outfile.write(";\n    ")
-        outfile.write("return ret;\n}\n\n")
+        outfile.write("return (void *) ret;\n}\n\n")
 
 
 if __name__ == "__main__":
