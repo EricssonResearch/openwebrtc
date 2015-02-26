@@ -487,26 +487,26 @@ static void add_helper_server_info(GResolver *resolver, GAsyncResult *result, GH
         g_free(g_hash_table_lookup(info, "username"));
         g_free(g_hash_table_lookup(info, "password"));
         g_hash_table_unref(info);
-        goto out;
+        info = NULL;
+    } else {
+        g_hash_table_insert(info, "address", g_inet_address_to_string(address_list->data));
+        g_resolver_free_addresses(address_list);
+
+        priv->helper_server_infos = g_list_append(priv->helper_server_infos, info);
     }
-
-    g_hash_table_insert(info, "address", g_inet_address_to_string(address_list->data));
-    g_resolver_free_addresses(address_list);
-
-    priv->helper_server_infos = g_list_append(priv->helper_server_infos, info);
 
     g_mutex_lock(&priv->sessions_lock);
     stream_ids = g_hash_table_get_keys(priv->sessions);
     g_mutex_unlock(&priv->sessions_lock);
     for (item = stream_ids; item; item = item->next) {
         stream_id = GPOINTER_TO_UINT(item->data);
-        update_helper_servers(transport_agent, stream_id);
+        if (info)
+            update_helper_servers(transport_agent, stream_id);
         if (!priv->deferred_helper_server_adds)
             nice_agent_gather_candidates(priv->nice_agent, stream_id);
     }
     g_list_free(stream_ids);
 
-out:
     g_object_unref(transport_agent);
 }
 
