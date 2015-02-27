@@ -143,8 +143,15 @@
                 bridge.removeObjectRef(client);
                 resolve(new MediaStream(trackList));
             };
-
-            bridge.requestSources(options, bridge.createObjectRef(client, "gotSources"));
+            client.noSources = function (reason) {
+                var message = "AbortError";
+                if (reason == "rejected") 
+                    message = "PermissionDeniedError";
+                else if (reason == "notavailable")
+                    message = "SourceUnavailableError";
+                reject(new MediaStreamError({"name": message}));
+            }
+            bridge.requestSources(options, bridge.createObjectRef(client, "gotSources", "noSources"));
         });
     }
 
