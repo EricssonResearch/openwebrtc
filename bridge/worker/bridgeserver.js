@@ -40,9 +40,9 @@ extensionServer.onaccept = function (event) {
             var extws = event.socket;
 
             this.add = function (message, client) {
-                queue.push({ "reqMsg": message, "client": client }); //only push if the extension origin is OK
+                queue.push({ "reqMsg": message, "client": client }); // only push if the extension origin is OK
                 if (queue.length == 1)
-                    extws.send(JSON.stringify(message)); //send only if there was no queue
+                    extws.send(JSON.stringify(message)); // send only if there was no queue
             };
 
             function handleResponse(evt) {
@@ -50,6 +50,9 @@ extensionServer.onaccept = function (event) {
                 var response = JSON.parse(evt.data);
                 if (response.name == "accept" && response.Id == outstandingRequest.reqMsg.Id)
                     outstandingRequest.client.gotSources(response.acceptSourceInfos);
+                else if (response.name == "reject" && response.Id == outstandingRequest.reqMsg.Id)
+                    outstandingRequest.client.noSources("rejected");
+
                 if (queue.length > 0)
                     extws.send(JSON.stringify(queue[0].reqMsg));
             }
@@ -146,19 +149,24 @@ server.onaccept = function (event) {
                 }
             }
 
-            if (consentRequestQueue) { //If an extension ever did try to connect
-                var requestId = Math.random().toString(16).substr(2);
-                var requestMessage = {
-                    "name": "request",
-                    "origin": origin,
-                    "Id": requestId,
-                    "requestSourceInfos": sourceInfos
-                };
-                consentRequestQueue.add(requestMessage, client);
-            } else {
-                //This option should be removed eventually - only extensions that ask for consent should be allowed to use owr
-                client.gotSources(sourceInfos);
-            }
+            if (sourceInfos.length > 0) {
+                if (consentRequestQueue) { // If an extension ever did try to connect
+                    var requestId = Math.random().toString(16).substr(2);
+                    var requestMessage = {
+                        "name": "request",
+                        "origin": origin,
+                        "Id": requestId,
+                        "requestSourceInfos": sourceInfos
+                    };
+                    consentRequestQueue.add(requestMessage, client);
+                } else {
+                    // This option should be removed eventually - only extensions that ask for consent should be allowed to use owr
+                    client.gotSources(sourceInfos);
+                }
+            }    
+            else
+                client.noSources("notavailable");
+
         });
     };
 
