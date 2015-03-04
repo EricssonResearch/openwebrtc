@@ -300,6 +300,9 @@
     //
     RTCPeerConnection.prototype = Object.create(EventTarget.prototype);
     RTCPeerConnection.prototype.constructor = RTCPeerConnection;
+    RTCPeerConnection.prototype.createDataChannel = function () { 
+        console.warn("createDataChannel only exposed on the prototype for feature probing");
+    };
 
     function RTCPeerConnection(configuration) {
         var _this = this;
