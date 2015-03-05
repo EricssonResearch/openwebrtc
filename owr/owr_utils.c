@@ -133,3 +133,28 @@ GClosure *_owr_utils_list_closure_merger_new(GClosure *final_callback, GDestroyN
 
     return merger;
 }
+
+gboolean _owr_gst_caps_foreach(const GstCaps *caps, OwrGstCapsForeachFunc func, gpointer user_data)
+{
+    guint i, n;
+    GstCapsFeatures *features;
+    GstStructure *structure;
+    gboolean ret;
+
+    g_return_val_if_fail(GST_IS_CAPS(caps), FALSE);
+    g_return_val_if_fail(func != NULL, FALSE);
+
+    n = gst_caps_get_size(caps);
+
+    for (i = 0; i < n; i++) {
+        features = gst_caps_get_features(caps, i);
+        structure = gst_caps_get_structure(caps, i);
+        if (features && structure) {
+            ret = func(features, structure, user_data);
+            if (G_UNLIKELY(!ret))
+                return FALSE;
+	}
+    }
+
+    return TRUE;
+}
