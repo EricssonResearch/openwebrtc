@@ -2125,5 +2125,9 @@ gchar * owr_transport_agent_get_dot_data(OwrTransportAgent *transport_agent)
     g_return_val_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent), NULL);
     g_return_val_if_fail(transport_agent->priv->pipeline, NULL);
 
+#if GST_CHECK_VERSION(1, 5, 0)
     return gst_debug_bin_to_dot_data(GST_BIN(transport_agent->priv->pipeline), GST_DEBUG_GRAPH_SHOW_ALL);
+#else
+    return g_strdup("");
+#endif
 }

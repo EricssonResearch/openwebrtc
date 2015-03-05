@@ -394,5 +394,9 @@ gchar * owr_media_renderer_get_dot_data(OwrMediaRenderer *renderer)
     g_return_val_if_fail(OWR_IS_MEDIA_RENDERER(renderer), NULL);
     g_return_val_if_fail(renderer->priv->pipeline, NULL);
 
+#if GST_CHECK_VERSION(1, 5, 0)
     return gst_debug_bin_to_dot_data(GST_BIN(renderer->priv->pipeline), GST_DEBUG_GRAPH_SHOW_ALL);
+#else
+    return g_strdup("");
+#endif
 }

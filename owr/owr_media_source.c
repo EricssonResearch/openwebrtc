@@ -605,5 +605,9 @@ gchar * owr_media_source_get_dot_data(OwrMediaSource *source)
     if (!source->priv->source_bin)
         return g_strdup("");
 
+#if GST_CHECK_VERSION(1, 5, 0)
     return gst_debug_bin_to_dot_data(GST_BIN(source->priv->source_bin), GST_DEBUG_GRAPH_SHOW_ALL);
+#else
+    return g_strdup("");
+#endif
 }
