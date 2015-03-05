@@ -522,8 +522,11 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
 
             /* Framerate is handled at intervideosrc */
             source_caps = gst_caps_new_empty();
+#if GST_CHECK_VERSION(1, 5, 0)
             gst_caps_foreach(caps, fix_video_caps_framerate, source_caps);
-
+#else
+            _owr_gst_caps_foreach(caps, fix_video_caps_framerate, source_caps);
+#endif
             /* Now see what the device can really produce */
             srcpad = gst_element_get_static_pad(source, "src");
             gst_element_set_state(source, GST_STATE_READY);
@@ -533,7 +536,11 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
                 /* Let's see if it works when we drop format constraints (which can be dealt with downsteram) */
                 GstCaps *tmp = source_caps;
                 source_caps = gst_caps_new_empty();
+#if GST_CHECK_VERSION(1, 5, 0)
                 gst_caps_foreach(tmp, fix_video_caps_format, source_caps);
+#else
+                _owr_gst_caps_foreach(tmp, fix_video_caps_format, source_caps);
+#endif
                 gst_caps_unref(tmp);
 
                 gst_caps_unref(device_caps);

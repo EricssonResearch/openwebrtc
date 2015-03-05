@@ -44,6 +44,16 @@ OwrCodecType _owr_caps_to_codec_type(GstCaps *caps);
 void _owr_utils_call_closure_with_list(GClosure *callback, GList *list);
 GClosure *_owr_utils_list_closure_merger_new(GClosure *final_callback, GDestroyNotify list_item_destroy);
 
+/* FIXME: This should be removed when the GStreamer required version
+ * is 1.6 and gst_caps_foreach() can be used.
+ * Upstream commit: http://cgit.freedesktop.org/gstreamer/gstreamer/commit/?id=bc11a1b79dace8ca73d3367d7c70629f8a6dd7fd 
+ * The author of the above commit, Sebastian Dröge, agreed
+ * relicensing this copy of the function under BSD 2-Clause. */
+typedef gboolean (*OwrGstCapsForeachFunc) (GstCapsFeatures *features,
+                                           GstStructure    *structure,
+                                           gpointer         user_data);
+gboolean _owr_gst_caps_foreach(const GstCaps *caps, OwrGstCapsForeachFunc func, gpointer user_data);
+
 G_END_DECLS
 
 #endif /* __GTK_DOC_IGNORE__ */
