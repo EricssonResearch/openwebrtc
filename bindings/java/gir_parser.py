@@ -64,6 +64,7 @@ ATTR_CLOSURE = 'closure'
 ATTR_READABLE = 'readable'
 ATTR_WRITABLE = 'writable'
 ATTR_ALLOW_NONE = 'allow-none'
+ATTR_INTROSPECTABLE = 'introspectable'
 ATTR_CONSTRUCT_ONLY = 'construct-only'
 ATTR_SHARED_LIBRARY = 'shared-library'
 ATTR_TRANSFER_ONWERSHIP = 'transfer-ownership'
@@ -246,6 +247,7 @@ class Property(object):
     @classmethod
     def from_tag(cls, type_registry, class_value, tag):
         name = tag.get(ATTR_NAME)
+
         return cls(
             name=name,
             value=parse_tag_value(type_registry, tag, camel_case(name)),
@@ -388,11 +390,11 @@ class Class(object):
             glib_type_name=tag.get(ATTR_GLIB_TYPE_NAME),
             glib_get_type=tag.get(ATTR_GLIB_GET_TYPE),
             glib_type_struct=tag.get(ATTR_GLIB_TYPE_STRUCT),
-            constructors=[Constructor.from_tag(type_registry, t) for t in tag.findall(TAG_CONSTRUCTOR)],
-            properties=[Property.from_tag(type_registry, value, t) for t in tag.findall(TAG_PROPERTY)],
-            methods=[Method.from_tag(type_registry, t) for t in tag.findall(TAG_METHOD)],
-            functions=[Function.from_tag(type_registry, t) for t in tag.findall(TAG_FUNCTION)],
-            signals=[Signal.from_tag(type_registry, value, t) for t in tag.findall(TAG_SIGNAL)],
+            constructors=[Constructor.from_tag(type_registry, t) for t in tag.findall(TAG_CONSTRUCTOR) if t.get(ATTR_INTROSPECTABLE) != '0'],
+            properties=[Property.from_tag(type_registry, value, t) for t in tag.findall(TAG_PROPERTY) if t.get(ATTR_INTROSPECTABLE) != '0'],
+            methods=[Method.from_tag(type_registry, t) for t in tag.findall(TAG_METHOD) if t.get(ATTR_INTROSPECTABLE) != '0'],
+            functions=[Function.from_tag(type_registry, t) for t in tag.findall(TAG_FUNCTION) if t.get(ATTR_INTROSPECTABLE) != '0'],
+            signals=[Signal.from_tag(type_registry, value, t) for t in tag.findall(TAG_SIGNAL) if t.get(ATTR_INTROSPECTABLE) != '0'],
         )
 
 
