@@ -197,11 +197,22 @@ class PrimitiveMetaType(GirMetaType):
 
 class CharType   (PrimitiveMetaType('byte',    'jbyte',    'gchar',    'B', 'Char')): pass
 class UcharType  (PrimitiveMetaType('byte',    'jbyte',    'guchar',   'B', 'Char')): pass
+class Int8Type   (PrimitiveMetaType('byte',    'jbyte',    'gint8',    'B', 'Char')): pass
+class Uint8Type  (PrimitiveMetaType('byte',    'jbyte',    'guint8',   'B', 'Char')): pass
+class ShortType  (PrimitiveMetaType('short',   'jshort',   'gshort',   'S', 'Short')): pass
+class UshortType (PrimitiveMetaType('short',   'jshort',   'gushort',  'S', 'Short')): pass
+class Int16Type  (PrimitiveMetaType('short',   'jshort',   'gint16',   'S', 'Short')): pass
+class Uint16Type (PrimitiveMetaType('short',   'jshort',   'guint16',  'S', 'Short')): pass
 class IntType    (PrimitiveMetaType('int',     'jint',     'gint',     'I', 'Integer')): pass
 class UintType   (PrimitiveMetaType('int',     'jint',     'guint',    'I', 'Integer')): pass
+class Uint32Type (PrimitiveMetaType('int',     'jint',     'gint32',   'I', 'Integer')): pass
+class Int32Type  (PrimitiveMetaType('int',     'jint',     'guint32',  'I', 'Integer')): pass
 class LongType   (PrimitiveMetaType('long',    'jlong',    'glong',    'J', 'Long')): pass
 class UlongType  (PrimitiveMetaType('long',    'jlong',    'gulong',   'J', 'Long')): pass
 class LongPtrType(PrimitiveMetaType('long',    'jlong',    'gpointer', 'J', 'Long')): pass
+class SizeType   (PrimitiveMetaType('long',    'jlong',    'gsize',    'J', 'Long')): pass
+class SsizeType  (PrimitiveMetaType('long',    'jlong',    'gssize',   'J', 'Long')): pass
+class OffsetType (PrimitiveMetaType('long',    'jlong',    'goffset',  'J', 'Long')): pass
 class Int64Type  (PrimitiveMetaType('long',    'jlong',    'gint64',   'J', 'Long')): pass
 class Uint64Type (PrimitiveMetaType('long',    'jlong',    'guint64',  'J', 'Long')): pass
 class BooleanType(PrimitiveMetaType('boolean', 'jboolean', 'gboolean', 'Z', 'Boolean')): pass
@@ -538,8 +549,22 @@ standard_types = [
     VoidType,
     CharType,
     UcharType,
+    Int8Type,
+    Uint8Type,
+    ShortType,
+    UshortType,
+    Int16Type,
+    Uint16Type,
     IntType,
     UintType,
+    Uint32Type,
+    Int32Type,
+    LongType,
+    UlongType,
+    LongPtrType,
+    SizeType,
+    SsizeType,
+    OffsetType,
     Int64Type,
     Uint64Type,
     BooleanType,
