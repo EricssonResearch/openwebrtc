@@ -144,12 +144,20 @@
                 resolve(new MediaStream(trackList));
             };
             client.noSources = function (reason) {
-                var message = "AbortError";
-                if (reason == "rejected") 
-                    message = "PermissionDeniedError";
-                else if (reason == "notavailable")
-                    message = "SourceUnavailableError";
-                reject(new MediaStreamError({"name": message}));
+                var name = "AbortError";
+                var message = "Aborted";
+                if (reason == "rejected") {
+                    name = "PermissionDeniedError";
+                    message = "The user did not grant permission for the operation.";
+                }
+                else if (reason == "notavailable") {
+                    name = "SourceUnavailableError";
+                    message = "The sources available did not match the requirements.";
+                }
+                reject(new MediaStreamError({
+                    "name": name,
+                    "message": message
+                }));
             }
             bridge.requestSources(options, bridge.createObjectRef(client, "gotSources", "noSources"));
         });
@@ -291,14 +299,14 @@
             initDict = {};
 
         var a = { // attributes
-            "name": initDict.name || "",
+            "name": initDict.name || "MediaStreamError",
             "message": initDict.message || null,
             "constraintName": initDict.constraintName || null
         };
         domObject.addReadOnlyAttributes(this, a);
 
         this.toString = function () {
-            return "MediaStreamError: " + a.name + ": " + (a.message ? a.message : "");
+            return a.name + ": " + (a.message ? a.message : "");
         };
     }
 
