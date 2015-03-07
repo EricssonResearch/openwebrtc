@@ -195,10 +195,10 @@ class PrimitiveMetaType(GirMetaType):
         ])
 
 
-class CharType   (PrimitiveMetaType('byte',    'jbyte',    'gchar',    'B', 'Char')): pass
-class UcharType  (PrimitiveMetaType('byte',    'jbyte',    'guchar',   'B', 'Char')): pass
-class Int8Type   (PrimitiveMetaType('byte',    'jbyte',    'gint8',    'B', 'Char')): pass
-class Uint8Type  (PrimitiveMetaType('byte',    'jbyte',    'guint8',   'B', 'Char')): pass
+class CharType   (PrimitiveMetaType('byte',    'jbyte',    'gchar',    'B', 'Byte')): pass
+class UcharType  (PrimitiveMetaType('byte',    'jbyte',    'guchar',   'B', 'Byte')): pass
+class Int8Type   (PrimitiveMetaType('byte',    'jbyte',    'gint8',    'B', 'Byte')): pass
+class Uint8Type  (PrimitiveMetaType('byte',    'jbyte',    'guint8',   'B', 'Byte')): pass
 class ShortType  (PrimitiveMetaType('short',   'jshort',   'gshort',   'S', 'Short')): pass
 class UshortType (PrimitiveMetaType('short',   'jshort',   'gushort',  'S', 'Short')): pass
 class Int16Type  (PrimitiveMetaType('short',   'jshort',   'gint16',   'S', 'Short')): pass
