@@ -39,6 +39,7 @@ TAG_INCLUDE = NS + 'include'
 TAG_CONSTRUCTOR = NS + 'constructor'
 TAG_RETURN_VALUE = NS + 'return-value'
 TAG_TYPE = NS + 'type'
+TAG_ARRAY = NS + 'array'
 TAG_PARAMETERS = NS + 'parameters'
 TAG_VIRTUAL_METHOD = NS + 'virtual-method'
 TAG_PARAMETER = NS + 'parameter'
@@ -59,6 +60,7 @@ ATTR_NAME = 'name'
 ATTR_WHEN = 'when'
 ATTR_VALUE = 'value'
 ATTR_SCOPE = 'scope'
+ATTR_LENGTH = 'length'
 ATTR_PARENT = 'parent'
 ATTR_CLOSURE = 'closure'
 ATTR_READABLE = 'readable'
@@ -67,6 +69,7 @@ ATTR_ALLOW_NONE = 'allow-none'
 ATTR_INTROSPECTABLE = 'introspectable'
 ATTR_CONSTRUCT_ONLY = 'construct-only'
 ATTR_SHARED_LIBRARY = 'shared-library'
+ATTR_ZERO_TERMINATED = 'zero-terminated'
 ATTR_TRANSFER_ONWERSHIP = 'transfer-ownership'
 
 ATTR_C_IDENTIFIER_PREFIXES = C_NS + 'identifier-prefixes'
@@ -113,12 +116,20 @@ def camel_case(st):
 
 def parse_tag_value(type_registry, tag, name=None):
     def lookup_type(tag):
-        gir_type = tag.get(ATTR_NAME)
-        c_type = tag.get(ATTR_C_TYPE)
-        return type_registry.lookup(gir_type, c_type)
+        if tag.tag == TAG_ARRAY:
+            inner_tag = tag.find(TAG_TYPE)
+            gir_type = inner_tag.get(ATTR_NAME)
+            c_type = inner_tag.get(ATTR_C_TYPE)
+            return type_registry.lookup(gir_type, c_type, is_array=True)
+        else:
+            gir_type = tag.get(ATTR_NAME)
+            c_type = tag.get(ATTR_C_TYPE)
+            return type_registry.lookup(gir_type, c_type)
 
     transfer = tag.get(ATTR_TRANSFER_ONWERSHIP)
     type_tag = tag.find(TAG_TYPE)
+    if type_tag is None:
+        type_tag = tag.find(TAG_ARRAY)
     allow_none = tag.get(ATTR_ALLOW_NONE) == '1'
     inner_type_tags = type_tag.findall(TAG_TYPE)
 
@@ -129,14 +140,18 @@ def parse_tag_value(type_registry, tag, name=None):
     typ = lookup_type(type_tag)
     value = None
 
-    if inner_type_tags:
-        assert typ.is_container
+    if typ.is_container:
+        assert inner_type_tags
         types = enumerate(map(lookup_type, inner_type_tags))
         type_params = [c(name + '_' + str(i), transfer == 'full') for i, c in types]
         value = typ(name, transfer != 'none', allow_none, *type_params)
     else:
         assert transfer != 'container'
-        value = typ(name, transfer == 'full', allow_none)
+        if typ.is_array:
+            c_array_type = type_tag.get(ATTR_C_TYPE)
+            value = typ(name, transfer == 'full', allow_none, c_array_type)
+        else:
+            value = typ(name, transfer == 'full', allow_none)
     value.doc = parse_doc(tag)
     return value
 
@@ -160,6 +175,11 @@ class Parameters(object):
 
         self.closure_params, self.java_params = partition(is_closure_param, params)
 
+        def is_length_param(param):
+            return param.is_length_param
+
+        self.length_params, self.java_params = partition(is_length_param, self.java_params)
+
         if java_params:
             self.java_params = java_params
 
@@ -181,10 +201,16 @@ class Parameters(object):
             return cls(return_value, None)
 
         closure_refs = {}
+        array_refs = {}
         for tag_index, tag in enumerate(params_tag.findall(TAG_PARAMETER)):
             closure = tag.get(ATTR_CLOSURE)
             if closure is not None:
                 closure_refs[int(closure)] = tag_index
+            array_tag = tag.find(TAG_ARRAY)
+            if array_tag is not None:
+                length = array_tag.get(ATTR_LENGTH)
+                if length is not None:
+                    array_refs[int(length)] = tag_index
 
         params = []
         instance_param = None
@@ -201,6 +227,15 @@ class Parameters(object):
                     assert closure_index == real_tag_index - 1 or closure_index == real_tag_index
                     closure = params[-1]
                     params.append(JObjectWrapperType(name, closure, transfer_ownership=True))
+                elif array_refs.get(real_tag_index) is not None:
+                    array_index = array_refs.get(real_tag_index)
+                    assert array_index == real_tag_index - 1
+                    array = params[-1]
+                    value = parse_tag_value(type_registry, tag)
+                    value.is_length_param = True
+                    value.array = array
+                    array.length = value
+                    params.append(value)
                 else:
                     params.append(parse_tag_value(type_registry, tag))
                 real_tag_index += 1

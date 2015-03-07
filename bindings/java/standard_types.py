@@ -181,17 +181,85 @@ class PrimitiveMetaType(GirMetaType):
         return new
 
     def transform_to_c(self):
+        if self.is_length_param:
+            return TypeTransform()
+        else:
+            return TypeTransform([
+                C.Decl(self.c_type, self.c_name),
+            ],[
+                C.Assign(self.c_name, self.jni_name, cast=self.c_type),
+            ])
+
+    def transform_to_jni(self):
+        if self.is_length_param:
+            return TypeTransform()
+        else:
+            return TypeTransform([
+                C.Decl(self.jni_type, self.jni_name),
+            ],[
+                C.Assign(self.jni_name, self.c_name, cast=self.jni_type)
+            ])
+
+
+class PrimitiveArrayMetaType(GirMetaType):
+    is_array = True
+
+    def __init__(self, name, transfer_ownership, allow_none, c_array_type='gpointer'):
+        super(PrimitiveArrayMetaType, self).__init__(name, transfer_ownership, allow_none)
+        self.c_type = c_array_type
+
+    def __new__(cls, java_type, jni_type, c_type, java_signature, object_type):
+        new = super(PrimitiveArrayMetaType, cls).__new__(cls)
+        new.gir_type = c_type
+        new.java_type = java_type + '[]'
+        new.primitive_type_name = java_type.title()
+        new.jni_type = jni_type
+        new.c_element_type = c_type
+        new.java_signature = '[' + java_signature
+        new.object_type = object_type + '[]'
+        new.object_full_type = 'java.lang.' + object_type
+        return new
+
+    @staticmethod
+    def from_primitive_type(typ):
+        return PrimitiveArrayMetaType(
+            typ.java_type,
+            typ.jni_type + 'Array',
+            typ.c_type,
+            typ.java_signature,
+            typ.object_type,
+        )
+
+    def transform_to_c(self):
+        assert not self.transfer_ownership # transfer not implemented
         return TypeTransform([
             C.Decl(self.c_type, self.c_name),
-        ],[
-            C.Assign(self.c_name, self.jni_name, cast=self.c_type)
+            C.Decl('jsize', self.length.jni_name),
+            C.Decl(self.length.c_type, self.length.c_name),
+        ], [
+            C.Assert('sizeof(%s) == sizeof(%s)' % (self.c_element_type, self.jni_type[:-5])),
+            C.Assign(self.c_name, C.Env('Get%sArrayElements' % self.primitive_type_name, self.jni_name, 'NULL'), cast=self.c_type),
+            C.ExceptionCheck.default(self),
+            C.Assign(self.length.c_name, C.Env('GetArrayLength', '(jarray) ' + self.jni_name), cast=self.length.c_type),
+            C.ExceptionCheck.default(self),
+        ], [
+            # discard any changes
+            C.Env('Release%sArrayElements' % self.primitive_type_name, self.jni_name, self.c_name, 'JNI_ABORT'),
+            C.ExceptionCheck.default(self),
         ])
 
     def transform_to_jni(self):
         return TypeTransform([
             C.Decl(self.jni_type, self.jni_name),
-        ],[
-            C.Assign(self.jni_name, self.c_name, cast=self.jni_type)
+            C.Decl('jsize', self.length.jni_name),
+        ], [
+            C.Assert('sizeof(%s) == sizeof(%s)' % (self.c_element_type, self.jni_type[:-5])),
+            C.Assign(self.length.jni_name, self.length.c_name, cast='jsize'),
+            C.Assign(self.jni_name, C.Env('New%sArray' % self.primitive_type_name, self.length.jni_name)),
+            C.ExceptionCheck.default(self),
+            C.Env('Set%sArrayRegion' % self.primitive_type_name, self.jni_name, '0', self.length.jni_name, '(const %s*)' % self.jni_type[:-5] + self.c_name),
+        ], self.transfer_ownership and [
+            C.Call('g_free', self.c_name),
         ])
 
 
@@ -547,8 +615,7 @@ class GListType(ContainerMetaType(
         ])
 
 
-standard_types = [
-    VoidType,
+primitive_types = [
     CharType,
     UcharType,
     Int8Type,
@@ -572,6 +639,12 @@ standard_types = [
     BooleanType,
     FloatType,
     DoubleType,
+]
+
+primitive_array_types = [PrimitiveArrayMetaType.from_primitive_type(t) for t in primitive_types]
+
+standard_types = primitive_types + primitive_array_types + [
+    VoidType,
     StringMetaType('gchar*'),
     StringMetaType('const gchar*'),
     GListType,
