@@ -31,14 +31,22 @@ class TypeRegistry:
         self.types=[]
         self.by_gir_type = defaultdict(set)
         self.by_c_type = defaultdict(set)
+        self.array_by_gir_type = defaultdict(set)
+        self.array_by_c_type = defaultdict(set)
         self.enum_aliases = {}
 
     def _register(self, typ):
         self.types.append(typ)
-        if typ.gir_type:
-            self.by_gir_type[typ.gir_type] |= set([typ])
-        if typ.c_type:
-            self.by_c_type[typ.c_type] |= set([typ])
+        if typ.is_array:
+            if typ.gir_type:
+                self.array_by_gir_type[typ.gir_type] |= set([typ])
+            if typ.c_type:
+                self.array_by_c_type[typ.c_type] |= set([typ])
+        else:
+            if typ.gir_type:
+                self.by_gir_type[typ.gir_type] |= set([typ])
+            if typ.c_type:
+                self.by_c_type[typ.c_type] |= set([typ])
 
     def register(self, typ):
         try:
@@ -49,9 +57,15 @@ class TypeRegistry:
     def register_enum_aliases(self, aliases):
         self.enum_aliases.update(aliases)
 
-    def lookup(self, gir_type = None, c_type = None):
-        girs = self.by_gir_type[gir_type]
-        cs = self.by_c_type[c_type]
+    def lookup(self, gir_type = None, c_type = None, is_array=False):
+        girs = None;
+        cs = None;
+        if is_array:
+            girs = self.array_by_gir_type[gir_type]
+            cs = self.array_by_c_type[c_type]
+        else:
+            girs = self.by_gir_type[gir_type]
+            cs = self.by_c_type[c_type]
         if not girs and len(cs) == 1:
             return next(iter(cs))
         elif not cs and len(girs) == 1:
@@ -85,6 +99,8 @@ class GirMetaType(object):
     c_type = None
     java_signature = None
     is_container = False
+    is_array = False
+    is_length_param = False
 
     def __new__(cls):
         return type(cls.__name__, (cls,), {
