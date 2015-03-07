@@ -95,6 +95,8 @@ HEADERS = [
     'owr_audio_payload.h',
     'owr_audio_renderer.h',
     'owr_candidate.h',
+    'owr_data_channel.h',
+    'owr_data_session.h',
     'owr_image_renderer.h',
     'owr_image_server.h',
     'owr_local.h',
