@@ -62,6 +62,8 @@ class TypeRegistry:
         enum_alias = self.enum_aliases.get(gir_type)
         if enum_alias is not None:
             return self.lookup(enum_alias, c_type)
+        if len(girs):
+            return max(iter(girs))
         raise LookupError("type lookup failed (gir_type=%s, c_type=%s)" % (gir_type, c_type))
 
 
