@@ -465,6 +465,8 @@ class ContainerMetaType(ObjectMetaType):
 
 
 class BitfieldMetaType(ContainerMetaType):
+    is_container = False
+
     def __init__(self, name, transfer_ownership, allow_none):
         super(BitfieldMetaType, self).__init__(name, transfer_ownership, allow_none,
             self.inner_type(name + '_enum'))
