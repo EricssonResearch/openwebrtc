@@ -28,7 +28,6 @@ PACKAGE_ROOT = 'com.ericsson.research'
 LOG_TAG = 'OpenWebRTC'
 
 IGNORED_ELEMENTS = [
-    ".//*[@name='on-new-stats']",
     ".//*[@name='init_with_main_context']",
 ]
 
