@@ -665,6 +665,7 @@ class GListType(ContainerMetaType(
                 inner_transforms.conversion,
                 C.Env.method(self.jni_name, ('ArrayList', 'add'), self.inner_value.jni_name),
                 C.ExceptionCheck.default(self),
+                C.Env('DeleteLocalRef', self.inner_value.jni_name),
                 inner_transforms.cleanup,
                 C.Assign(it, it + '->next'),
             ),
@@ -698,6 +699,8 @@ class GHashTableType(ContainerMetaType(
                 inner_transforms.conversion,
                 C.Env.method(self.jni_name, ('HashMap', 'put'), self.inner_key.jni_name, self.inner_value.jni_name),
                 C.ExceptionCheck.default(self),
+                C.Env('DeleteLocalRef', self.inner_key.jni_name),
+                C.Env('DeleteLocalRef', self.inner_value.jni_name),
                 inner_transforms.cleanup,
             )
         ], self.transfer_ownership and [
