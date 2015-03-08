@@ -161,6 +161,45 @@ C.Helper.add_helper('jobject_to_gobject',
     )
 )
 
+C.Helper.add_helper('gvalue_to_jobject',
+    C.Function('gvalue_to_jobject',
+        return_type='jobject',
+        params=['JNIEnv* env', 'GValue* value'],
+        body=[
+            C.Decl('jobject', 'obj'),
+            '',
+            C.Switch(C.Call('G_VALUE_TYPE', 'value'), cases=[
+                (args[0], [
+                    C.Decl(args[1], 'val'),
+                    C.Assign('val', C.Call(args[2], 'value'), cast=args[1]),
+                    C.Assign('obj', C.Env.static_method((args[3], 'valueOf'), 'val')),
+                ]) for args in [
+                    ['G_TYPE_BOOLEAN', 'jboolean', 'g_value_get_boolean', 'Boolean'],
+                    ['G_TYPE_CHAR', 'jchar', 'g_value_get_schar', 'Character'],
+                    ['G_TYPE_UCHAR', 'jchar', 'g_value_get_uchar', 'Character'],
+                    ['G_TYPE_INT', 'jint', 'g_value_get_int', 'Integer'],
+                    ['G_TYPE_UINT', 'jint', 'g_value_get_uint', 'Integer'],
+                    ['G_TYPE_LONG', 'jlong', 'g_value_get_long', 'Long'],
+                    ['G_TYPE_ULONG', 'jlong', 'g_value_get_ulong', 'Long'],
+                    ['G_TYPE_INT64', 'jlong', 'g_value_get_int64', 'Long'],
+                    ['G_TYPE_UINT64', 'jlong', 'g_value_get_uint64', 'Long'],
+                    ['G_TYPE_FLOAT', 'jfloat', 'g_value_get_float', 'Float'],
+                    ['G_TYPE_DOUBLE', 'jdouble', 'g_value_get_double', 'Double'],
+                ]
+            ] + [('G_TYPE_STRING',[
+                C.Decl('const gchar*', 'str'),
+                C.Assign('str', C.Call('g_value_get_string', 'value')),
+                C.Assign('obj', C.Env('NewStringUTF', 'str')),
+            ])],
+            default=[
+                C.Assign('obj', 'NULL'),
+            ]),
+            '',
+            C.Return('obj'),
+        ]
+    )
+)
+
 
 class PrimitiveMetaType(GirMetaType):
     default_value = '0'
@@ -506,6 +545,23 @@ class StringMetaType(ObjectMetaType):
         ])
 
 
+class GValueType(ObjectMetaType(
+        gir_type='GObject.Value',
+        java_type='Object',
+        c_type='GValue*',
+        package='java.lang',
+    )):
+
+    def transform_to_jni(self):
+        return TypeTransform([
+            C.Decl(self.jni_type, self.jni_name),
+        ], [
+            C.Assign(self.jni_name, C.Helper('gvalue_to_jobject', 'env', self.c_name)),
+        ], self.transfer_ownership and [
+            C.Call('g_value_reset', self.c_name),
+        ])
+
+
 class ContainerMetaType(ObjectMetaType):
     is_container = True
 
@@ -645,6 +701,7 @@ primitive_array_types = [PrimitiveArrayMetaType.from_primitive_type(t) for t in 
 
 standard_types = primitive_types + primitive_array_types + [
     VoidType,
+    GValueType,
     StringMetaType('gchar*'),
     StringMetaType('const gchar*'),
     GListType,
