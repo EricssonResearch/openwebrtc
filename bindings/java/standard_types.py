@@ -671,6 +671,40 @@ class GListType(ContainerMetaType(
         ])
 
 
+class GHashTableType(ContainerMetaType(
+        gir_type='GLib.HashTable',
+        java_type='HashMap',
+        c_type='GHashTable*',
+    )):
+
+    def __init__(self, *args, **kwargs):
+        super(GHashTableType, self).__init__(*args, **kwargs)
+        (self.inner_key, self.inner_value) = self.inner_values
+
+    def transform_to_jni(self):
+        it = self.c_name + '_it'
+        inner_transforms = super(GHashTableType, self).transform_to_jni()
+        return TypeTransform([
+            C.Decl(self.jni_type, self.jni_name),
+            C.Decl('GHashTableIter', it),
+            C.Decl(self.inner_key.c_type, self.inner_key.c_name),
+            C.Decl(self.inner_value.c_type, self.inner_value.c_name),
+            inner_transforms.declarations,
+        ], [
+            C.Assign(self.jni_name, C.Env.new('HashMap')),
+            C.ExceptionCheck.default(self),
+            C.Call('g_hash_table_iter_init', '&' + it, self.c_name),
+            C.While(C.Call('g_hash_table_iter_next', '&' + it, '(void **) &' + self.inner_key.c_name, '(void **) &' + self.inner_value.c_name),
+                inner_transforms.conversion,
+                C.Env.method(self.jni_name, ('HashMap', 'put'), self.inner_key.jni_name, self.inner_value.jni_name),
+                C.ExceptionCheck.default(self),
+                inner_transforms.cleanup,
+            )
+        ], self.transfer_ownership and [
+            C.Call('g_hash_table_unref', self.c_name),
+        ])
+
+
 primitive_types = [
     CharType,
     UcharType,
@@ -705,4 +739,5 @@ standard_types = primitive_types + primitive_array_types + [
     StringMetaType('gchar*'),
     StringMetaType('const gchar*'),
     GListType,
+    GHashTableType,
 ]
