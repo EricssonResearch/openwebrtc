@@ -168,12 +168,20 @@ class BaseGenerator():
             @property
             def body(self):
                 def make_case(case, body):
-                    return [(0, 'case ' + case + ':')] + [(1, b) for b in body] + [(1, 'break;')]
-                start = [(0, 'switch (' + self.name + ') {')]
+                    needs_scope = False
+                    if isinstance(body, list):
+                        for statement in body:
+                            if isinstance(statement, Decl):
+                                needs_scope = True
+                    if needs_scope:
+                        return [(0, 'case ' + case + ': {')] + [(1, b) for b in body] + [(1, 'break;')] + [(0, '}')]
+                    else:
+                        return [(0, 'case ' + case + ':')] + [(1, b) for b in body] + [(1, 'break;')]
+                start = [(0, 'switch (' + nosemi(flatjoin(self.name, '')) + ') {')]
                 end = [(0, '}')]
                 default = []
                 if self.default:
-                    default = [(0, 'default:'), [(1, b) for b in self.default]]
+                    default = [(0, 'default:')] + [(1, b) for b in self.default]
                 return start + sum(starmap(make_case, self.cases), []) + default + end
 
 
