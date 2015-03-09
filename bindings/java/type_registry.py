@@ -101,6 +101,7 @@ class GirMetaType(object):
     is_container = False
     is_array = False
     is_length_param = False
+    has_local_ref = False
 
     def __new__(cls):
         return type(cls.__name__, (cls,), {

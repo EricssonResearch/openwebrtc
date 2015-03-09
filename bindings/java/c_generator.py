@@ -143,7 +143,7 @@ class Function(C.FunctionBlock):
             'return_type': callback.params.return_value.c_type,
             'name': 'callback_' + callback.value.gir_type,
             'params': map(c_param, callback.params),
-            'body': [TypeConversions.params_to_jni(callback.params, body=body or [], get_env=True)],
+            'body': [TypeConversions.params_to_jni(callback.params, body=body or [], push_frame=True)],
         }
         if callback.params.return_value.name is not None:
             args['body'] += [C.Return(callback.params.return_value.c_name)]
@@ -199,7 +199,7 @@ class JniExport(C.FunctionBlock):
             'return_type': function.params.return_value.jni_type,
             'method_name': function.name,
             'params': params,
-            'body': [C.TypeConversions.params_to_c(function.params, body=body)],
+            'body': [C.TypeConversions.params_to_c(function.params, body=body, get_env=False)],
         }
         if function.params.return_value.name is not None:
             args['body'] += [C.Return(function.params.return_value.jni_name)]
@@ -384,19 +384,25 @@ class Env(C.Lines):
 
 @add_to(C)
 class TypeConversions(C.Lines):
-    def __init__(self, conversions, return_conversion, body=None, get_env=False, **kwargs):
+    def __init__(self, conversions, return_conversion, body=None, get_env=True, push_frame=False, **kwargs):
         super(TypeConversions, self).__init__(**kwargs)
         self.conversions = list(conversions)
         self.return_conversion = return_conversion
         self.body = body or []
         self.get_env = get_env
+        self.push_frame = push_frame
 
     def __iter__(self):
         conversion = [
             prune_empty([p.declarations for p in self.conversions] + [self.get_env and C.Decl('JNIEnv*', 'env')]),
-            prune_empty([self.get_env and C.Assign('env', C.Call('get_jni_env'))] + [p.conversion for p in self.conversions]),
+            self.get_env and C.Assign('env', C.Call('get_jni_env')),
+            C.If(Env('PushLocalFrame', str(config.LOCAL_FRAME_SIZE)),
+                C.Log('warning', 'failed to push local frame at %s:%d', '__FILE__', '__LINE__')
+            ) if self.push_frame else [],
+            prune_empty([p.conversion for p in self.conversions]),
             self.body,
             prune_empty(p.cleanup for p in reversed(self.conversions)),
+            Env('PopLocalFrame', 'NULL') if self.push_frame else [],
         ]
         if self.return_conversion is not None:
             conversion = [self.return_conversion.declarations] + conversion + [
@@ -498,9 +504,8 @@ def gen_class(package, clazz):
                 name='callback_' + prop.signal.value.gir_type,
                 return_type=prop.signal.params.return_value.c_type,
                 params=map(c_param, prop.signal.params),
-                body=[TypeConversions([p.transform_to_jni() for p in prop.signal.params.params], None, body=[
+                body=[TypeConversions([p.transform_to_jni() for p in prop.signal.params.params], None, push_frame=True, body=[
                     '(void) c_pspec;',
-                    C.Assign('env', C.Call('get_jni_env')),
                     C.Call('g_object_get', get_params),
                     transform.conversion,
                     C.Env.callback(prop.signal),
@@ -508,7 +513,6 @@ def gen_class(package, clazz):
                 ])],
             )
             func.body = [
-                C.Decl('JNIEnv*', 'env'),
                 C.Decl(ret.c_type, ret.c_name),
                 transform.declarations,
             ] + func.body
