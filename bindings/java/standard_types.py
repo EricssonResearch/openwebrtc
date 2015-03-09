@@ -242,6 +242,7 @@ class PrimitiveMetaType(GirMetaType):
 
 class PrimitiveArrayMetaType(GirMetaType):
     is_array = True
+    has_local_ref = True
 
     def __init__(self, name, transfer_ownership, allow_none, c_array_type='gpointer'):
         super(PrimitiveArrayMetaType, self).__init__(name, transfer_ownership, allow_none)
@@ -375,6 +376,7 @@ class GParamSpecType(GirMetaType()):
 class ObjectMetaType(GirMetaType):
     jni_type = 'jobject'
     default_value = 'NULL'
+    has_local_ref = True
 
     def __new__(cls, gir_type, java_type, c_type, package):
         new = super(ObjectMetaType, cls).__new__(cls)
@@ -395,6 +397,7 @@ class JObjectWrapperType(ObjectMetaType(
         c_type='gpointer',
         package=None,
     )):
+    has_local_ref = False
 
     def __init__(self, name, closure, transfer_ownership):
         super(JObjectWrapperType, self).__init__(name, transfer_ownership, allow_none=False)
@@ -420,6 +423,8 @@ class JObjectWrapperType(ObjectMetaType(
 
 
 class EnumMetaType(ObjectMetaType):
+    has_local_ref = False
+
     def __new__(cls, gir_type, c_type, prefix):
         return super(EnumMetaType, cls).__new__(cls,
             gir_type=gir_type,
@@ -477,6 +482,8 @@ class ClassCallbackMetaType(CallbackMetaType):
 
 
 class GObjectMetaType(ObjectMetaType):
+    has_local_ref = False
+
     def __new__(cls, gir_type, c_type, prefix):
         return super(GObjectMetaType, cls).__new__(cls,
             gir_type=gir_type,
@@ -665,7 +672,7 @@ class GListType(ContainerMetaType(
                 inner_transforms.conversion,
                 C.Env.method(self.jni_name, ('ArrayList', 'add'), self.inner_value.jni_name),
                 C.ExceptionCheck.default(self),
-                C.Env('DeleteLocalRef', self.inner_value.jni_name),
+                C.Env('DeleteLocalRef', self.inner_value.jni_name) if self.inner_value.has_local_ref else [],
                 inner_transforms.cleanup,
                 C.Assign(it, it + '->next'),
             ),
@@ -699,8 +706,8 @@ class GHashTableType(ContainerMetaType(
                 inner_transforms.conversion,
                 C.Env.method(self.jni_name, ('HashMap', 'put'), self.inner_key.jni_name, self.inner_value.jni_name),
                 C.ExceptionCheck.default(self),
-                C.Env('DeleteLocalRef', self.inner_key.jni_name),
-                C.Env('DeleteLocalRef', self.inner_value.jni_name),
+                C.Env('DeleteLocalRef', self.inner_key.jni_name) if self.inner_value.has_local_ref else [],
+                C.Env('DeleteLocalRef', self.inner_value.jni_name) if self.inner_value.has_local_ref else [],
                 inner_transforms.cleanup,
             )
         ], self.transfer_ownership and [
