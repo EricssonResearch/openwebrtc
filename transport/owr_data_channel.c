@@ -335,7 +335,7 @@ void owr_data_channel_send(OwrDataChannel *data_channel, const gchar *data)
     g_return_if_fail(data_channel);
     g_return_if_fail(data);
 
-    length = strlen(data);
+    length = strlen(data) + 1;
     g_return_if_fail(length <= MAX_CHUNK_SIZE);
 
     priv->bytes_sent += length;
