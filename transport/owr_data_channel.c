@@ -630,7 +630,7 @@ GstCaps * _owr_data_channel_create_caps(OwrDataChannel *data_channel)
 
     caps = gst_caps_new_simple("application/data", "ordered", G_TYPE_BOOLEAN, priv->ordered,
         "ppid", G_TYPE_UINT, ppid, NULL);
-    if (priv->max_packet_life_time == -1 && !priv->max_retransmits == -1) {
+    if (priv->max_packet_life_time == -1 && priv->max_retransmits == -1) {
         gst_caps_set_simple(caps, "partially-reliability", G_TYPE_STRING, "none",
             "reliability-parameter", G_TYPE_UINT, 0, NULL);
     } else if (priv->max_retransmits >= 0) {
