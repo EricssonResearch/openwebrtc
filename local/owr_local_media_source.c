@@ -398,6 +398,7 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
         gchar *bin_name;
         GstCaps *source_caps;
         GstBus *bus;
+        GSource *bus_source;
 
         g_object_get(media_source, "media-type", &media_type, "type", &source_type, NULL);
 
@@ -423,10 +424,10 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
 #endif
 
         bus = gst_pipeline_get_bus(GST_PIPELINE(source_pipeline));
-        g_main_context_push_thread_default(_owr_get_main_context());
-        gst_bus_add_watch(bus, (GstBusFunc)bus_call, source_pipeline);
-        g_main_context_pop_thread_default(_owr_get_main_context());
-        gst_object_unref(bus);
+        bus_source = gst_bus_create_watch(bus);
+        g_source_set_callback(bus_source, (GSourceFunc) bus_call, source_pipeline, NULL);
+        g_source_attach(bus_source, _owr_get_main_context());
+        g_source_unref(bus_source);
 
         GST_DEBUG_OBJECT(local_source, "media_type: %d, type: %d", media_type, source_type);
 

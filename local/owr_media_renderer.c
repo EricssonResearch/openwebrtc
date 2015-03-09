@@ -191,6 +191,7 @@ static void owr_media_renderer_init(OwrMediaRenderer *renderer)
 {
     OwrMediaRendererPrivate *priv;
     GstBus *bus;
+    GSource *bus_source;
     gchar *bin_name;
 
     renderer->priv = priv = OWR_MEDIA_RENDERER_GET_PRIVATE(renderer);
@@ -211,10 +212,10 @@ static void owr_media_renderer_init(OwrMediaRenderer *renderer)
     priv->src = NULL;
 
     bus = gst_pipeline_get_bus(GST_PIPELINE(priv->pipeline));
-    g_main_context_push_thread_default(_owr_get_main_context());
-    gst_bus_add_watch(bus, (GstBusFunc)bus_call, priv->pipeline);
-    g_main_context_pop_thread_default(_owr_get_main_context());
-    gst_object_unref(bus);
+    bus_source = gst_bus_create_watch(bus);
+    g_source_set_callback(bus_source, (GSourceFunc) bus_call, priv->pipeline, NULL);
+    g_source_attach(bus_source, _owr_get_main_context());
+    g_source_unref(bus_source);
 
     g_mutex_init(&priv->media_renderer_lock);
 }
