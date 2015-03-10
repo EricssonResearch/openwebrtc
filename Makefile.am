@@ -1,6 +1,10 @@
 ## Process this file with automake to produce Makefile.in
 
-SUBDIRS = transport local owr bridge tests docs bindings
+SUBDIRS = transport local owr tests docs bindings
+
+if OWR_BRIDGE
+SUBDIRS += bridge
+endif
 
 if OWR_DEBUG
 DEBUG_CFLAGS = "-g"

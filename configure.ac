@@ -26,9 +26,28 @@ PKG_CHECK_MODULES(GSTREAMER, [gstreamer-1.0 >= $GST_REQUIRED gstreamer-rtp-1.0 >
 PKG_CHECK_MODULES(NICE, [nice >= 0.1.7.1])
 PKG_CHECK_MODULES(GSTREAMER_SCTP, [gstreamer-sctp-1.0])
 PKG_CHECK_MODULES(ORC, [orc-0.4])
-PKG_CHECK_MODULES(SEED, [seed])
 PKG_CHECK_MODULES(JSON_GLIB, [json-glib-1.0])
 PKG_CHECK_MODULES(LIBSOUP, [libsoup-2.4])
+
+dnl build bridge or not
+AC_MSG_CHECKING([whether to build bridge or not])
+AC_ARG_ENABLE(bridge,
+AC_HELP_STRING(
+  [--enable-bridge],
+  [Enable bridge @<:@default=yes@:>@]),
+[case "${enableval}" in
+  yes) enable_bridge=yes ;;
+  no)  enable_bridge=no ;;
+  *) AC_MSG_ERROR(bad value ${enableval} for --enable-bridge) ;;
+esac],[enable_bridge=yes])
+AC_MSG_RESULT([$enable_bridge])
+if test "x$enable_bridge" = xyes; then
+  AC_DEFINE(OWR_BRIDGE, 1,
+  [Define if building bridge])
+  PKG_CHECK_MODULES(SEED, [seed])
+fi
+AM_CONDITIONAL(OWR_BRIDGE, test x$enable_bridge = xyes)
+
 
 # check for gobject-introspection
 m4_ifdef([GOBJECT_INTROSPECTION_CHECK], [
