@@ -26,8 +26,6 @@ PKG_CHECK_MODULES(GSTREAMER, [gstreamer-1.0 >= $GST_REQUIRED gstreamer-rtp-1.0 >
 PKG_CHECK_MODULES(NICE, [nice >= 0.1.7.1])
 PKG_CHECK_MODULES(GSTREAMER_SCTP, [gstreamer-sctp-1.0])
 PKG_CHECK_MODULES(ORC, [orc-0.4])
-PKG_CHECK_MODULES(JSON_GLIB, [json-glib-1.0])
-PKG_CHECK_MODULES(LIBSOUP, [libsoup-2.4])
 
 dnl build bridge or not
 AC_MSG_CHECKING([whether to build bridge or not])
@@ -80,6 +78,26 @@ if test "x$enable_debug" = xyes; then
   [Define if building debug])
 fi
 AM_CONDITIONAL(OWR_DEBUG, test x$enable_debug = xyes)
+
+dnl build debug or not
+AC_MSG_CHECKING([whether to build tests or not])
+AC_ARG_ENABLE(tests,
+AC_HELP_STRING(
+  [--enable-tests],
+  [Enable tests @<:@default=yes@:>@]),
+[case "${enableval}" in
+  yes) enable_tests=yes ;;
+  no)  enable_tests=no ;;
+  *) AC_MSG_ERROR(bad value ${enableval} for --enable-tests) ;;
+esac],[enable_tests=yes])
+AC_MSG_RESULT([$enable_tests])
+if test "x$enable_tests" = xyes; then
+  PKG_CHECK_MODULES(JSON_GLIB, [json-glib-1.0])
+  PKG_CHECK_MODULES(LIBSOUP, [libsoup-2.4])
+  AC_DEFINE(OWR_TESTS, 1,
+  [Define if building tests])
+fi
+AM_CONDITIONAL(OWR_TESTS, test x$enable_tests = xyes)
 
 dnl build static or not
 AC_MSG_CHECKING([whether to build static owr or not])
