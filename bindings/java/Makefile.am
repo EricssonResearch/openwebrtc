@@ -13,16 +13,22 @@ AM_CFLAGS = \
 	-Wextra \
 	$(DEBUG_CFLAGS)
 
-lib_LTLIBRARIES = libopenwebrtc_jni.la libopenwebrtc_bridge_jni.la
+lib_LTLIBRARIES = libopenwebrtc_jni.la
+
+if OWR_BRIDGE
+lib_LTLIBRARIES += libopenwebrtc_bridge_jni.la
+endif
 
 libopenwebrtc_jni_la_SOURCES = owr_jni.c
 libopenwebrtc_jni_la_LIBADD = \
 	$(top_builddir)/owr/libopenwebrtc.la
 
+if OWR_BRIDGE
 libopenwebrtc_bridge_jni_la_SOURCES = owr_bridge_jni.c
 libopenwebrtc_bridge_jni_la_LIBADD = \
 	$(top_builddir)/bindings/java/libopenwebrtc_jni.la \
 	$(top_builddir)/bridge/libopenwebrtc_bridge.la
+endif
 
 BUILT_SOURCES = owr_jni.c
 noinst_DATA = \
@@ -66,7 +72,7 @@ install-data-local: install-exec
 	cp -r javadoc/* '$(DESTDIR)/$(javadocdir)'
 	mkdir -p '$(DESTDIR)/$(jardir)'
 	rm -rf jar-build && mkdir -p jar-build/lib/armeabi
-	for eachlib in '$(DESTDIR)/$(libdir)'/libopenwebrtc{,_bridge}{,_jni}.so; do \
+	for eachlib in '$(DESTDIR)/$(libdir)'/libopenwebrtc{,_jni}.so; do \
 		cp -L $$eachlib jar-build/lib/armeabi; \
 	done
 	$(JAR) cvf '$(DESTDIR)/$(jardir)/openwebrtc.jar' \
@@ -77,10 +83,15 @@ install-data-local: install-exec
 	$(JAR) cvf '$(DESTDIR)/$(jardir)/openwebrtc-source.jar' \
 		-C owr com/ericsson/research/owr \
 		-C owr com/ericsson/research
+if OWR_BRIDGE
+	for eachlib in '$(DESTDIR)/$(libdir)'/libopenwebrtc_bridge{,_jni}.so; do \
+		cp -L $$eachlib jar-build/lib/armeabi; \
+	done
 	$(JAR) cvf '$(DESTDIR)/$(jardir)/openwebrtc_bridge.jar' \
 		-C gen/bridge com/ericsson/research/owr \
 		-C jar-build lib/armeabi/libopenwebrtc_bridge.so \
 		-C jar-build lib/armeabi/libopenwebrtc_bridge_jni.so
+endif
 	rm -rf jar-build
 
 -include $(top_srcdir)/git.mk
