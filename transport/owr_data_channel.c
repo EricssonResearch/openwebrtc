@@ -450,12 +450,14 @@ static gboolean data_channel_close(GHashTable *args)
     data_channel = g_hash_table_lookup(args, "data_channel");
     priv = data_channel->priv;
 
-    g_return_val_if_fail(priv->on_datachannel_close, FALSE);
+    g_warn_if_fail(priv->on_datachannel_close);
 
-    g_value_init(&params[0], OWR_TYPE_DATA_CHANNEL);
-    g_value_set_object(&params[0], data_channel);
-    g_closure_invoke(priv->on_datachannel_close, NULL, 1, (const GValue *)&params, NULL);
-    g_value_unset(&params[0]);
+    if (priv->on_datachannel_close) {
+        g_value_init(&params[0], OWR_TYPE_DATA_CHANNEL);
+        g_value_set_object(&params[0], data_channel);
+        g_closure_invoke(priv->on_datachannel_close, NULL, 1, (const GValue *)&params, NULL);
+        g_value_unset(&params[0]);
+    }
 
     g_hash_table_unref(args);
     g_object_unref(data_channel);
