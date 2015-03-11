@@ -2745,6 +2745,7 @@ static gboolean create_datachannel_appsrc(OwrTransportAgent *transport_agent,
     result = TRUE;
 end:
     gst_object_unref(sctpenc);
+    gst_object_unref(send_output_bin);
     return result;
 }
 
