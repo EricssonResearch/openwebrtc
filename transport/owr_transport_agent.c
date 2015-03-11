@@ -2308,6 +2308,11 @@ static void on_new_jitterbuffer(G_GNUC_UNUSED GstElement *rtpbin, GstElement *ji
     media_session = OWR_MEDIA_SESSION(get_session(transport_agent, session_id));
     g_return_if_fail(OWR_IS_MEDIA_SESSION(media_session));
 
+    /* This is a tradeoff between latency and jitter resilience. The 50ms value
+     * is picked anecdotally based on the mean deviation of ping RTT over 3G
+     * from Bangalore, IN to Portland, US. */
+    g_object_set(jitterbuffer, "latency", 50, NULL);
+
     if (_owr_media_session_want_receive_rtx(media_session))
         g_object_set(jitterbuffer, "do-retransmission", TRUE, NULL);
     g_object_unref(media_session);
