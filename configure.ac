@@ -165,7 +165,7 @@ AC_MSG_CHECKING([for javadoc installation path])
 AC_ARG_WITH(javadocdir,
             AS_HELP_STRING([--with-javadocdir],
                            [javadoc file installation path [LIBDIR/share/javadoc]]),
-            javadocdir=${withval}, javadocdir=${libdir}/share/javadoc/openwebrtc)
+            javadocdir=${withval}, javadocdir=${datarootdir}/javadoc/openwebrtc)
 AC_MSG_RESULT([$javadocdir])
 AC_SUBST(javadocdir)
 
