@@ -86,6 +86,11 @@ static guint next_transport_agent_id = 1;
 G_DEFINE_TYPE(OwrTransportAgent, owr_transport_agent, G_TYPE_OBJECT)
 
 typedef struct {
+    OwrTransportAgent *transport_agent;
+    guint session_id;
+} AgentAndSessionIdPair;
+
+typedef struct {
     OwrDataChannelState state;
     GstElement *data_sink, *data_src;
     guint session_id;
@@ -132,12 +137,9 @@ struct _OwrTransportAgentPrivate {
     GHashTable *data_channels;
     GRWLock data_channels_rw_mutex;
     gboolean data_session_added, data_session_established;
+    
+    AgentAndSessionIdPair latest_jitterbuffer_pair;
 };
-
-typedef struct {
-    OwrTransportAgent *transport_agent;
-    guint session_id;
-} AgentAndSessionIdPair;
 
 #define GEN_HASH_KEY(seq, ssrc) (seq ^ ssrc)
 
@@ -169,6 +171,7 @@ static void on_rtpbin_pad_added(GstElement *rtpbin, GstPad *new_pad, OwrTranspor
 static void setup_video_receive_elements(GstPad *new_pad, guint32 session_id, OwrPayload *payload, OwrTransportAgent *transport_agent);
 static void setup_audio_receive_elements(GstPad *new_pad, guint32 session_id, OwrPayload *payload, OwrTransportAgent *transport_agent);
 static GstCaps * on_rtpbin_request_pt_map(GstElement *rtpbin, guint session_id, guint pt, OwrTransportAgent *agent);
+static GstCaps * on_rtpjitterbuffer_request_pt_map(GstElement *rtpjitterbuffer, guint pt, AgentAndSessionIdPair *data);
 static GstElement * on_rtpbin_request_aux_sender(GstElement *rtpbin, guint session_id, OwrTransportAgent *transport_agent);
 static GstElement * on_rtpbin_request_aux_receiver(GstElement *rtpbin, guint session_id, OwrTransportAgent *transport_agent);
 
@@ -413,6 +416,10 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
     priv->data_session_established = FALSE;
 
     priv->send_bins = g_hash_table_new_full(NULL, NULL, NULL, g_free);
+    
+    // Set default invalid data for AgentAndSessionIdPair
+    priv->latest_jitterbuffer_pair.transport_agent = NULL;
+    priv->latest_jitterbuffer_pair.session_id = 0;
 }
 
 
@@ -2072,6 +2079,30 @@ static GstCaps * on_rtpbin_request_pt_map(GstElement *rtpbin, guint session_id, 
     return caps;
 }
 
+static GstCaps * on_rtpjitterbuffer_request_pt_map(GstElement *rtpjitterbuffer, guint pt, AgentAndSessionIdPair *data)
+{
+    OwrMediaSession *media_session = NULL;
+    OwrPayload *payload = NULL;
+    GstCaps *caps = NULL;
+
+    g_warning("rtpjitterbuffer request-pt");
+
+    g_return_val_if_fail(rtpjitterbuffer, NULL);
+    g_return_val_if_fail(data, NULL);
+    g_return_val_if_fail(OWR_IS_TRANSPORT_AGENT(data->transport_agent), NULL);
+
+    media_session = OWR_MEDIA_SESSION(get_session(data->transport_agent, data->session_id));
+    g_return_val_if_fail(OWR_IS_MEDIA_SESSION(media_session), NULL);
+
+    payload = _owr_media_session_get_receive_payload(media_session, pt);
+
+    caps = _owr_payload_create_rtp_caps(payload);
+    g_object_unref(payload);
+    g_object_unref(media_session);
+
+    return caps;
+}
+
 static GstElement * create_aux_bin(gchar *prefix, GstElement *rtx, guint session_id)
 {
     GstElement *bin;
@@ -2311,6 +2342,14 @@ static void on_new_jitterbuffer(G_GNUC_UNUSED GstElement *rtpbin, GstElement *ji
     
     // Enable lost packet propagation from jitter buffer
     g_object_set(jitterbuffer, "do-lost", TRUE, NULL);
+
+    // Set request-pt callback using AgentAndSessionIdPair for callback userdata
+    {
+      AgentAndSessionIdPair *pair = &transport_agent->priv->latest_jitterbuffer_pair;
+      pair->transport_agent = transport_agent;
+      pair->session_id = session_id;
+      g_signal_connect(jitterbuffer, "request-pt-map", G_CALLBACK(on_rtpjitterbuffer_request_pt_map), pair);
+    }
 
     if (_owr_media_session_want_receive_rtx(media_session))
         g_object_set(jitterbuffer, "do-retransmission", TRUE, NULL);
