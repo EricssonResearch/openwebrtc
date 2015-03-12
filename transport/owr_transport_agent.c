@@ -392,6 +392,7 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
     priv->transport_bin = gst_bin_new(priv->transport_bin_name);
     priv->rtpbin = gst_element_factory_make("rtpbin", "rtpbin");
     g_object_set(priv->rtpbin, "do-lost", TRUE, NULL);
+    g_object_set(priv->rtpbin, "use-pipeline-clock", TRUE, NULL);
     g_signal_connect(priv->rtpbin, "pad-added", G_CALLBACK(on_rtpbin_pad_added), transport_agent);
     g_signal_connect(priv->rtpbin, "request-pt-map", G_CALLBACK(on_rtpbin_request_pt_map), transport_agent);
     g_signal_connect(priv->rtpbin, "request-aux-sender", G_CALLBACK(on_rtpbin_request_aux_sender), transport_agent);
