@@ -182,9 +182,11 @@ if (typeof(SDP) == "undefined")
                 "port": parts[i + 1],
                 "protocol": parts[i + 2],
             };
-            var fmt = parts[i + 3].trimLeft().split(/ +/).map(function (x) {
-                return parseInt(x);
-            });
+            var fmt = parts[i + 3].replace(/^[\s\uFEFF\xA0]+/, '')
+                .split(/ +/)
+                .map(function (x) {
+                    return parseInt(x);
+                });
             var mblock = parts[i + 4];
 
             var connection = match(mblock, regexps.cline, "m", sblock);
