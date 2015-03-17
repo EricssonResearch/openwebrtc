@@ -1,10 +1,13 @@
 ## Process this file with automake to produce Makefile.in
 
-SUBDIRS = transport local owr tests docs bindings
+SUBDIRS = transport local owr tests docs
 
 if OWR_BRIDGE
 SUBDIRS += bridge
 endif
+
+# bindings need to be generated last
+SUBDIRS += bindings
 
 if OWR_DEBUG
 DEBUG_CFLAGS = "-g"
