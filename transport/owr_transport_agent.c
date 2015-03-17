@@ -1038,7 +1038,7 @@ static GstElement *add_dtls_srtp_bin(OwrTransportAgent *transport_agent, guint s
     element_name = g_strdup_printf("dtls_srtp_%s_%s_%u", is_rtcp ? "rtcp" : "rtp",
         is_encoder ? "encoder" : "decoder", stream_id);
 
-    dtls_srtp_bin = gst_element_factory_make(is_encoder ? "erdtlssrtpenc" : "erdtlssrtpdec",
+    dtls_srtp_bin = gst_element_factory_make(is_encoder ? "dtlssrtpenc" : "dtlssrtpdec",
         element_name);
     connection_id = g_strdup_printf("%s_%u_%u", is_rtcp ? "rtcp" : "rtp",
         priv->agent_id, stream_id);
