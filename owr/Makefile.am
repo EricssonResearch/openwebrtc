@@ -57,10 +57,14 @@ include_HEADERS = \
     owr_types.h
 
 noinst_HEADERS = \
-    Owr-0.1.gir.h \
     owr_private.h \
     owr_media_source_private.h \
     owr_utils.h
+
+if HAVE_INTROSPECTION
+noinst_HEADERS += \
+    Owr-0.1.gir.h
+endif
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = openwebrtc-0.1.pc

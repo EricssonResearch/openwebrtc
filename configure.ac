@@ -46,14 +46,10 @@ if test "x$enable_bridge" = xyes; then
 fi
 AM_CONDITIONAL(OWR_BRIDGE, test x$enable_bridge = xyes)
 
+AC_CONFIG_MACRO_DIR(m4)
 
 # check for gobject-introspection
-m4_ifdef([GOBJECT_INTROSPECTION_CHECK], [
 GOBJECT_INTROSPECTION_CHECK([1.30.0])
-],[
-AM_CONDITIONAL([ENABLE_GOBJECT_INTROSPECTION], false)
-])
-AC_CONFIG_MACRO_DIR(m4)
 
 m4_ifdef([GTK_DOC_CHECK], [
 GTK_DOC_CHECK([1.18],[--flavour no-tmpl])
@@ -148,6 +144,9 @@ AC_HELP_STRING(
 esac],[enable_owr_java=no])
 AC_MSG_RESULT([$enable_owr_java])
 if test "x$enable_owr_java" = xyes; then
+  if test "x$found_introspection" != xyes; then
+    AC_MSG_ERROR([--enable-owr-java requires GObject-instrospection support])
+  fi
   if test "x$enable_shared" != xyes; then
     AC_MSG_ERROR([--enable-owr-java needs --enabled-shared])
   fi
