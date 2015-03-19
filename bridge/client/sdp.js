@@ -312,6 +312,8 @@ if (typeof(SDP) == "undefined")
                         if (candidate.port == 0 || candidate.port == 9) {
                             candidate.tcpType = "active";
                             candidate.port = 9;
+                        } else {
+                            return;
                         }
                     }
                     mediaDescription.ice.candidates.push(candidate);
