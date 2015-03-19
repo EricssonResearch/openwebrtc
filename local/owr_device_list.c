@@ -492,7 +492,7 @@ static JavaVM *get_java_vm(void)
     gpointer handle = NULL;
     static JavaVM *jvm = NULL;
     const gchar *error_string;
-    jsize num_jvms = NULL;
+    jsize num_jvms = 0;
     gint lib_index = 0;
     gint err;
 
@@ -630,7 +630,7 @@ static jint get_camera_facing(gint camera_index)
     JNIEnv *env;
 
     env = get_jni_env();
-    g_return_val_if_fail(env, NULL);
+    g_return_val_if_fail(env, 0);
 
     camera_info_instance = (*env)->NewObject(env, CameraInfo.class, CameraInfo.constructor);
     if ((*env)->ExceptionCheck(env)) {
