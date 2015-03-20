@@ -158,7 +158,7 @@ if (typeof(SDP) == "undefined")
         if (originator) {
             sdpObj.originator = {
                 "username": originator[1],
-                "sessionId": parseInt(originator[2]),
+                "sessionId": originator[2],
                 "sessionVersion": parseInt(originator[3]),
                 "netType": "IN",
                 "addressType": originator[4],
@@ -365,7 +365,7 @@ if (typeof(SDP) == "undefined")
         });
         addDefaults(sdpObj.originator, {
             "username": "-",
-            "sessionId": Math.floor((Math.random() + +new Date()) * 1e6),
+            "sessionId": "" + Math.floor((Math.random() + +new Date()) * 1e6),
             "sessionVersion": 1,
             "netType": "IN",
             "addressType": "IP4",
