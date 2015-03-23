@@ -110,9 +110,8 @@ case "$host_os" in
     ;;
   linux*)
     PKG_CHECK_MODULES(PULSE, [libpulse libpulse-mainloop-glib])
-    PKG_CHECK_MODULES(V4L2, [libv4l2])
-    OWR_DEVICE_LIST_EXT_CFLAGS="\$(PULSE_CFLAGS) \$(V4L2_CFLAGS)"
-    OWR_DEVICE_LIST_EXT_LIBS="\$(PULSE_LIBS) \$(V4L2_LIBS)"
+    OWR_DEVICE_LIST_EXT_CFLAGS="\$(PULSE_CFLAGS)"
+    OWR_DEVICE_LIST_EXT_LIBS="\$(PULSE_LIBS)"
     ;;
 esac
 AC_SUBST(OWR_DEVICE_LIST_EXT_LIBS)

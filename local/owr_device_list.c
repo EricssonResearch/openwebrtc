@@ -55,7 +55,8 @@
 
 #elif defined(__linux__)
 #include <fcntl.h>
-#include <libv4l2.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
 #include <linux/videodev2.h>
 
 #endif /* defined(__linux__) */
@@ -299,7 +300,7 @@ static gchar *get_v4l2_device_name(gchar *filename)
         return NULL;
     }
 
-    if (v4l2_ioctl(fd, VIDIOC_QUERYCAP, &vcap) < 0) {
+    if (ioctl(fd, VIDIOC_QUERYCAP, &vcap) < 0) {
         g_warning("v4l: failed to query %s", filename);
 
         device_name = g_strdup(filename);

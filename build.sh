@@ -108,8 +108,6 @@ build(){
             local seed_platform_libs="-ljavascriptcoregtk-3.0 -licui18n -licuuc -licudata"
             export PULSE_CFLAGS="$(/usr/bin/pkg-config --cflags libpulse-mainloop-glib) $(/usr/bin/pkg-config --cflags libpulse) "
             export PULSE_LIBS="$(/usr/bin/pkg-config --libs libpulse-mainloop-glib) $(/usr/bin/pkg-config --libs libpulse) "
-            export V4L2_CFLAGS="$(/usr/bin/pkg-config --cflags libv4l2) "
-            export V4L2_LIBS="$(/usr/bin/pkg-config --libs libv4l2) "
             export PLATFORM_GLIB_LIBS="-lpthread -lffi -lrt -ldl -lresolv"
             export PLATFORM_GSTREAMER_LIBS="-lgstvideoconvert -lgstpulse -lgstvideo4linux2 -lX11 -lXv -lgstallocators-1.0 -lGLU -lGL"
             export PLATFORM_CXX_LIBS="-lstdc++"
