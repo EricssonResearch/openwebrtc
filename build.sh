@@ -111,7 +111,7 @@ build(){
             export V4L2_CFLAGS="$(/usr/bin/pkg-config --cflags libv4l2) "
             export V4L2_LIBS="$(/usr/bin/pkg-config --libs libv4l2) "
             export PLATFORM_GLIB_LIBS="-lpthread -lffi -lrt -ldl -lresolv"
-            export PLATFORM_GSTREAMER_LIBS="-lgstvideoconvert -lgstpulse -lgstvideo4linux2 -lX11 -lXv -lgstallocators-1.0 -lGLU -lGL"
+            export PLATFORM_GSTREAMER_LIBS="-lgstvideoconvert -lgstpulse -lgstvideo4linux2 -lX11 -lXv -lgstallocators-1.0 -lGLU -lGL -lEGL"
             export PLATFORM_CXX_LIBS="-lstdc++"
         fi
 
