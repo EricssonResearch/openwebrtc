@@ -27,8 +27,6 @@ openwebrtcdoc_DATA = \
 
 EXTRA_DIST = $(openwebrtcdoc_DATA)
 
-GITIGNOREFILES = openwebrtc-deps-* build out .build_successful_tag_file.txt
-
 DISTCLEANFILES = aclocal.m4 config.guess config.h.in config.sub \
     depcomp gtk-doc.make m4 install-sh ltmain.sh missing
 
