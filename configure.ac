@@ -144,9 +144,6 @@ AC_HELP_STRING(
 esac],[enable_owr_java=no])
 AC_MSG_RESULT([$enable_owr_java])
 if test "x$enable_owr_java" = xyes; then
-  if test "x$found_introspection" != xyes; then
-    AC_MSG_ERROR([--enable-owr-java requires GObject-instrospection support])
-  fi
   if test "x$enable_shared" != xyes; then
     AC_MSG_ERROR([--enable-owr-java needs --enabled-shared])
   fi
