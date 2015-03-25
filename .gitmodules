@@ -1,3 +1,0 @@
-[submodule "scripts"]
-	path = scripts
-	url = https://github.com/EricssonResearch/openwebrtc-build-scripts.git
