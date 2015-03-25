@@ -189,7 +189,11 @@ C.Helper.add_helper('gvalue_to_jobject',
             ] + [('G_TYPE_STRING',[
                 C.Decl('const gchar*', 'str'),
                 C.Assign('str', C.Call('g_value_get_string', 'value')),
-                C.Assign('obj', C.Env('NewStringUTF', 'str')),
+                C.IfElse(ifs=['str'], bodies=[[
+                    C.Assign('obj', C.Env('NewStringUTF', 'str')),
+                ],[
+                    C.Assign('obj', 'NULL'),
+                ]]),
             ])],
             default=[
                 C.Assign('obj', 'NULL'),
@@ -525,20 +529,28 @@ class StringMetaType(ObjectMetaType):
                 C.Decl(self.c_type, self.c_name),
                 C.Decl(self.c_type, tmp),
             ],[
-                C.Assign(tmp, Env('GetStringUTFChars', self.jni_name, 'NULL'), cast=self.c_type),
-                C.ExceptionCheck.default(self),
-                C.Assign(self.c_name, Call('g_strdup', tmp)),
+                C.IfElse(ifs=[self.jni_name], bodies=[[
+                    C.Assign(tmp, C.Env('GetStringUTFChars', self.jni_name, 'NULL'), cast=self.c_type),
+                    C.ExceptionCheck.default(self),
+                    C.Assign(self.c_name, C.Call('g_strdup', tmp)),
+                ],[
+                    C.Assign(self.c_name, 'NULL'),
+                ]])
             ],[
-                C.Env('ReleaseStringUTFChars', self.jni_name, tmp),
+                C.If(self.jni_name, C.Env('ReleaseStringUTFChars', self.jni_name, tmp)),
             ])
         else:
             return TypeTransform([
                 C.Decl(self.c_type, self.c_name),
             ],[
-                C.Assign(self.c_name, C.Env('GetStringUTFChars', self.jni_name, 'NULL'), cast=self.c_type),
-                C.ExceptionCheck.default(self),
+            C.IfElse(ifs=[self.jni_name], bodies=[[
+                    C.Assign(self.c_name, C.Env('GetStringUTFChars', self.jni_name, 'NULL'), cast=self.c_type),
+                    C.ExceptionCheck.default(self),
+                ],[
+                    C.Assign(self.c_name, 'NULL'),
+                ]]),
             ],[
-                C.Env('ReleaseStringUTFChars', self.jni_name, self.c_name),
+                C.If(self.jni_name, C.Env('ReleaseStringUTFChars', self.jni_name, self.c_name)),
             ])
 
 
@@ -546,7 +558,10 @@ class StringMetaType(ObjectMetaType):
         return TypeTransform([
             C.Decl(self.jni_type, self.jni_name),
         ],[
-            C.Assign(self.jni_name, C.Env('NewStringUTF', self.c_name))
+            C.IfElse(ifs=[self.c_name], bodies=[
+                C.Assign(self.jni_name, C.Env('NewStringUTF', self.c_name)),
+                C.Assign(self.jni_name, 'NULL'),
+            ]),
         ], self.transfer_ownership and [
             C.Call('g_free', self.c_name),
         ])
