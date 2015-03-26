@@ -61,9 +61,6 @@
 static gboolean owr_initialized = FALSE;
 static GMainContext *owr_main_context = NULL;
 static GMainLoop *owr_main_loop = NULL;
-static GThread *owr_main_thread = NULL;
-
-static gpointer owr_run(gpointer data);
 
 #ifdef OWR_STATIC
 GST_PLUGIN_STATIC_DECLARE(alaw);
@@ -163,17 +160,15 @@ static void gst_log_android_handler(GstDebugCategory *category,
 }
 #endif
 
+
 /**
  * owr_init:
+ * @ctx: #GMainContext to use inside OpenWebRTC, if NULL is passed the default main context is used.
  *
- * Initializes the OpenWebRTC library. Creates a new #GMainContext and starts
- * the main loop used in the OpenWebRTC library.  Either this function or
- * owr_init_with_main_context() must be called before doing anything else.
+ * Initializes the OpenWebRTC library.
  */
-void owr_init()
+void owr_init(GMainContext *main_context)
 {
-    gboolean owr_main_context_is_external;
-
     g_return_if_fail(!owr_initialized);
 
 #ifdef __ANDROID__
@@ -241,35 +236,36 @@ void owr_init()
 
 #endif
 
-    owr_main_context_is_external = !!owr_main_context;
+    owr_main_context = main_context;
 
-    if (!owr_main_context_is_external)
-        owr_main_context = g_main_context_new();
-
-    if (owr_main_context_is_external)
-        return;
-
-    owr_main_loop = g_main_loop_new(owr_main_context, FALSE);
-    owr_main_thread = g_thread_new("owr_main_loop", owr_run, NULL);
+    if (!owr_main_context)
+        owr_main_context = g_main_context_ref_thread_default();
+    else
+        g_main_context_ref(owr_main_context);
 }
 
-
-/**
- * owr_init_with_main_context:
- * @main_context: a #GMainContext to be used in OpenWebRTC.
- *
- * Initializes the OpenWebRTC library with the given #GMainContext. When this
- * function is used the application is responsible for iterating the
- * #GMainContext. Either This function or owr_init() must be called before
- * doing anything else.
- */
-void owr_init_with_main_context(GMainContext *main_context)
+static gboolean owr_running_callback(GAsyncQueue *msg_queue)
 {
-    g_return_if_fail(!owr_initialized);
-    g_return_if_fail(main_context);
+    g_return_val_if_fail(msg_queue, FALSE);
+    g_async_queue_push(msg_queue, "ready");
+    return G_SOURCE_REMOVE;
+}
 
-    owr_main_context = main_context;
-    owr_init();
+static gpointer owr_run_thread_func(GAsyncQueue *msg_queue)
+{
+    GSource *idle_source;
+
+    g_return_val_if_fail(msg_queue, NULL);
+    g_return_val_if_fail(owr_main_context, NULL);
+
+    idle_source = g_idle_source_new();
+    g_source_set_callback(idle_source, (GSourceFunc) owr_running_callback, msg_queue, NULL);
+    g_source_set_priority(idle_source, G_PRIORITY_DEFAULT);
+    g_source_attach(idle_source, owr_main_context);
+    msg_queue = NULL;
+
+    owr_run();
+    return NULL;
 }
 
 #if defined(__ANDROID__)
@@ -280,8 +276,18 @@ static gboolean keep_alive_function(gpointer data) {
 }
 #endif
 
-static gpointer owr_run(gpointer data)
+/**
+ * owr_run:
+ *
+ * Runs the OpenWebRTC main-loop inside the current thread.
+ */
+void owr_run(void)
 {
+    GMainLoop *main_loop;
+
+    g_return_if_fail(owr_main_context);
+    g_return_if_fail(!owr_main_loop);
+
 #if defined(__ANDROID__)
     /* Fix for the mainloop thread not always being awoken when adding a source
         https://bugzilla.gnome.org/show_bug.cgi?id=745965 */
@@ -289,11 +295,43 @@ static gpointer owr_run(gpointer data)
     g_source_set_callback(keep_alive_timer, keep_alive_function, NULL, NULL);
     g_source_attach(keep_alive_timer, owr_main_context);
 #endif
-    g_return_val_if_fail(!data, NULL);
-    g_main_context_push_thread_default(owr_main_context);
-    g_main_loop_run(owr_main_loop);
-    g_main_context_pop_thread_default(owr_main_context);
-    return NULL;
+
+    main_loop = g_main_loop_new(owr_main_context, FALSE);
+    owr_main_loop = main_loop;
+    g_main_loop_run(main_loop);
+    g_main_loop_unref(main_loop);
+}
+
+/**
+ * owr_run_in_background:
+ *
+ * Creates a new thread and runs the OpenWebRTC main-loop inside that thread.
+ * This function does not return until the thread has started and the mainloop is running.
+ */
+void owr_run_in_background(void)
+{
+    GThread *owr_main_thread;
+    GAsyncQueue *msg_queue = g_async_queue_new();
+
+    g_return_if_fail(owr_main_context);
+    g_return_if_fail(!owr_main_loop);
+
+    owr_main_thread = g_thread_new("owr_main_loop", (GThreadFunc) owr_run_thread_func, msg_queue);
+    g_thread_unref(owr_main_thread);
+    g_async_queue_pop(msg_queue);
+    g_async_queue_unref(msg_queue);
+}
+
+/**
+ * owr_quit:
+ *
+ * Quits the OpenWebRTC main-loop, and stops the background thread if owr_run_in_background was used.
+ */
+void owr_quit(void)
+{
+    g_return_if_fail(owr_main_loop);
+    g_main_loop_quit(owr_main_loop);
+    owr_main_loop = NULL;
 }
 
 gboolean _owr_is_initialized()

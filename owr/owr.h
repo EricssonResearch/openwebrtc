@@ -32,8 +32,10 @@
 
 G_BEGIN_DECLS
 
-void owr_init(void);
-void owr_init_with_main_context(GMainContext *main_context);
+void owr_init(GMainContext *main_context);
+void owr_run(void);
+void owr_run_in_background(void);
+void owr_quit(void);
 
 G_END_DECLS
 

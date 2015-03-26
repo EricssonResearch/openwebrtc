@@ -314,7 +314,6 @@ static gboolean bridge_ready_callback(GAsyncQueue *msg_queue)
 
 static gpointer run(GAsyncQueue *msg_queue)
 {
-    GMainLoop *main_loop;
     SeedEngine *engine;
     SeedGlobalContext worker_context;
     SeedException exception;
@@ -387,7 +386,7 @@ static gpointer run(GAsyncQueue *msg_queue)
     load_typelibs();
 #endif
 
-    owr_init_with_main_context(g_main_context_default());
+    owr_init(NULL);
     engine = seed_init(&argc, &argv);
     seed_engine_set_search_path(engine, "");
     worker_context = seed_context_create(engine->group, NULL);
@@ -420,9 +419,7 @@ static gpointer run(GAsyncQueue *msg_queue)
     if (msg_queue)
         g_idle_add((GSourceFunc)bridge_ready_callback, msg_queue);
 
-    main_loop = g_main_loop_new(g_main_context_default(), FALSE);
-    g_main_loop_run(main_loop);
-    g_main_loop_unref(main_loop);
+    owr_run();
 
     seed_context_unref(worker_context);
 

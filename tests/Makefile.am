@@ -19,6 +19,7 @@ bin_PROGRAMS = \
     list-devices \
     test-self-view \
     test-send-receive \
+    test-init \
     test-client
 
 list_devices_SOURCES = list_devices.c
@@ -53,6 +54,16 @@ test_send_receive_CFLAGS = \
 test_send_receive_LDADD = \
     $(GSTREAMER_LIBS) \
     $(NICE_LIBS) \
+    $(GLIB_LIBS) \
+    $(top_builddir)/owr/libopenwebrtc.la
+
+test_init_SOURCES = test_init.c
+
+test_init_CFLAGS = \
+    $(AM_CFLAGS) \
+    -I$(top_srcdir)/owr
+
+test_init_LDADD = \
     $(GLIB_LIBS) \
     $(top_builddir)/owr/libopenwebrtc.la
 

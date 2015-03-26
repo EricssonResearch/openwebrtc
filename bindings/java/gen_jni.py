@@ -37,6 +37,7 @@ from c_generator import C
 from gir_parser import GirParser
 from type_registry import TypeRegistry
 from type_registry import TypeTransform
+from type_registry import GirMetaType
 from standard_types import standard_types
 from standard_types import ObjectMetaType
 
@@ -129,6 +130,17 @@ class WindowHandleType(ObjectMetaType(
         ])
 
 
+class GMainContextDummy(GirMetaType()):
+    gir_type = 'GLib.MainContext'
+    c_type = 'GMainContext*'
+
+    def __init__(self, *ignored):
+        self.c_name = 'NULL'
+
+    def transform_to_c(self):
+        return TypeTransform()
+
+
 def remove_ignored_elements(xml_root):
     def remove_elem(path):
         parent = xml_root.find(path + '/..')
@@ -149,6 +161,7 @@ def main(argv = None):
     type_registry = TypeRegistry()
     type_registry.register(standard_types)
     type_registry.register(WindowHandleType)
+    type_registry.register(GMainContextDummy)
 
     xml_root = ET.parse(args.gir).getroot()
     remove_ignored_elements(xml_root)

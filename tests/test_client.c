@@ -751,8 +751,6 @@ static void got_local_sources(GList *sources, gchar *url)
 
 gint main(gint argc, gchar **argv)
 {
-    GMainLoop *main_loop;
-    GMainContext *main_context;
     gchar *url;
 
     if (argc < 2) {
@@ -763,11 +761,9 @@ gint main(gint argc, gchar **argv)
     session_id = argv[1];
     client_id = g_random_int();
     url = g_strdup_printf(SERVER_URL"/stoc/%s/%u", session_id, client_id);
-    main_loop = g_main_loop_new(NULL, FALSE);
-    main_context = g_main_context_default();
-    owr_init_with_main_context(main_context);
+    owr_init(NULL);
     owr_get_capture_sources(OWR_MEDIA_TYPE_AUDIO | OWR_MEDIA_TYPE_VIDEO,
         (OwrCaptureSourcesCallback)got_local_sources, url);
-    g_main_loop_run(main_loop);
+    owr_run();
     return 0;
 }

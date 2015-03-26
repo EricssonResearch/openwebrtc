@@ -15,7 +15,9 @@ owr_image_server_get_type
 owr_image_server_new
 owr_image_server_remove_image_renderer
 owr_init
-owr_init_with_main_context
+owr_run
+owr_run_in_background
+owr_quit
 owr_data_channel_close
 owr_data_channel_get_type
 owr_data_channel_new
