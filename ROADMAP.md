@@ -5,11 +5,11 @@
 * [~~H.264 HW video support on iOS~~](http://www.openwebrtc.io/blog/2015/1/14/hardware-h264-video-on-ios) (done)
 * ~~H.264 HW video in Bowser~~ (done)
 * ~~Promises in JavaScript~~ (done)
-* [~~WebRTC DataChannel~~](https://github.com/EricssonResearch/openwebrtc/issues/3)
+* [~~WebRTC DataChannel~~](https://github.com/EricssonResearch/openwebrtc/issues/3) (done)
 * [~~Android native sample app~~](https://github.com/EricssonResearch/openwebrtc-examples/pull/31) (done)
 * [iOS native sample app](https://github.com/EricssonResearch/openwebrtc-examples/pull/49)
 * More tutorials and documentation
-* ~~New build system: [Cerbero](https://github.com/EricssonResearch/cerbero) ([64-bit support](https://github.com/EricssonResearch/openwebrtc/issues/48) for iOS and more)~~
+* ~~New build system: [Cerbero](https://github.com/EricssonResearch/cerbero) ([64-bit support](https://github.com/EricssonResearch/openwebrtc/issues/48) for iOS and more)~~ (done)
 * Compressed video sources
 * Releases
 * [Overlay video rendering](https://github.com/EricssonResearch/openwebrtc-examples/issues/38)
