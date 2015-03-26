@@ -205,7 +205,7 @@ static void owr_media_renderer_init(OwrMediaRenderer *renderer)
     g_free(bin_name);
 
 #ifdef OWR_DEBUG
-    g_signal_connect(priv->pipeline, "deep-notify", G_CALLBACK(gst_object_default_deep_notify), NULL);
+    g_signal_connect(priv->pipeline, "deep-notify", G_CALLBACK(_owr_deep_notify), NULL);
 #endif
 
     priv->sink = NULL;

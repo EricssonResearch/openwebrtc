@@ -158,3 +158,42 @@ gboolean _owr_gst_caps_foreach(const GstCaps *caps, OwrGstCapsForeachFunc func, 
 
     return TRUE;
 }
+
+void _owr_deep_notify(GObject *object, GstObject *orig,
+    GParamSpec *pspec, gpointer user_data)
+{
+    GValue value = G_VALUE_INIT;
+    gchar *str = NULL;
+    GstObject *it;
+    gchar *prevpath, *path;
+
+    OWR_UNUSED(user_data);
+    OWR_UNUSED(object);
+
+    path = g_strdup("");
+
+    for (it = orig; GST_IS_OBJECT(it); it = GST_OBJECT_PARENT(it)) {
+        prevpath = path;
+        path = g_strjoin("/", GST_OBJECT_NAME(it), prevpath, NULL);
+        g_free(prevpath);
+    }
+
+    if (pspec->flags & G_PARAM_READABLE) {
+        g_value_init(&value, pspec->value_type);
+        g_object_get_property(G_OBJECT(orig), pspec->name, &value);
+
+        if (G_VALUE_TYPE(&value) == GST_TYPE_CAPS)
+            str = gst_caps_to_string(gst_value_get_caps(&value));
+        else if (G_VALUE_HOLDS_STRING(&value))
+            str = g_value_dup_string(&value);
+        else
+            str = gst_value_serialize(&value);
+
+        GST_INFO_OBJECT(object, "%s%s = %s\n", path, pspec->name, str);
+        g_free(str);
+        g_value_unset(&value);
+    } else
+        GST_INFO_OBJECT(object, "Parameter %s not readable in %s.", pspec->name, path);
+
+    g_free(path);
+}

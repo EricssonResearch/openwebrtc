@@ -54,6 +54,9 @@ typedef gboolean (*OwrGstCapsForeachFunc) (GstCapsFeatures *features,
                                            gpointer         user_data);
 gboolean _owr_gst_caps_foreach(const GstCaps *caps, OwrGstCapsForeachFunc func, gpointer user_data);
 
+void _owr_deep_notify(GObject *object, GstObject *orig,
+    GParamSpec *pspec, gpointer user_data);
+
 G_END_DECLS
 
 #endif /* __GTK_DOC_IGNORE__ */
