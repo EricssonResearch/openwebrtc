@@ -28,7 +28,7 @@ PACKAGE_ROOT = 'com.ericsson.research'
 LOG_TAG = 'OpenWebRTC'
 
 IGNORED_ELEMENTS = [
-    ".//*[@name='init_with_main_context']",
+    # ".//*[@name='name_of_symbol_to_ignore_here']",
 ]
 
 C_INDENTATION = ' ' * 4

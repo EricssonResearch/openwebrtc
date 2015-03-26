@@ -157,14 +157,11 @@ void got_sources(GList *sources, gpointer user_data)
 }
 
 int main() {
-    GMainContext *ctx = g_main_context_default();
-    GMainLoop *loop = g_main_loop_new(ctx, FALSE);
-
-    owr_init_with_main_context(ctx);
+    owr_init(NULL);
 
     owr_get_capture_sources(OWR_MEDIA_TYPE_AUDIO|OWR_MEDIA_TYPE_VIDEO, got_sources, NULL);
 
-    g_main_loop_run(loop);
+    owr_run();
 
     return 0;
 }

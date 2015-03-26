@@ -198,8 +198,6 @@ static gboolean dump_cb(gpointer *user_data)
 
 
 int main(int argc, char **argv) {
-    GMainContext *ctx = g_main_context_default();
-    GMainLoop *loop = g_main_loop_new(ctx, FALSE);
     GOptionContext *options;
     GError *error = NULL;
 
@@ -219,7 +217,7 @@ int main(int argc, char **argv) {
 
     OwrPayload *receive_payload;
 
-    owr_init_with_main_context(ctx);
+    owr_init(NULL);
 
     recv_transport_agent = owr_transport_agent_new(FALSE);
     g_assert(OWR_IS_TRANSPORT_AGENT(recv_transport_agent));
@@ -281,7 +279,7 @@ int main(int argc, char **argv) {
 
     g_timeout_add_seconds(10, (GSourceFunc)dump_cb, NULL);
 
-    g_main_loop_run(loop);
+    owr_run();
 
     return 0;
 }
