@@ -36,6 +36,7 @@
 
 #include "owr_media_renderer_private.h"
 #include "owr_private.h"
+#include "owr_utils.h"
 #include "owr_video_renderer_private.h"
 #include "owr_window_registry.h"
 #include "owr_window_registry_private.h"
@@ -83,6 +84,7 @@ static void owr_video_renderer_constructed(GObject *object);
 
 static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer, guintptr window_handle);
 static GstCaps *owr_video_renderer_get_caps(OwrMediaRenderer *renderer);
+static GstElement *owr_video_renderer_get_sink(OwrMediaRenderer *renderer);
 
 struct _OwrVideoRendererPrivate {
     guint width;
@@ -135,6 +137,7 @@ static void owr_video_renderer_class_init(OwrVideoRendererClass *klass)
     gobject_class->finalize = owr_video_renderer_finalize;
 
     media_renderer_class->get_caps = (void *(*)(OwrMediaRenderer *))owr_video_renderer_get_caps;
+    media_renderer_class->get_sink = (void *(*)(OwrMediaRenderer *))owr_video_renderer_get_sink;
 
     g_object_class_install_properties(gobject_class, N_PROPERTIES, obj_properties);
 }
@@ -261,7 +264,7 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer, gu
         balance, 0);
     renderer_disabled(renderer, NULL, balance);
 
-    sink = gst_element_factory_make(VIDEO_SINK, "video-renderer-sink");
+    sink = OWR_MEDIA_RENDERER_GET_CLASS(renderer)->get_sink(renderer);
     g_assert(sink);
     g_object_set(sink, "enable-last-sample", FALSE, NULL);
     if (priv->tag) {
@@ -329,6 +332,12 @@ static GstCaps *owr_video_renderer_get_caps(OwrMediaRenderer *renderer)
     }
 
     return caps;
+}
+
+static GstElement *owr_video_renderer_get_sink(OwrMediaRenderer *renderer)
+{
+    OWR_UNUSED(renderer);
+    return gst_element_factory_make(VIDEO_SINK, "video-renderer-sink");
 }
 
 void _owr_video_renderer_notify_tag_changed(OwrVideoRenderer *video_renderer, const gchar *tag, gboolean have_handle, guintptr new_handle)
