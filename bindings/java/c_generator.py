@@ -71,6 +71,7 @@ class Log(C.Lines):
     warning = _make_logfunc('warning')
     debug = _make_logfunc('debug')
     info = _make_logfunc('info')
+    verbose = _make_logfunc('verbose')
 
     def __iter__(self):
         yield 'log_%s("%s"%s);' % (self.level, self.msg, (', ' if self.args else '') + flatjoin(self.args, ', '))
