@@ -463,7 +463,7 @@ static JNIEnv* get_jni_env_from_jvm(JavaVM *jvm)
         if (pthread_key_create(&detach_key, (void (*)(void *)) on_java_detach))
             g_warning("android device list: failed to set on_java_detach");
 
-        pthread_setspecific(detach_key, env);
+        pthread_setspecific(detach_key, jvm);
     } else if (JNI_OK != err)
         g_warning("jvm->GetEnv() failed");
 
