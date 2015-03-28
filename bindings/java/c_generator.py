@@ -102,6 +102,7 @@ class ExceptionCheck(C.Lines):
     def __iter__(self):
         yield C.If(C.Env('ExceptionCheck'),
             C.Log('warning', 'exception at %s:%d', '__FILE__', '__LINE__'),
+            C.Env('ExceptionDescribe'),
             C.Return(self.value),
         )
 
