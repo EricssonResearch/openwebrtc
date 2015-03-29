@@ -597,7 +597,6 @@
                         "app": "webrtc-datachannel"
                     };
                     if (rmdesc.sctp) {
-                        lmdesc.sctp.maxMessageSize = rmdesc.sctp.maxMessageSize;
                         lmdesc.sctp.streams = rmdesc.sctp.streams;
                     }
                 } else {
