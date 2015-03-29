@@ -2723,7 +2723,7 @@ static gboolean create_datachannel_appsrc(OwrTransportAgent *transport_agent,
     data_src = gst_element_factory_make("appsrc", name);
     g_free(name);
     g_assert(data_src);
-    g_object_set(data_src, "caps", caps, "is-live", TRUE, "min-latency", 0,
+    g_object_set(data_src, "caps", caps, "is-live", TRUE, "min-latency", G_GINT64_CONSTANT(0),
         "do-timestamp", TRUE, NULL);
 
     data_channel_info->data_src = data_src;
