@@ -57,7 +57,7 @@ if (typeof(SDP) == "undefined")
             "( tcptype (active|passive|so))?.*$",
         "fingerprint": "^a=fingerprint:(sha-1|sha-256) ([A-Fa-f\\d\:]+).*$",
         "setup": "^a=setup:(actpass|active|passive).*$",
-        "sctpmap": "^a=sctpmap:${port} ([\\w\\-]+)( [\\d]{3,})?( [\\d]+)?.*$"
+        "sctpmap": "^a=sctpmap:${port} ([\\w\\-]+)( [\\d]+)?.*$"
     };
 
     var templates = {
@@ -112,7 +112,7 @@ if (typeof(SDP) == "undefined")
         "dtlsFingerprint": "a=fingerprint:${fingerprintHashFunction} ${fingerprint}\r\n",
         "dtlsSetup": "a=setup:${setup}\r\n",
 
-        "sctpmap": "a=sctpmap:${port} ${app}${[ ]maxMessageSize}${[ ]streams}\r\n"
+        "sctpmap": "a=sctpmap:${port} ${app}${[ ]streams}\r\n"
     };
 
     function match(data, pattern, flags, alt) {
@@ -343,9 +343,7 @@ if (typeof(SDP) == "undefined")
                 if (sctpmap) {
                     mediaDescription.sctp.app = sctpmap[1];
                     if (sctpmap[2])
-                        mediaDescription.sctp.maxMessageSize = parseInt(sctpmap[2]);
-                    if (sctpmap[3])
-                        mediaDescription.sctp.streams = parseInt(sctpmap[3]);
+                        mediaDescription.sctp.streams = parseInt(sctpmap[2]);
                 }
             }
 
@@ -497,7 +495,7 @@ if (typeof(SDP) == "undefined")
 
             var sctpInfo = {"sctpmapLine": "", "fmt": ""};
             if (mediaDescription.sctp) {
-                addDefaults(mediaDescription.sctp, {"maxMessageSize": null, "streams": null});
+                addDefaults(mediaDescription.sctp, {"streams": null});
                 sctpInfo.sctpmapLine = fillTemplate(templates.sctpmap, mediaDescription.sctp);
                 sctpInfo.fmt = mediaDescription.sctp.port;
             }
