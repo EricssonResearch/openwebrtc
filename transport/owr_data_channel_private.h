@@ -34,19 +34,12 @@
 
 G_BEGIN_DECLS
 
-typedef enum {
-    OWR_DATA_CHANNEL_READY_STATE_CONNECTING,
-    OWR_DATA_CHANNEL_READY_STATE_OPEN,
-    OWR_DATA_CHANNEL_READY_STATE_CLOSING,
-    OWR_DATA_CHANNEL_READY_STATE_CLOSED
-} DataChannelReadyState;
-
 /*< private >*/
 void _owr_data_channel_set_on_send(OwrDataChannel *data_channel,
     GClosure *on_datachannel_send);
 void _owr_data_channel_set_on_close(OwrDataChannel *data_channel,
     GClosure *on_datachannel_close);
-void _owr_data_channel_set_ready_state(OwrDataChannel *data_channel, DataChannelReadyState state);
+void _owr_data_channel_set_ready_state(OwrDataChannel *data_channel, OwrDataChannelReadyState state);
 void _owr_data_channel_set_on_request_bytes_sent(OwrDataChannel *data_channel,
     GClosure *on_request_bytes_sent);
 void _owr_data_channel_clear_closures(OwrDataChannel *data_channel);

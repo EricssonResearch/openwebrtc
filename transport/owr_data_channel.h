@@ -34,6 +34,16 @@
 
 G_BEGIN_DECLS
 
+typedef enum {
+    OWR_DATA_CHANNEL_READY_STATE_CONNECTING,
+    OWR_DATA_CHANNEL_READY_STATE_OPEN,
+    OWR_DATA_CHANNEL_READY_STATE_CLOSING,
+    OWR_DATA_CHANNEL_READY_STATE_CLOSED
+} OwrDataChannelReadyState;
+
+#define OWR_DATA_CHANNEL_READY_STATE_TYPE (owr_data_channel_ready_state_get_type())
+GType owr_data_channel_ready_state_get_type(void);
+
 #define OWR_TYPE_DATA_CHANNEL            (owr_data_channel_get_type())
 #define OWR_DATA_CHANNEL(obj)            (G_TYPE_CHECK_INSTANCE_CAST((obj), OWR_TYPE_DATA_CHANNEL, OwrDataChannel))
 #define OWR_DATA_CHANNEL_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST((klass), OWR_TYPE_DATA_CHANNEL, OwrDataChannelClass))

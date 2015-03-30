@@ -51,8 +51,7 @@
 
 G_DEFINE_TYPE(OwrDataChannel, owr_data_channel, G_TYPE_OBJECT)
 
-#define OWR_DATA_CHANNEL_READY_STATE_TYPE (owr_data_channel_ready_state_get_type())
-static GType owr_data_channel_ready_state_get_type(void)
+GType owr_data_channel_ready_state_get_type(void)
 {
     static const GEnumValue values[] = {
         {OWR_DATA_CHANNEL_READY_STATE_CONNECTING, "Ready State connecting", "ready-state-connecting"},
@@ -65,7 +64,7 @@ static GType owr_data_channel_ready_state_get_type(void)
 
     if (g_once_init_enter((gsize *) & id)) {
         GType _id;
-        _id = g_enum_register_static("GstSctpReadyState", values);
+        _id = g_enum_register_static("OwrDataChannelReadyStates", values);
         g_once_init_leave((gsize *) & id, _id);
     }
 
@@ -83,7 +82,7 @@ struct _OwrDataChannelPrivate {
     GClosure *on_datachannel_send;
     GClosure *on_request_bytes_sent;
     GClosure *on_datachannel_close;
-    DataChannelReadyState ready_state;
+    OwrDataChannelReadyState ready_state;
     guint64 bytes_sent;
 };
 
@@ -502,7 +501,7 @@ static gboolean set_ready_state(GHashTable *args)
 {
     OwrDataChannel *data_channel;
     OwrDataChannelPrivate *priv;
-    DataChannelReadyState state;
+    OwrDataChannelReadyState state;
 
     data_channel = g_hash_table_lookup(args, "data_channel");
     state = GPOINTER_TO_UINT(g_hash_table_lookup(args, "state"));
@@ -606,7 +605,7 @@ void _owr_data_channel_clear_closures(OwrDataChannel *data_channel)
     }
 }
 
-void _owr_data_channel_set_ready_state(OwrDataChannel *data_channel, DataChannelReadyState state)
+void _owr_data_channel_set_ready_state(OwrDataChannel *data_channel, OwrDataChannelReadyState state)
 {
     GHashTable *args;
 
