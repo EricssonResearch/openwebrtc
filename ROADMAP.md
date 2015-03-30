@@ -7,14 +7,14 @@
 * ~~Promises in JavaScript~~ (done)
 * [~~WebRTC DataChannel~~](https://github.com/EricssonResearch/openwebrtc/issues/3) (done)
 * [~~Android native sample app~~](https://github.com/EricssonResearch/openwebrtc-examples/pull/31) (done)
-* [iOS native sample app](https://github.com/EricssonResearch/openwebrtc-examples/pull/49)
+* [~~iOS native sample app~~](https://github.com/EricssonResearch/openwebrtc-examples/tree/master/ios/NativeDemo) (done)
 * More tutorials and documentation
 * ~~New build system: [Cerbero](https://github.com/EricssonResearch/cerbero) ([64-bit support](https://github.com/EricssonResearch/openwebrtc/issues/48) for iOS and more)~~ (done)
 * Compressed video sources
 * Releases
 * [Overlay video rendering](https://github.com/EricssonResearch/openwebrtc-examples/issues/38)
 * Mobile-optimized congestion control (based on [IETF contribution SCReAM](https://tools.ietf.org/html/draft-johansson-rmcat-scream-cc-00))
-* [CocoaPods](https://github.com/EricssonResearch/openwebrtc/issues/59)
+* [CocoaPods](https://github.com/EricssonResearch/openwebrtc-ios-sdk)
 * [HEVC/H.265 video](https://github.com/EricssonResearch/openwebrtc/issues/1)
 * [WebRTC Statistics API](https://github.com/EricssonResearch/openwebrtc/issues/5)
 * [Better handling of video rotation](https://github.com/EricssonResearch/openwebrtc/issues/150)
