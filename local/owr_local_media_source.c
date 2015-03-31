@@ -444,8 +444,16 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
             case OWR_SOURCE_TYPE_CAPTURE:
                 CREATE_ELEMENT(source, AUDIO_SRC, "audio-source");
 #if !defined(__APPLE__) || !TARGET_IPHONE_SIMULATOR
+/*
+    Default values for buffer-time and latency-time on android are 200ms and 20ms.
+    The minimum latency-time that can be used on Android is 20ms, and using
+    a 40ms buffer-time with a 20ms latency-time causes crackling audio.
+    So let's just stick with the defaults.
+*/
+#if !defined(__ANDROID__)
                 g_object_set(source, "buffer-time", G_GINT64_CONSTANT(40000),
                     "latency-time", G_GINT64_CONSTANT(10000), NULL);
+#endif
                 if (priv->device_index > -1) {
 #ifdef __APPLE__
                     g_object_set(source, "device", priv->device_index, NULL);
