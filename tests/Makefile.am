@@ -23,6 +23,25 @@ bin_PROGRAMS = \
     test-init \
     test-client
 
+if OWR_GST
+AM_CPPFLAGS += \
+    -I$(top_srcdir)/gst
+bin_PROGRAMS += \
+    test-gst-io
+
+test_gst_io_SOURCES = test_gst_io.c
+
+test_gst_io_CFLAGS = \
+    -I$(top_srcdir)/gst \
+    -I$(top_srcdir)/local \
+    -I$(top_srcdir)/owr
+
+test_gst_io_LDADD = \
+    $(GSTREAMER_LIBS) \
+    $(GLIB_LIBS) \
+    $(top_builddir)/gst/libopenwebrtc_gst.la
+endif
+
 list_devices_SOURCES = list_devices.c
 
 list_devices_CFLAGS = \
