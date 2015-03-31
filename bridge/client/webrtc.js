@@ -110,13 +110,13 @@
     bridge.importFunctions("createPeerHandler", "requestSources", "renderSources");
 
     function getUserMedia(options) {
-        checkArguments("getUserMedia", "object", 1, arguments);
+        checkArguments("getUserMedia", "dictionary", 1, arguments);
 
         return internalGetUserMedia(options);
     }
 
     function legacyGetUserMedia(options, successCallback, errorCallback) {
-        checkArguments("getUserMedia", "object, function, function", 3, arguments);
+        checkArguments("getUserMedia", "dictionary, function, function", 3, arguments);
 
         internalGetUserMedia(options).then(successCallback).catch(errorCallback);
     }
@@ -341,7 +341,7 @@
         };
         domObject.addReadOnlyAttributes(this, a);
 
-        checkArguments("RTCPeerConnection", "object", 1, arguments);
+        checkArguments("RTCPeerConnection", "dictionary", 1, arguments);
         checkConfigurationDictionary(configuration);
 
         if (!configuration.iceTransports)
@@ -447,13 +447,13 @@
 
         this.createOffer = function () {
             // backwards compatibility with callback based method
-            var callbackArgsError = getArgumentsError("function, function, object", 2, arguments);
+            var callbackArgsError = getArgumentsError("function, function, dictionary", 2, arguments);
             if (!callbackArgsError) {
                 internalCreateOffer(arguments[2]).then(arguments[0]).catch(arguments[1]);
                 return;
             }
 
-            var promiseArgsError = getArgumentsError("object", 0, arguments);
+            var promiseArgsError = getArgumentsError("dictionary", 0, arguments);
             if (!promiseArgsError)
                 return internalCreateOffer(arguments[0]);
 
@@ -537,13 +537,13 @@
 
         this.createAnswer = function () {
             // backwards compatibility with callback based method
-            var callbackArgsError = getArgumentsError("function, function, object", 2, arguments);
+            var callbackArgsError = getArgumentsError("function, function, dictionary", 2, arguments);
             if (!callbackArgsError) {
                 internalCreateAnswer(arguments[2]).then(arguments[0]).catch(arguments[1]);
                 return;
             }
 
-            var promiseArgsError = getArgumentsError("object", 0, arguments);
+            var promiseArgsError = getArgumentsError("dictionary", 0, arguments);
             if (!promiseArgsError)
                 return internalCreateAnswer(arguments[0]);
 
@@ -776,7 +776,7 @@
         };
 
         this.updateIce = function (configuration) {
-            checkArguments("updateIce", "object", 1, arguments);
+            checkArguments("updateIce", "dictionary", 1, arguments);
             checkConfigurationDictionary(configuration);
             checkClosedState("updateIce");
         };
@@ -981,7 +981,7 @@
 
             if (configuration.iceServers) {
                 configuration.iceServers.forEach(function (iceServer) {
-                    checkType("RTCConfiguration.iceServers", iceServer, "object");
+                    checkType("RTCConfiguration.iceServers", iceServer, "dictionary");
                     checkDictionary("RTCIceServer", iceServer, {
                         "urls": "Array | string",
                         "url": "string", // legacy support
@@ -1264,7 +1264,7 @@
     };
 
     function RTCSessionDescription(initDict) {
-        checkArguments("RTCSessionDescription", "object", 0, arguments);
+        checkArguments("RTCSessionDescription", "dictionary", 0, arguments);
         if (initDict) {
             checkDictionary("RTCSessionDescriptionInit", initDict, {
                 "type": "string",
@@ -1288,7 +1288,7 @@
     };
 
     function RTCIceCandidate(initDict) {
-        checkArguments("RTCIceCandidate", "object", 0, arguments);
+        checkArguments("RTCIceCandidate", "dictionary", 0, arguments);
         if (initDict) {
             checkDictionary("RTCIceCandidateInit", initDict, {
                 "candidate": "string",

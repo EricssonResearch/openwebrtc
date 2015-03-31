@@ -181,6 +181,10 @@ function canConvert(value, expectedTypes) {
             if (!isNaN(asNumber) && asNumber != -Infinity && asNumber != Infinity)
                 return true;
         }
+        if (expectedType == "dictionary") { // object, undefined and null can be converted
+            if (type == "object" || type == "undefined" || type == "null")
+                return true;
+        }
         if (type == "object") {
             if (expectedType == "object")
                 return true;
