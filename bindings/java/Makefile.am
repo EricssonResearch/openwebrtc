@@ -57,11 +57,11 @@ Owr-0.1.gir:
 
 gen/bridge/%: bridge/%
 	mkdir -p gen/bridge
-	$(JAVAC) -d gen/bridge $</*.java
+	$(JAVAC) -source 1.7 -target 1.7 -d gen/bridge $</*.java
 
 gen/owr/%: owr/%
 	mkdir -p gen/owr
-	$(JAVAC) -classpath '$(ANDROID_CLASSPATH):gen/owr/' -d gen/owr $+/*.java
+	$(JAVAC) -source 1.7 -target 1.7 -classpath '$(ANDROID_CLASSPATH):gen/owr/' -d gen/owr $+/*.java
 
 javadoc: owr
 	$(JAVADOC) -d javadoc -sourcepath owr -subpackages com.ericsson.research.owr -classpath '$(ANDROID_CLASSPATH)'
