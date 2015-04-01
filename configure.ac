@@ -6,6 +6,11 @@ AC_CONFIG_HEADERS([config.h])
 
 AC_CONFIG_MACRO_DIR(m4)
 
+OWR_API_VERSION=0.1
+AC_SUBST(OWR_API_VERSION)
+OWR_API_VERSION_UNDERSCORE=0_1
+AC_SUBST(OWR_API_VERSION_UNDERSCORE)
+
 AM_INIT_AUTOMAKE([1.11 -Wno-portability foreign])
 
 AM_SILENT_RULES([yes])
@@ -276,13 +281,13 @@ AC_SUBST(OWR_DEVICE_LIST_EXT_LIBS)
 AC_OUTPUT([
 Makefile
 bridge/Makefile
-bridge/openwebrtc-bridge-0.1.pc
+bridge/openwebrtc-bridge-$OWR_API_VERSION.pc
 bridge/client/Makefile
 bridge/seed/Makefile
 bridge/shared/Makefile
 bridge/worker/Makefile
 owr/Makefile
-owr/openwebrtc-0.1.pc
+owr/openwebrtc-$OWR_API_VERSION.pc
 transport/Makefile
 local/Makefile
 tests/Makefile

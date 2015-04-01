@@ -44,7 +44,7 @@
 #include "worker/peerhandler.js.h"
 
 #ifdef OWR_STATIC
-#include "Owr-0.1.gir.h"
+#include OWR_GIR_FILE
 #include <gir/GIRepository-2.0.gir.h>
 #include <gir/GLib-2.0.gir.h>
 #include <gir/GObject-2.0.gir.h>
@@ -232,7 +232,7 @@ static void load_typelibs()
         GObject_2_0_gir_sha1,
         Gio_2_0_gir_sha1,
         GIRepository_2_0_gir_sha1,
-        Owr_0_1_gir_sha1,
+        G_PASTE(OWR_GIR_VAR_PREFIX, _gir_sha1),
         NULL
     };
     guint gir_checksum_lengths[G_N_ELEMENTS(gir_checksums)];
@@ -242,7 +242,7 @@ static void load_typelibs()
         GObject_2_0_gir,
         Gio_2_0_gir,
         GIRepository_2_0_gir,
-        Owr_0_1_gir,
+        G_PASTE(OWR_GIR_VAR_PREFIX, _gir),
         NULL
     };
     guint gir_lengths[G_N_ELEMENTS(girs)];
@@ -251,14 +251,14 @@ static void load_typelibs()
     gir_checksum_lengths[1] = GObject_2_0_gir_sha1_len,
     gir_checksum_lengths[2] = Gio_2_0_gir_sha1_len,
     gir_checksum_lengths[3] = GIRepository_2_0_gir_sha1_len,
-    gir_checksum_lengths[4] = Owr_0_1_gir_sha1_len,
+    gir_checksum_lengths[4] = G_PASTE(OWR_GIR_VAR_PREFIX, _gir_sha1_len),
     gir_checksum_lengths[5] = 0;
 
     gir_lengths[0] = GLib_2_0_gir_len;
     gir_lengths[1] = GObject_2_0_gir_len,
     gir_lengths[2] = Gio_2_0_gir_len,
     gir_lengths[3] = GIRepository_2_0_gir_len,
-    gir_lengths[4] = Owr_0_1_gir_len,
+    gir_lengths[4] = G_PASTE(OWR_GIR_VAR_PREFIX, _gir_len),
     gir_lengths[5] = 0;
 
     for (i = 0; gir_checksums[i]; i++)

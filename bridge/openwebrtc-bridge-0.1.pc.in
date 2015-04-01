@@ -8,6 +8,6 @@ includedir=@includedir@
 Name: libopenwebrtc-bridge
 Description: libopenwebrtc-bridge
 Version: @VERSION@
-Requires: openwebrtc-0.1 glib-2.0 gobject-2.0 gmodule-2.0 gthread-2.0 seed
+Requires: openwebrtc-@OWR_API_VERSION@ glib-2.0 gobject-2.0 gmodule-2.0 gthread-2.0 seed
 Libs: -L${libdir} -lopenwebrtc_bridge
 Cflags: -I${includedir}

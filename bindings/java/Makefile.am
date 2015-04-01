@@ -44,10 +44,10 @@ endif
 CLEANFILES = owr_jni.c owr gen javadoc javadoc-bridge
 
 if HAVE_INTROSPECTION
-OWR_GIR = $(top_builddir)/owr/Owr-0.1.gir
+OWR_GIR = $(top_builddir)/owr/Owr-@OWR_API_VERSION@.gir
 else
 # You need to provide this externally
-OWR_GIR = Owr-0.1.gir
+OWR_GIR = Owr-@OWR_API_VERSION@.gir
 endif
 
 owr_jni.c: $(OWR_GIR) $(top_srcdir)/bindings/java/
@@ -56,8 +56,8 @@ owr_jni.c: $(OWR_GIR) $(top_srcdir)/bindings/java/
 	--c-out=$(top_builddir)/bindings/java/owr_jni.c \
 	--j-out=$(top_builddir)/bindings/java/owr
 
-Owr-0.1.gir:
-	cat `find $(top_srcdir)/out -name Owr-0.1.gir || echo "Owr-0.1.gir"` | sed 's/shared-library="[^"]*"/shared-library="libopenwebrtc_jni.so"/' > Owr-0.1.gir
+Owr-@OWR_API_VERSION@.gir:
+	cat `find $(top_srcdir)/out -name Owr-@OWR_API_VERSION@.gir || echo "Owr-@OWR_API_VERSION@.gir"` | sed 's/shared-library="[^"]*"/shared-library="libopenwebrtc_jni.so"/' > Owr-@OWR_API_VERSION@.gir
 
 gen/bridge/%: bridge/%
 	mkdir -p gen/bridge

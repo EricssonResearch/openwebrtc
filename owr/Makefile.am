@@ -65,14 +65,14 @@ noinst_HEADERS = \
 
 if HAVE_INTROSPECTION
 noinst_HEADERS += \
-    Owr-0.1.gir.h
+    Owr-@OWR_API_VERSION@.gir.h
 endif
 
 pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = openwebrtc-0.1.pc
+pkgconfig_DATA = openwebrtc-@OWR_API_VERSION@.pc
 
 EXTRA_DIST = \
-    openwebrtc-0.1.pc.in
+    openwebrtc-@OWR_API_VERSION@.pc.in
 
 -include $(INTROSPECTION_MAKEFILE)
 INTROSPECTION_GIRS =
@@ -90,15 +90,15 @@ endif
 if HAVE_INTROSPECTION
 introspection_sources = $(libopenwebrtc_la_SOURCES)
 
-Owr-0.1.gir: libopenwebrtc.la
-Owr_0_1_gir_INCLUDES = GObject-2.0
-Owr_0_1_gir_CFLAGS = \
+Owr-@OWR_API_VERSION@.gir: libopenwebrtc.la
+Owr_@OWR_API_VERSION_UNDERSCORE@_gir_INCLUDES = GObject-2.0
+Owr_@OWR_API_VERSION_UNDERSCORE@_gir_CFLAGS = \
     $(INCLUDES) \
     -I$(top_srcdir)/owr \
     -I$(top_srcdir)/transport \
     -I$(top_srcdir)/local
-Owr_0_1_gir_LIBS = libopenwebrtc.la
-Owr_0_1_gir_FILES = \
+Owr_@OWR_API_VERSION_UNDERSCORE@_gir_LIBS = libopenwebrtc.la
+Owr_@OWR_API_VERSION_UNDERSCORE@_gir_FILES = \
     owr.h \
     owr.c \
     owr_types.h \
@@ -142,7 +142,7 @@ Owr_0_1_gir_FILES = \
     ../local/owr_window_registry.h \
     ../local/owr_window_registry.c
 
-INTROSPECTION_GIRS += Owr-0.1.gir
+INTROSPECTION_GIRS += Owr-@OWR_API_VERSION@.gir
 
 girdir = $(datadir)/gir-1.0
 gir_DATA = $(INTROSPECTION_GIRS)
@@ -150,16 +150,16 @@ gir_DATA = $(INTROSPECTION_GIRS)
 typelibdir = $(libdir)/girepository-1.0
 typelib_DATA = $(INTROSPECTION_GIRS:.gir=.typelib)
 
-Owr-0.1.gir.h: Owr-0.1.gir
+Owr-@OWR_API_VERSION@.gir.h: Owr-@OWR_API_VERSION@.gir
 	xxd -i $< > $@
 	shasum -a 1 -b < $< | head -c 40 > $<.sha1
 	xxd -i $<.sha1 >> $@
 	rm -f $<.sha1
 
-CLEANFILES += $(gir_DATA) $(typelib_DATA) Owr-0.1.gir.h
+CLEANFILES += $(gir_DATA) $(typelib_DATA) Owr-@OWR_API_VERSION@.gir.h
 else
-Owr-0.1.gir.h:
-	cp -f `find $(top_srcdir) -name Owr-0.1.gir.h || echo "Owr-0.1.gir.h"` .
+Owr-@OWR_API_VERSION@.gir.h:
+	cp -f `find $(top_srcdir) -name Owr-@OWR_API_VERSION@.gir.h || echo "Owr-@OWR_API_VERSION@.gir.h"` .
 endif
 
 -include $(top_srcdir)/git.mk
