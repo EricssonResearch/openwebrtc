@@ -33,13 +33,13 @@
 #include "config.h"
 #endif
 #include "owr_remote_media_source.h"
-#include "owr_remote_media_source_private.h"
 
 #include "owr_media_source.h"
 #include "owr_media_source_private.h"
+#include "owr_private.h"
+#include "owr_remote_media_source_private.h"
 #include "owr_types.h"
 #include "owr_utils.h"
-#include "owr_private.h"
 
 #include <gst/gst.h>
 
@@ -105,17 +105,16 @@ OwrMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
     } else if (media_type == OWR_MEDIA_TYPE_AUDIO) {
         bin_name = g_strdup_printf("audio-src-%u-%u", codec_type, stream_id);
         pad_name = g_strdup_printf("audio_raw_src_%u", stream_id);
-    } else {
+    } else
         g_assert_not_reached();
-    }
 
     source_bin = gst_bin_new(bin_name);
     _owr_media_source_set_source_bin(OWR_MEDIA_SOURCE(source), source_bin);
-    tee = gst_element_factory_make ("tee", "tee");
+    tee = gst_element_factory_make("tee", "tee");
     _owr_media_source_set_source_tee(OWR_MEDIA_SOURCE(source), tee);
-    fakesink = gst_element_factory_make ("fakesink", "fakesink");
+    fakesink = gst_element_factory_make("fakesink", "fakesink");
     g_object_set(fakesink, "async", FALSE, NULL);
-    queue = gst_element_factory_make ("queue", "queue");
+    queue = gst_element_factory_make("queue", "queue");
     g_free(bin_name);
 
     transport_pipeline = GST_ELEMENT(gst_element_get_parent(transport_bin));
@@ -133,9 +132,8 @@ OwrMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
     /* Link the transport bin to our tee */
     srcpad = gst_element_get_static_pad(transport_bin, pad_name);
     g_free(pad_name);
-    if (gst_pad_link(srcpad, ghostpad) != GST_PAD_LINK_OK) {
+    if (gst_pad_link(srcpad, ghostpad) != GST_PAD_LINK_OK)
         GST_ERROR("Failed to link source bin to the outside");
-    }
 
     return OWR_MEDIA_SOURCE(source);
 }
