@@ -37,7 +37,11 @@ noinst_DATA = \
 	gen/owr/com/ericsson/research/owr \
 	gen/bridge/com/ericsson/research/owr \
 	javadoc
-CLEANFILES = owr_jni.c owr gen javadoc
+if OWR_BRIDGE
+noinst_DATA += javadoc-bridge
+endif
+
+CLEANFILES = owr_jni.c owr gen javadoc javadoc-bridge
 
 if HAVE_INTROSPECTION
 OWR_GIR = $(top_builddir)/owr/Owr-0.1.gir
@@ -63,8 +67,15 @@ gen/owr/%: owr/%
 	mkdir -p gen/owr
 	$(JAVAC) -source 1.7 -target 1.7 -classpath '$(ANDROID_CLASSPATH):gen/owr/' -d gen/owr $+/*.java
 
+JAVADOC_HEADER="OpenWebRTC $(VERSION) JavaDoc"
+
 javadoc: owr
-	$(JAVADOC) -d javadoc -sourcepath owr -subpackages com.ericsson.research.owr -classpath '$(ANDROID_CLASSPATH)'
+	$(JAVADOC) -d javadoc -sourcepath owr -subpackages com.ericsson.research.owr -classpath '$(ANDROID_CLASSPATH)' -windowtitle $(JAVADOC_HEADER)
+
+if OWR_BRIDGE
+javadoc-bridge: bridge
+	$(JAVADOC) -d javadoc-bridge -sourcepath bridge -subpackages com.ericsson.research.owr -windowtitle $(JAVADOC_HEADER)
+endif
 
 # This must be done in install because we need the installed version of
 # the shared library created by libtool, not the "uninstalled" version
@@ -81,9 +92,11 @@ install-data-local: install-exec
 		-C gen/owr com/ericsson/research \
 		-C jar-build lib/armeabi/libopenwebrtc.so \
 		-C jar-build lib/armeabi/libopenwebrtc_jni.so
-	$(JAR) cvf '$(DESTDIR)/$(jardir)/openwebrtc-source.jar' \
+	$(JAR) cvf '$(DESTDIR)/$(jardir)/openwebrtc-sources.jar' \
 		-C owr com/ericsson/research/owr \
 		-C owr com/ericsson/research
+	$(JAR) cvf '$(DESTDIR)/$(jardir)/openwebrtc-javadoc.jar' \
+		-C javadoc/ .
 if OWR_BRIDGE
 	for eachlib in '$(DESTDIR)/$(libdir)'/libopenwebrtc_bridge{,_jni}.so; do \
 		cp -L $$eachlib jar-build/lib/armeabi; \
@@ -92,6 +105,10 @@ if OWR_BRIDGE
 		-C gen/bridge com/ericsson/research/owr \
 		-C jar-build lib/armeabi/libopenwebrtc_bridge.so \
 		-C jar-build lib/armeabi/libopenwebrtc_bridge_jni.so
+	$(JAR) cvf '$(DESTDIR)/$(jardir)/openwebrtc_bridge-sources.jar' \
+		-C bridge com/ericsson/research/owr
+	$(JAR) cvf '$(DESTDIR)/$(jardir)/openwebrtc_bridge-javadoc.jar' \
+		-C javadoc-bridge/ .
 endif
 	rm -rf jar-build
 
