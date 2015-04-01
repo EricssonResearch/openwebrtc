@@ -608,9 +608,8 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
         } else if (source_process) {
             LINK_ELEMENTS(source_process, tee);
             LINK_ELEMENTS(source, source_process);
-        } else {
+        } else
             LINK_ELEMENTS(source, tee);
-        }
 
         gst_element_sync_state_with_parent(tee);
         if (capsfilter)

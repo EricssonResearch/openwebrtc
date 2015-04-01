@@ -26,21 +26,21 @@
  */
 
 #define _GNU_SOURCE 1
-#include <string.h>
-
 #include "owr.h"
-#include "owr_local.h"
-#include "owr_media_source.h"
-#include "owr_media_renderer.h"
-#include "owr_audio_renderer.h"
-#include "owr_video_renderer.h"
-#include "owr_payload.h"
 #include "owr_audio_payload.h"
-#include "owr_video_payload.h"
-#include "owr_session.h"
+#include "owr_audio_renderer.h"
+#include "owr_local.h"
+#include "owr_media_renderer.h"
 #include "owr_media_session.h"
+#include "owr_media_source.h"
+#include "owr_payload.h"
+#include "owr_session.h"
 #include "owr_transport_agent.h"
+#include "owr_video_payload.h"
+#include "owr_video_renderer.h"
 #include "test_utils.h"
+
+#include <string.h>
 
 static OwrTransportAgent *recv_transport_agent = NULL;
 static OwrMediaSession *recv_session_audio = NULL;
@@ -117,7 +117,7 @@ static void got_sources(GList *sources, gpointer user_data)
 
     g_assert(sources);
 
-    while(sources && (source = sources->data)) {
+    while (sources && (source = sources->data)) {
         OwrMediaType media_type;
         OwrSourceType source_type;
 
@@ -197,7 +197,8 @@ static gboolean dump_cb(gpointer *user_data)
 }
 
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
     GOptionContext *options;
     GError *error = NULL;
 
@@ -275,7 +276,7 @@ int main(int argc, char **argv) {
     /* PREPARE FOR SENDING */
 
     owr_get_capture_sources((!disable_video ? OWR_MEDIA_TYPE_VIDEO : 0) | (!disable_audio ? OWR_MEDIA_TYPE_AUDIO : 0),
-            got_sources, NULL);
+        got_sources, NULL);
 
     g_timeout_add_seconds(10, (GSourceFunc)dump_cb, NULL);
 

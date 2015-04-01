@@ -55,9 +55,9 @@
 
 #elif defined(__linux__)
 #include <fcntl.h>
-#include <unistd.h>
-#include <sys/ioctl.h>
 #include <linux/videodev2.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
 
 #endif /* defined(__linux__) */
 

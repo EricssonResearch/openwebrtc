@@ -28,13 +28,11 @@
 
 #define _GNU_SOURCE 1
 
-#include <string.h>
-
 #include "owr.h"
-#include "owr_local.h"
-#include "owr_media_source.h"
-#include "owr_media_renderer.h"
 #include "owr_audio_renderer.h"
+#include "owr_local.h"
+#include "owr_media_renderer.h"
+#include "owr_media_source.h"
 #include "owr_video_renderer.h"
 #include "test_utils.h"
 
@@ -45,6 +43,9 @@ static OwrMediaRenderer *audio_renderer = NULL, *video_renderer = NULL;
 
 /* For reading source selection from console in manual mode*/
 #include <stdio.h>
+
+#include <string.h>
+
 
 gboolean dump_pipeline(gpointer user_data)
 {
@@ -156,10 +157,11 @@ void got_sources(GList *sources, gpointer user_data)
     g_timeout_add(5000, dump_pipeline, NULL);
 }
 
-int main() {
+int main()
+{
     owr_init(NULL);
 
-    owr_get_capture_sources(OWR_MEDIA_TYPE_AUDIO|OWR_MEDIA_TYPE_VIDEO, got_sources, NULL);
+    owr_get_capture_sources(OWR_MEDIA_TYPE_AUDIO | OWR_MEDIA_TYPE_VIDEO, got_sources, NULL);
 
     owr_run();
 

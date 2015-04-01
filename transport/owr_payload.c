@@ -38,8 +38,8 @@
 #include "owr_audio_payload.h"
 #include "owr_payload_private.h"
 #include "owr_types.h"
-#include "owr_video_payload.h"
 #include "owr_utils.h"
+#include "owr_video_payload.h"
 
 #include <string.h>
 
@@ -183,21 +183,21 @@ static gpointer owr_payload_detect_codecs(gpointer data)
     OWR_UNUSED(data);
 
     decoder_factories = gst_element_factory_list_get_elements(GST_ELEMENT_FACTORY_TYPE_DECODER |
-                                                              GST_ELEMENT_FACTORY_TYPE_MEDIA_VIDEO,
-                                                              GST_RANK_MARGINAL);
-    encoder_factories = gst_element_factory_list_get_elements (GST_ELEMENT_FACTORY_TYPE_ENCODER |
-                                                               GST_ELEMENT_FACTORY_TYPE_MEDIA_VIDEO,
-                                                               GST_RANK_MARGINAL);
+        GST_ELEMENT_FACTORY_TYPE_MEDIA_VIDEO,
+        GST_RANK_MARGINAL);
+    encoder_factories = gst_element_factory_list_get_elements(GST_ELEMENT_FACTORY_TYPE_ENCODER |
+        GST_ELEMENT_FACTORY_TYPE_MEDIA_VIDEO,
+        GST_RANK_MARGINAL);
 
     caps = gst_caps_new_empty_simple("video/x-h264");
     h264_decoders = gst_element_factory_list_filter(decoder_factories, caps, GST_PAD_SINK, FALSE);
     h264_encoders = gst_element_factory_list_filter(encoder_factories, caps, GST_PAD_SRC, FALSE);
-    gst_caps_unref (caps);
+    gst_caps_unref(caps);
 
     caps = gst_caps_new_empty_simple("video/x-vp8");
     vp8_decoders = gst_element_factory_list_filter(decoder_factories, caps, GST_PAD_SINK, FALSE);
     vp8_encoders = gst_element_factory_list_filter(encoder_factories, caps, GST_PAD_SRC, FALSE);
-    gst_caps_unref (caps);
+    gst_caps_unref(caps);
 
     gst_plugin_feature_list_free(decoder_factories);
     gst_plugin_feature_list_free(encoder_factories);
@@ -266,7 +266,7 @@ static void owr_payload_init(OwrPayload *payload)
 {
     static GOnce g_once = G_ONCE_INIT;
 
-    g_once (&g_once, owr_payload_detect_codecs, NULL);
+    g_once(&g_once, owr_payload_detect_codecs, NULL);
 
     payload->priv = OWR_PAYLOAD_GET_PRIVATE(payload);
     payload->priv->mtu = DEFAULT_MTU;
@@ -317,8 +317,8 @@ static GstElement * try_codecs(GList *codecs, const gchar *name_prefix)
         GstElement *e;
 
         element_name = g_strdup_printf("%s_%s_%u", name_prefix,
-                                       gst_plugin_feature_get_name(GST_PLUGIN_FEATURE(f)),
-                                       get_unique_id());
+            gst_plugin_feature_get_name(GST_PLUGIN_FEATURE(f)),
+                get_unique_id());
 
         e = gst_element_factory_create(f, element_name);
         g_free(element_name);
@@ -329,8 +329,8 @@ static GstElement * try_codecs(GList *codecs, const gchar *name_prefix)
         /* Try setting to READY. If this fails the codec does not work, for
          * example because the hardware codec is currently busy
          */
-        if (gst_element_set_state (e, GST_STATE_READY) != GST_STATE_CHANGE_SUCCESS) {
-            gst_element_set_state (e, GST_STATE_NULL);
+        if (gst_element_set_state(e, GST_STATE_READY) != GST_STATE_CHANGE_SUCCESS) {
+            gst_element_set_state(e, GST_STATE_NULL);
             gst_object_unref(e);
             continue;
         }

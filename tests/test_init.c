@@ -85,13 +85,14 @@ gpointer timeout_thread_func(GAsyncQueue *msg_queue)
 
     end_time = g_get_monotonic_time() + G_TIME_SPAN_SECOND * 2;
 
-    while (!done)
+    while (!done) {
         if (!g_cond_wait_until(&timeout_thread_cond, &timeout_thread_mutex, end_time)) {
             g_mutex_unlock(&timeout_thread_mutex);
             g_print("test failed, timeout reached");
             exit(-1);
             return NULL;
         }
+    }
 
     done = FALSE;
     g_mutex_unlock(&timeout_thread_mutex);
@@ -131,7 +132,8 @@ void log_handler(const gchar *log_domain, GLogLevelFlags log_level, const gchar 
     }
 }
 
-int main() {
+int main()
+{
     g_log_set_handler(NULL, G_LOG_LEVEL_CRITICAL | G_LOG_FLAG_FATAL, log_handler, NULL);
     g_print("first we make sure that run and quit doesn't work before owr_init");
 

@@ -420,9 +420,8 @@ static gboolean add_receive_payload(GHashTable *args)
     if (!payload_found) {
         g_ptr_array_add(payloads, payload);
         g_object_ref(payload);
-    } else {
+    } else
         g_warning("An already existing payload was added to the media session. Action aborted.\n");
-    }
 
     g_rw_lock_writer_unlock(&media_session->priv->rw_lock);
 
@@ -636,7 +635,7 @@ GstStructure * _owr_media_session_get_receive_rtx_pt_map(OwrMediaSession *media_
 
     g_rw_lock_reader_unlock(&media_session->priv->rw_lock);
 
-    if (gst_structure_n_fields(pt_map) == 0) {
+    if (!gst_structure_n_fields(pt_map)) {
         gst_structure_free(pt_map);
         return NULL;
     }

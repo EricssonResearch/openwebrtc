@@ -428,9 +428,8 @@ static gboolean data_channel_send(GHashTable *args)
         g_value_unset(&params[1]);
         g_value_unset(&params[2]);
         g_value_unset(&params[3]);
-    } else {
+    } else
         g_free(data);
-    }
 
     g_hash_table_unref(args);
     g_object_unref(data_channel);
@@ -482,9 +481,8 @@ static guint get_buffered_amount(OwrDataChannel *data_channel)
 
         g_value_unset(&params[0]);
         g_value_unset(&ret_value);
-    } else {
+    } else
         g_warning("on_request_bytes_sent closure not set. Cannot get buffered amount.");
-    }
 
     if (priv->bytes_sent < bytes_sent)
         bytes_sent = 0;
