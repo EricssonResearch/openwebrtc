@@ -59,6 +59,7 @@
 #elif defined(__ANDROID__)
 #define AUDIO_SRC "openslessrc"
 #define VIDEO_SRC "androidvideosource"
+#define VIDEO_CONVERT "videoconvert"
 
 #elif defined(__linux__)
 #define AUDIO_SRC  "pulsesrc"

@@ -104,10 +104,7 @@ GST_PLUGIN_STATIC_DECLARE(pulseaudio);
 GST_PLUGIN_STATIC_DECLARE(video4linux2);
 #endif
 
-#if defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR && !defined(__arm64__))
-GST_PLUGIN_STATIC_DECLARE(ercolorspace);
-#endif
-#endif
+#endif /* OWR_STATIC */
 
 #ifdef __ANDROID__
 static void g_print_android_handler(const gchar *message)
@@ -230,11 +227,8 @@ void owr_init(GMainContext *main_context)
     GST_PLUGIN_STATIC_REGISTER(pulseaudio);
     GST_PLUGIN_STATIC_REGISTER(video4linux2);
 #endif
-#if defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR && !defined(__arm64__))
-    GST_PLUGIN_STATIC_REGISTER(ercolorspace);
-#endif
 
-#endif
+#endif /* OWR_STATIC */
 
     owr_main_context = main_context;
 

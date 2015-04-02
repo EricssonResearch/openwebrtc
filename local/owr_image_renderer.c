@@ -49,6 +49,12 @@
 #define DEFAULT_WIDTH 0
 #define DEFAULT_HEIGHT 0
 
+#if (defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR && !defined(__arm64__))
+#define VIDEO_CONVERT "videoconvert"
+#else
+#define VIDEO_CONVERT "videoconvert"
+#endif
+
 #define DEFAULT_MAX_FRAMERATE 0.0
 
 #define LIMITED_WIDTH 640
