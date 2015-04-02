@@ -37,7 +37,8 @@ libopenwebrtc_la_DEPENDENCIES = \
     $(top_builddir)/local/libopenwebrtc_local.la \
     $(top_builddir)/transport/libopenwebrtc_transport.la
 
-libopenwebrtc_la_LDFLAGS = -export-dynamic -version-info 3601
+# 4201 is the glib version info
+libopenwebrtc_la_LDFLAGS = -export-dynamic -version-info 4201
 
 if OWR_STATIC
 libopenwebrtc.sym: $(top_srcdir)/libopenwebrtc.exp
