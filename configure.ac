@@ -1,14 +1,14 @@
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT(openwebrtc, 0.1)
+AC_INIT(openwebrtc, 0.3.0)
 
 AC_CONFIG_HEADERS([config.h])
 
 AC_CONFIG_MACRO_DIR(m4)
 
-OWR_API_VERSION=0.1
+OWR_API_VERSION=0.3
 AC_SUBST(OWR_API_VERSION)
-OWR_API_VERSION_UNDERSCORE=0_1
+OWR_API_VERSION_UNDERSCORE=0_3
 AC_SUBST(OWR_API_VERSION_UNDERSCORE)
 
 AM_INIT_AUTOMAKE([1.11 -Wno-portability foreign])
