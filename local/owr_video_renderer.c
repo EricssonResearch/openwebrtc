@@ -266,6 +266,7 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer, gu
 
     sink = gst_element_factory_make(VIDEO_SINK, "video-renderer-sink");
     g_assert(sink);
+    g_object_set(sink, "enable-last-sample", FALSE, NULL);
     if (priv->tag) {
         GstElement *sink_element = GST_IS_BIN(sink) ?
             gst_bin_get_by_interface(GST_BIN(sink), GST_TYPE_VIDEO_OVERLAY) : sink;

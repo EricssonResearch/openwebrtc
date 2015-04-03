@@ -148,7 +148,8 @@ static GstElement *owr_audio_renderer_get_element(OwrMediaRenderer *renderer)
     g_assert(sink);
 
     g_object_set(sink, "buffer-time", SINK_BUFFER_TIME,
-        "latency-time", G_GINT64_CONSTANT(10000), NULL);
+        "latency-time", G_GINT64_CONSTANT(10000),
+        "enable-last-sample", FALSE, NULL);
 
     gst_bin_add_many(GST_BIN(renderer_bin), audioresample, audioconvert, capsfilter,
         volume, sink, NULL);

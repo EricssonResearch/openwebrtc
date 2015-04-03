@@ -584,7 +584,7 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
         CREATE_ELEMENT(queue, "queue", "source-tee-fakesink-queue");
 
         CREATE_ELEMENT(fakesink, "fakesink", "source-tee-fakesink");
-        g_object_set(fakesink, "async", FALSE, NULL);
+        g_object_set(fakesink, "async", FALSE, "enable-last-sample", FALSE, NULL);
 
         gst_bin_add_many(GST_BIN(source_pipeline), source, tee, queue, fakesink, NULL);
 

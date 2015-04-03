@@ -113,7 +113,7 @@ OwrMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
     tee = gst_element_factory_make("tee", "tee");
     _owr_media_source_set_source_tee(OWR_MEDIA_SOURCE(source), tee);
     fakesink = gst_element_factory_make("fakesink", "fakesink");
-    g_object_set(fakesink, "async", FALSE, NULL);
+    g_object_set(fakesink, "async", FALSE, "enable-last-sample", FALSE, NULL);
     queue = gst_element_factory_make("queue", "queue");
     g_free(bin_name);
 
