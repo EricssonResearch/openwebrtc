@@ -33,8 +33,6 @@
 #include "owr_local.h"
 #include "owr_media_source.h"
 
-static GMainLoop *loop;
-
 static void got_sources(GList *sources, gpointer user_data)
 {
     OwrMediaSource *source = NULL;
@@ -56,7 +54,7 @@ static void got_sources(GList *sources, gpointer user_data)
         sources = sources->next;
     }
 
-    g_main_loop_quit(loop);
+    owr_quit();
 }
 
 int main() {
