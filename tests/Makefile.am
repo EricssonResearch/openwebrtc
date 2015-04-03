@@ -22,6 +22,7 @@ bin_PROGRAMS = \
     test-data-channel \
     test-init \
     test-bus \
+    test-uri \
     test-client
 
 if OWR_GST
@@ -123,6 +124,22 @@ test_client_CFLAGS = \
     -I$(top_srcdir)/owr
 
 test_client_LDADD = \
+    $(JSON_GLIB_LIBS) \
+    $(LIBSOUP_LIBS) \
+    $(GLIB_LIBS) \
+    $(top_builddir)/owr/libopenwebrtc.la
+
+test_uri_SOURCES = test_uri.c test_utils.c
+
+test_uri_CFLAGS = \
+    $(AM_CFLAGS) \
+    $(JSON_GLIB_CFLAGS) \
+    $(LIBSOUP_CFLAGS) \
+    -I$(top_srcdir)/local \
+    -I$(top_srcdir)/transport \
+    -I$(top_srcdir)/owr
+
+test_uri_LDADD = \
     $(JSON_GLIB_LIBS) \
     $(LIBSOUP_LIBS) \
     $(GLIB_LIBS) \
