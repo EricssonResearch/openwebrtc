@@ -946,13 +946,13 @@ static GstElement *add_nice_element(OwrTransportAgent *transport_agent, guint st
     nice_element = gst_element_factory_make(is_sink ? "nicesink" : "nicesrc", element_name);
     g_free(element_name);
 
-    g_object_set(nice_element, "agent", transport_agent->priv->nice_agent, NULL);
-    g_object_set(nice_element, "stream", stream_id, NULL);
-    g_object_set(nice_element, "component", is_rtcp
+    g_object_set(nice_element, "agent", transport_agent->priv->nice_agent,
+        "stream", stream_id,
+        "component", is_rtcp
         ? NICE_COMPONENT_TYPE_RTCP : NICE_COMPONENT_TYPE_RTP, NULL);
 
     if (is_sink)
-        g_object_set(nice_element, "sync", FALSE, "async", FALSE, NULL);
+        g_object_set(nice_element, "sync", FALSE, "async", FALSE, "enable-last-sample", FALSE, NULL);
 
     added_ok = gst_bin_add(GST_BIN(bin), nice_element);
     g_warn_if_fail(added_ok);
@@ -2462,7 +2462,7 @@ static void sctpdec_pad_added(GstElement *sctpdec, GstPad *sctpdec_srcpad,
     g_free(name);
 
     g_object_set(G_OBJECT(data_sink), "emit-signals", FALSE, "drop", FALSE, "sync", FALSE, "async",
-        FALSE, NULL);
+        FALSE, "enable-last-sample", FALSE, NULL);
 
     g_assert(!data_channel_info->data_sink);
 

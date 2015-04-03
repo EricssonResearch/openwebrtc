@@ -215,7 +215,7 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
     g_assert(sink);
     priv->appsink = sink;
 
-    g_object_set(sink, "max-buffers", 1, "drop", TRUE, "qos", TRUE, NULL);
+    g_object_set(sink, "max-buffers", 1, "drop", TRUE, "qos", TRUE, "enable-last-sample", FALSE, NULL);
 
     gst_bin_add_many(GST_BIN(renderer_bin), sink, NULL);
 
