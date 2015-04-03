@@ -34,6 +34,7 @@
 #endif
 #include "owr_window_registry.h"
 
+#include "owr_private.h"
 #include "owr_video_renderer.h"
 #include "owr_video_renderer_private.h"
 #include "owr_window_registry_private.h"
@@ -93,26 +94,32 @@ static void owr_window_registry_init(OwrWindowRegistry *window_registry)
     priv->registry_hash_table = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
 }
 
-/**
- * owr_window_registry_register:
- * @registry:
- * @tag:
- * @handle: (transfer none)(type OwrWindowHandle):
- */
-void owr_window_registry_register(OwrWindowRegistry *window_registry,
-    const gchar *tag, gpointer handle)
+static gboolean do_register(GHashTable *args)
 {
+    OwrWindowRegistry *window_registry;
+    gchar *tag;
+    gpointer handle;
     OwrWindowRegistryPrivate *priv;
     WindowHandleData *data;
 
-    g_return_if_fail(OWR_IS_WINDOW_REGISTRY(window_registry));
-    g_return_if_fail(handle);
+    g_return_val_if_fail(args, G_SOURCE_REMOVE);
+
+    window_registry = g_hash_table_lookup(args, "window_registry");
+    tag = g_hash_table_lookup(args, "tag");
+    handle = g_hash_table_lookup(args, "handle");
+
+    g_return_val_if_fail(OWR_IS_WINDOW_REGISTRY(window_registry), G_SOURCE_REMOVE);
+    g_return_val_if_fail(tag, G_SOURCE_REMOVE);
+    g_return_val_if_fail(handle, G_SOURCE_REMOVE);
 
     priv = window_registry->priv;
 
     data = g_hash_table_lookup(priv->registry_hash_table, tag);
     if (data) {
-        g_return_if_fail(!data->window_handle_set);
+        if (data->window_handle_set) {
+            g_warning("Tag '%s' has already been registered for another window handle", tag);
+            goto end;
+        }
 
         data->window_handle = (guintptr) handle;
         data->window_handle_set = TRUE;
@@ -128,20 +135,58 @@ void owr_window_registry_register(OwrWindowRegistry *window_registry,
 
         g_hash_table_insert(priv->registry_hash_table, g_strdup(tag), data);
     }
+
+end:
+    g_object_unref(window_registry);
+    g_free(tag);
+    g_hash_table_unref(args);
+    return G_SOURCE_REMOVE;
 }
 
-void owr_window_registry_unregister(OwrWindowRegistry *window_registry,
-    const gchar *tag)
+/**
+ * owr_window_registry_register:
+ * @registry:
+ * @tag:
+ * @handle: (transfer none)(type OwrWindowHandle):
+ */
+void owr_window_registry_register(OwrWindowRegistry *window_registry,
+    const gchar *tag, gpointer handle)
 {
+    GHashTable *args;
+
+    g_return_if_fail(OWR_IS_WINDOW_REGISTRY(window_registry));
+    g_return_if_fail(tag);
+    g_return_if_fail(handle);
+
+    args = g_hash_table_new(g_str_hash, g_str_equal);
+    g_hash_table_insert(args, "window_registry", window_registry);
+    g_hash_table_insert(args, "tag", g_strdup(tag));
+    g_hash_table_insert(args, "handle", handle);
+
+    g_object_ref(window_registry);
+
+    _owr_schedule_with_hash_table((GSourceFunc)do_register, args);
+}
+
+static gboolean do_unregister(GHashTable *args)
+{
+    OwrWindowRegistry *window_registry;
+    gchar *tag;
     OwrWindowRegistryPrivate *priv;
     WindowHandleData *data;
 
-    g_return_if_fail(OWR_IS_WINDOW_REGISTRY(window_registry));
+    g_return_val_if_fail(args, G_SOURCE_REMOVE);
+
+    window_registry = g_hash_table_lookup(args, "window_registry");
+    tag = g_hash_table_lookup(args, "tag");
+
+    g_return_val_if_fail(OWR_IS_WINDOW_REGISTRY(window_registry), G_SOURCE_REMOVE);
+    g_return_val_if_fail(tag, G_SOURCE_REMOVE);
 
     priv = window_registry->priv;
 
     data = g_hash_table_lookup(priv->registry_hash_table, tag);
-    g_return_if_fail(data);
+    g_return_val_if_fail(data, G_SOURCE_REMOVE);
 
     if (data->renderer) {
         data->window_handle = (guintptr) NULL;
@@ -150,6 +195,28 @@ void owr_window_registry_unregister(OwrWindowRegistry *window_registry,
         _owr_video_renderer_notify_tag_changed(data->renderer, tag, FALSE, 0);
     } else
         g_hash_table_remove(priv->registry_hash_table, tag);
+
+    g_object_unref(window_registry);
+    g_free(tag);
+    g_hash_table_unref(args);
+    return G_SOURCE_REMOVE;
+}
+
+void owr_window_registry_unregister(OwrWindowRegistry *window_registry,
+    const gchar *tag)
+{
+    GHashTable *args;
+
+    g_return_if_fail(OWR_IS_WINDOW_REGISTRY(window_registry));
+    g_return_if_fail(tag);
+
+    args = g_hash_table_new(g_str_hash, g_str_equal);
+    g_hash_table_insert(args, "window_registry", window_registry);
+    g_hash_table_insert(args, "tag", g_strdup(tag));
+
+    g_object_ref(window_registry);
+
+    _owr_schedule_with_hash_table((GSourceFunc)do_unregister, args);
 }
 
 void _owr_window_registry_register_renderer(OwrWindowRegistry *window_registry,

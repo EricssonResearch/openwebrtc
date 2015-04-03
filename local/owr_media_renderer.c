@@ -301,19 +301,19 @@ static void maybe_start_renderer(OwrMediaRenderer *renderer)
     gst_element_set_state(priv->pipeline, GST_STATE_PLAYING);
 }
 
-/**
- * owr_media_renderer_set_source:
- * @renderer:
- * @source: (transfer none) (allow-none):
- *
- * Returns:
- */
-void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *source)
+static gboolean set_source(GHashTable *args)
 {
+    OwrMediaRenderer *renderer;
+    OwrMediaSource *source;
     OwrMediaRendererPrivate *priv;
 
-    g_return_if_fail(renderer);
-    g_return_if_fail(!source || OWR_IS_MEDIA_SOURCE(source));
+    g_return_val_if_fail(args, G_SOURCE_REMOVE);
+
+    renderer = g_hash_table_lookup(args, "renderer");
+    source = g_hash_table_lookup(args, "source");
+
+    g_return_val_if_fail(OWR_IS_MEDIA_RENDERER(renderer), G_SOURCE_REMOVE);
+    g_return_val_if_fail(!source || OWR_IS_MEDIA_SOURCE(source), G_SOURCE_REMOVE);
 
     priv = renderer->priv;
 
@@ -321,7 +321,7 @@ void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *s
 
     if (source == priv->source) {
         g_mutex_unlock(&priv->media_renderer_lock);
-        return;
+        goto end;
     }
 
     if (priv->source) {
@@ -337,7 +337,7 @@ void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *s
         /* Shut down the pipeline if we have no source */
         gst_element_set_state(priv->pipeline, GST_STATE_NULL);
         g_mutex_unlock(&priv->media_renderer_lock);
-        return;
+        goto end;
     }
 
     priv->source = g_object_ref(source);
@@ -345,6 +345,38 @@ void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *s
     maybe_start_renderer(renderer);
 
     g_mutex_unlock(&priv->media_renderer_lock);
+
+end:
+    g_object_unref(renderer);
+    if (source)
+        g_object_unref(source);
+    g_hash_table_unref(args);
+    return G_SOURCE_REMOVE;
+}
+
+/**
+ * owr_media_renderer_set_source:
+ * @renderer:
+ * @source: (transfer none) (allow-none):
+ *
+ * Returns:
+ */
+void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *source)
+{
+    GHashTable *args;
+
+    g_return_if_fail(OWR_IS_MEDIA_RENDERER(renderer));
+    g_return_if_fail(!source || OWR_IS_MEDIA_SOURCE(source));
+
+    args = g_hash_table_new(g_str_hash, g_str_equal);
+    g_hash_table_insert(args, "renderer", renderer);
+    g_hash_table_insert(args, "source", source);
+
+    g_object_ref(renderer);
+    if (source)
+        g_object_ref(source);
+
+    _owr_schedule_with_hash_table((GSourceFunc)set_source, args);
 }
 
 /**
