@@ -25,6 +25,8 @@ libopenwebrtc_local_la_SOURCES = \
     owr_video_renderer.c \
     owr_image_renderer.c \
     owr_image_server.c \
+    owr_uri_source.c \
+    owr_uri_source_agent.c \
     owr_window_registry.c \
     owr_device_list.c
 
@@ -46,11 +48,14 @@ include_HEADERS = \
     owr_video_renderer.h \
     owr_image_renderer.h \
     owr_image_server.h \
+    owr_uri_source.h \
+    owr_uri_source_agent.h \
     owr_window_registry.h
 
 noinst_HEADERS = \
     owr_local_media_source_private.h \
     owr_image_renderer_private.h \
+    owr_uri_source_private.h \
     owr_window_registry_private.h
 
 if TARGET_APPLE
