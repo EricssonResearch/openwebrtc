@@ -65,6 +65,7 @@
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/sctp/sctpreceivemeta.h>
 #include <gst/sctp/sctpsendmeta.h>
+#include <gst/video/video.h>
 
 #include <math.h>
 #include <stdio.h>
@@ -309,6 +310,25 @@ static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer user_data)
         change_status = gst_element_set_state(GST_ELEMENT(pipeline), GST_STATE_PLAYING);
         g_warn_if_fail(change_status != GST_STATE_CHANGE_FAILURE);
         break;
+
+    case GST_MESSAGE_QOS:
+    {
+        /* vtdec emits QoS whenever it cannot decode a frame. We translate this
+         * to a force key unit event as it normally means the frame data was broken. */
+        GstElement *decoder = GST_IS_ELEMENT(msg) ? GST_ELEMENT(GST_MESSAGE_SRC(msg)) : NULL;
+        if (decoder) {
+            GstElementFactory *factory = gst_element_get_factory(decoder);
+            if (g_str_has_prefix(gst_plugin_feature_get_name(factory), "vtdec")) {
+                guint64 processed = 0, dropped = 0;
+
+                gst_message_parse_qos_stats(msg, NULL, &processed, &dropped);
+                GST_WARNING("Video frame dropped - processed/dropped: %" G_GUINT64_FORMAT "/%" G_GUINT64_FORMAT, processed, dropped);
+
+                gst_element_send_event(decoder, gst_video_event_new_upstream_force_key_unit(GST_CLOCK_TIME_NONE, FALSE, 0));
+            }
+        }
+        break;
+    }
 
     case GST_MESSAGE_EOS:
         g_print("End of stream\n");
