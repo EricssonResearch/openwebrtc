@@ -43,6 +43,10 @@
 
 #include <string.h>
 
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
+
 #define DEFAULT_MTU 1200
 #define DEFAULT_BITRATE 0
 #define DEFAULT_RTX_TIME 0    /* FIXME: what's a sane default here? */
@@ -360,6 +364,7 @@ GstElement * _owr_payload_create_encoder(OwrPayload *payload)
     gchar *element_name = NULL;
     GstElementFactory *factory;
     const gchar *factory_name;
+    gint cpu_used;
 
     g_return_val_if_fail(payload, NULL);
 
@@ -394,8 +399,42 @@ GstElement * _owr_payload_create_encoder(OwrPayload *payload)
     case OWR_CODEC_TYPE_VP8:
         encoder = try_codecs(vp8_encoders, "encoder");
         g_return_val_if_fail(encoder, NULL);
-        g_object_set(encoder, "end-usage", 1, "deadline", G_GINT64_CONSTANT(1), "lag-in-frames", 0,
-            "error-resilient", 1, "keyframe-mode", 0, NULL);
+        
+        /*
+         * end-usage: 1 (VPX_CBR).
+         * deadline: 1 (VPX_DL_REALTIME).
+         * cpu-used (VP8E_SET_CPUUSED): -12 (webrtc.org default for mobile) or -6 (webrtc.org default for desktop). Please refer to webrtc.org's vp8_impl.cc for more information.
+         * min-quantizer: 2 (webrtc.org default).
+         * buffer-initial-size: 500 (webrtc.org default).
+         * buffer-optimal-size: 600 (webrtc.org default).
+         * buffer-size: 1000 (webrtc.org default).
+         * lag-in-frames: 0 (webrtc.org default, no lag).
+         * timebase: 1 / 90000 (webrtc.org default).
+         * error-resilient: 1.
+         * keyframe-mode: 0 (VPX_KF_DISABLED).
+         */
+#if (defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR) || defined(__ANDROID__)
+        /* Mobile */
+        cpu_used = -12;
+#else
+        /* Desktop */
+        cpu_used = -6;
+#endif
+         
+        g_object_set(encoder,
+            "end-usage", 1,
+            "deadline", G_GINT64_CONSTANT(1),
+            "cpu-used", cpu_used,
+            "min-quantizer", 2,
+            "buffer-initial-size", 500,
+            "buffer-optimal-size", 600,
+            "buffer-size", 1000,
+            "lag-in-frames", 0,
+            "timebase", 1, 90000,
+            "error-resilient", 1,
+            "keyframe-mode", 0,
+            NULL);
+            
         g_object_bind_property(payload, "bitrate", encoder, "target-bitrate", G_BINDING_SYNC_CREATE);
         g_object_set(payload, "bitrate", evaluate_bitrate_from_payload(payload), NULL);
         break;
