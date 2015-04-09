@@ -565,6 +565,13 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
             gst_caps_unref(device_caps);
             gst_object_unref(srcpad);
 
+#if defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR
+            /* Force NV12 on iOS else the source can negotiate BGRA
+             * ercolorspace can do NV12 -> BGRA and NV12 -> I420 which is what
+             * is needed for Bowser */
+            gst_caps_set_simple(source_caps, "format", G_TYPE_STRING, "NV12", NULL);
+#endif
+
             CREATE_ELEMENT(capsfilter, "capsfilter", "video-source-capsfilter");
             g_object_set(capsfilter, "caps", source_caps, NULL);
             gst_caps_unref(source_caps);
