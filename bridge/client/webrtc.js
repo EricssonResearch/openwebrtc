@@ -315,7 +315,7 @@
     //
     RTCPeerConnection.prototype = Object.create(EventTarget.prototype);
     RTCPeerConnection.prototype.constructor = RTCPeerConnection;
-    RTCPeerConnection.prototype.createDataChannel = function () { 
+    RTCPeerConnection.prototype.createDataChannel = function () {
         console.warn("createDataChannel only exposed on the prototype for feature probing");
     };
 
@@ -1342,6 +1342,17 @@
             "bufferedAmount": 0
         };
         domObject.addReadOnlyAttributes(this, a);
+
+        Object.defineProperty(this, "binaryType", {
+            "get": function () { return "arraybuffer"; },
+            "set": function (binaryType) {
+                if (binaryType === 'blob') {
+                    throw createError("NotSupportedError", "Blob support not implemented");
+                } else if (binaryType !== 'arraybuffer') {
+                    throw createError("TypeMismatchError", "Unknown binary type: " + binaryType);
+                }
+            }
+        });
 
         var client = createInternalDataChannelClient();
         var clientRef = bridge.createObjectRef(client, "readyStateChanged", "gotData",
