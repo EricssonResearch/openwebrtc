@@ -29,6 +29,7 @@ worker_global.self = worker_global;
 worker_global.console = {"log": print};
 worker_global.atob = atob;
 worker_global.btoa = btoa;
+worker_global.base64StringToArray = base64StringToArray;
 worker_global.crypto = crypto;
 worker_global.WebSocket = WebSocket;
 worker_global.WebSocketServer = WebSocketServer;

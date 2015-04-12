@@ -411,7 +411,12 @@ function InternalDataChannel(settings, dataSession, client) {
     dataSession.add_data_channel(channel);
 
     this.send = function (data) {
-        channel.send(data);
+        if (data && data.base64) {
+            var arr = base64StringToArray(data.base64);
+            channel.send_binary(arr, arr.length);
+        } else {
+            channel.send(data);
+        }
         client.setBufferedAmount(channel.buffered_amount);
     };
 
