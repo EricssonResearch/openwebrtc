@@ -59,6 +59,10 @@ function btoa(data) {
 }
 
 function atob(data) {
+    return String.fromCharCode.apply(this, base64StringToArray(data));
+}
+
+function base64StringToArray(data) {
     var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     var buf = [];
     var a, b;
@@ -79,7 +83,7 @@ function atob(data) {
         b = (a & mask) << (offset + 2);
     }
 
-    return String.fromCharCode.apply(this, buf);
+    return buf;
 }
 
 if (typeof(ArrayBuffer) == "undefined" || typeof(Uint8Array) == "undefined") {

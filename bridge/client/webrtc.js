@@ -1354,9 +1354,28 @@
             });
         });
 
+        function encodeArrayBufferArgument(buffer) {
+            var binary = '';
+            var bufferView = new Uint8Array(buffer);
+            for (var i = 0, len = bufferView.byteLength; i < len; i++) {
+                binary += String.fromCharCode(bufferView[i]);
+            }
+            var base64 = btoa(binary);
+            return {
+                "base64": base64,
+                "length": bufferView.byteLength
+            };
+        }
+
         this.send = function (data) {
             if (a.readyState == "connecting")
                 throw createError("InvalidStateError", "send: readyState is \"connecting\"");
+
+            if (data instanceof Blob) {
+                throw createError("NotSupportedError", "Blob support not implemented");
+            } else if ((data instanceof ArrayBuffer) || ArrayBuffer.isView(data)) {
+                data = encodeArrayBufferArgument(data);
+            }
 
             a.bufferedAmount += data.length;
             if (a.readyState == "open")
