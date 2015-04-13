@@ -36,6 +36,11 @@
 
 #include "owr_types.h"
 
+#include <gst/gst.h>
+
+GST_DEBUG_CATEGORY_EXTERN(_owrvideopayload_debug);
+#define GST_CAT_DEFAULT _owrvideopayload_debug
+
 #define DEFAULT_CCM_FIR FALSE
 #define DEFAULT_NACK_PLI FALSE
 #define DEFAULT_WIDTH 0

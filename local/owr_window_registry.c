@@ -39,6 +39,9 @@
 #include "owr_video_renderer_private.h"
 #include "owr_window_registry_private.h"
 
+GST_DEBUG_CATEGORY_EXTERN(_owrwindowregistry_debug);
+#define GST_CAT_DEFAULT _owrwindowregistry_debug
+
 #define OWR_WINDOW_REGISTRY_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), \
     OWR_TYPE_WINDOW_REGISTRY, OwrWindowRegistryPrivate))
 

@@ -42,6 +42,9 @@
 #include "owr_private.h"
 #include "owr_utils.h"
 
+GST_DEBUG_CATEGORY_EXTERN(_owrlocal_debug);
+#define GST_CAT_DEFAULT _owrlocal_debug
+
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
 #endif

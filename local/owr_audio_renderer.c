@@ -38,6 +38,8 @@
 #include "owr_private.h"
 #include "owr_utils.h"
 
+GST_DEBUG_CATEGORY_EXTERN(_owraudiorenderer_debug);
+#define GST_CAT_DEFAULT _owraudiorenderer_debug
 
 #ifdef __APPLE__
 #include <TargetConditionals.h>

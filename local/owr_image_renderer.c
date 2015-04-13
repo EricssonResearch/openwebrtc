@@ -46,6 +46,9 @@
 #include <TargetConditionals.h>
 #endif
 
+GST_DEBUG_CATEGORY_EXTERN(_owrimagerenderer_debug);
+#define GST_CAT_DEFAULT _owrimagerenderer_debug
+
 #define DEFAULT_WIDTH 0
 #define DEFAULT_HEIGHT 0
 

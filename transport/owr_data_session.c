@@ -51,6 +51,9 @@
 
 #include <string.h>
 
+GST_DEBUG_CATEGORY_EXTERN(_owrdatasession_debug);
+#define GST_CAT_DEFAULT _owrdatasession_debug
+
 
 #define OWR_DATA_SESSION_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_DATA_SESSION, OwrDataSessionPrivate))
 

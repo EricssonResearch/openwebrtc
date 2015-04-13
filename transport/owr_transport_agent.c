@@ -70,6 +70,9 @@
 #include <stdio.h>
 #include <string.h>
 
+GST_DEBUG_CATEGORY_EXTERN(_owrtransportagent_debug);
+#define GST_CAT_DEFAULT _owrtransportagent_debug
+
 #define DEFAULT_ICE_CONTROLLING_MODE TRUE
 
 enum {

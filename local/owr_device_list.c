@@ -43,6 +43,9 @@
 
 #include <gst/gstinfo.h>
 
+GST_DEBUG_CATEGORY_EXTERN(_owrdevicelist_debug);
+#define GST_CAT_DEFAULT _owrdevicelist_debug
+
 #ifdef __APPLE__
 #include "owr_device_list_avf_private.h"
 #include <TargetConditionals.h>

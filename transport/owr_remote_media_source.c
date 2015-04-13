@@ -43,6 +43,9 @@
 
 #include <gst/gst.h>
 
+GST_DEBUG_CATEGORY_EXTERN(_owrremotemediasource_debug);
+#define GST_CAT_DEFAULT _owrremotemediasource_debug
+
 #define OWR_REMOTE_MEDIA_SOURCE_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_REMOTE_MEDIA_SOURCE, OwrRemoteMediaSourcePrivate))
 
 G_DEFINE_TYPE(OwrRemoteMediaSource, owr_remote_media_source, OWR_TYPE_MEDIA_SOURCE)

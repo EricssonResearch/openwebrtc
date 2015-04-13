@@ -48,6 +48,9 @@
 #include <stdio.h>
 #include <string.h>
 
+GST_DEBUG_CATEGORY_EXTERN(_owrlocalmediasource_debug);
+#define GST_CAT_DEFAULT _owrlocalmediasource_debug
+
 #ifdef __APPLE__
 #include <TargetConditionals.h>
 #endif

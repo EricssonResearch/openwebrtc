@@ -46,6 +46,9 @@
 
 #include <stdio.h>
 
+GST_DEBUG_CATEGORY_EXTERN(_owrmediarenderer_debug);
+#define GST_CAT_DEFAULT _owrmediarenderer_debug
+
 #define DEFAULT_MEDIA_TYPE OWR_MEDIA_TYPE_UNKNOWN
 #define DEFAULT_SOURCE NULL
 #define DEFAULT_DISABLED FALSE

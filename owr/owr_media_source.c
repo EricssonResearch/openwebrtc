@@ -46,6 +46,9 @@
 #include <TargetConditionals.h>
 #endif
 
+GST_DEBUG_CATEGORY_EXTERN(_owrmediasource_debug);
+#define GST_CAT_DEFAULT _owrmediasource_debug
+
 #if defined(__APPLE__) && !TARGET_IPHONE_SIMULATOR
 #if TARGET_OS_IPHONE
 #define VIDEO_CONVERT "ercolorspace"

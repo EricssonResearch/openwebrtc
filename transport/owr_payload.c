@@ -47,6 +47,9 @@
 #include <TargetConditionals.h>
 #endif
 
+GST_DEBUG_CATEGORY_EXTERN(_owrpayload_debug);
+#define GST_CAT_DEFAULT _owrpayload_debug
+
 #define DEFAULT_MTU 1200
 #define DEFAULT_BITRATE 0
 #define DEFAULT_RTX_TIME 0    /* FIXME: what's a sane default here? */

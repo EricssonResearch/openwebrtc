@@ -50,6 +50,9 @@
 
 #include <string.h>
 
+GST_DEBUG_CATEGORY_EXTERN(_owrsession_debug);
+#define GST_CAT_DEFAULT _owrsession_debug
+
 #define DEFAULT_DTLS_CLIENT_MODE FALSE
 #define DEFAULT_DTLS_CERTIFICATE "(auto)"
 #define DEFAULT_DTLS_KEY "(auto)"

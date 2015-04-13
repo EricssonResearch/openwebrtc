@@ -44,7 +44,11 @@
 
 #include "owr_candidate_private.h"
 
+#include <gst/gst.h>
 #include <string.h>
+
+GST_DEBUG_CATEGORY_EXTERN(_owrcandidate_debug);
+#define GST_CAT_DEFAULT _owrcandidate_debug
 
 #define OWR_CANDIDATE_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_CANDIDATE, OwrCandidatePrivate))
 

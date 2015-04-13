@@ -53,6 +53,9 @@
 
 #include <string.h>
 
+GST_DEBUG_CATEGORY_EXTERN(_owrmediasession_debug);
+#define GST_CAT_DEFAULT _owrmediasession_debug
+
 
 #define OWR_MEDIA_SESSION_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_MEDIA_SESSION, OwrMediaSessionPrivate))
 

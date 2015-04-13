@@ -62,6 +62,28 @@ static gboolean owr_initialized = FALSE;
 static GMainContext *owr_main_context = NULL;
 static GMainLoop *owr_main_loop = NULL;
 
+GST_DEBUG_CATEGORY(_owraudiopayload_debug);
+GST_DEBUG_CATEGORY(_owraudiorenderer_debug);
+GST_DEBUG_CATEGORY(_owrbridge_debug);
+GST_DEBUG_CATEGORY(_owrcandidate_debug);
+GST_DEBUG_CATEGORY(_owrdatachannel_debug);
+GST_DEBUG_CATEGORY(_owrdatasession_debug);
+GST_DEBUG_CATEGORY(_owrdevicelist_debug);
+GST_DEBUG_CATEGORY(_owrimagerenderer_debug);
+GST_DEBUG_CATEGORY(_owrimageserver_debug);
+GST_DEBUG_CATEGORY(_owrlocal_debug);
+GST_DEBUG_CATEGORY(_owrlocalmediasource_debug);
+GST_DEBUG_CATEGORY(_owrmediarenderer_debug);
+GST_DEBUG_CATEGORY(_owrmediasession_debug);
+GST_DEBUG_CATEGORY(_owrmediasource_debug);
+GST_DEBUG_CATEGORY(_owrpayload_debug);
+GST_DEBUG_CATEGORY(_owrremotemediasource_debug);
+GST_DEBUG_CATEGORY(_owrsession_debug);
+GST_DEBUG_CATEGORY(_owrtransportagent_debug);
+GST_DEBUG_CATEGORY(_owrvideopayload_debug);
+GST_DEBUG_CATEGORY(_owrvideorenderer_debug);
+GST_DEBUG_CATEGORY(_owrwindowregistry_debug);
+
 #ifdef OWR_STATIC
 GST_PLUGIN_STATIC_DECLARE(alaw);
 GST_PLUGIN_STATIC_DECLARE(app);
@@ -188,6 +210,49 @@ void owr_init(GMainContext *main_context)
 
     gst_init(NULL, NULL);
     owr_initialized = TRUE;
+
+    GST_DEBUG_CATEGORY_INIT(_owraudiopayload_debug, "owraudiopayload", 0,
+        "OpenWebRTC Audio Payload");
+    GST_DEBUG_CATEGORY_INIT(_owraudiorenderer_debug, "owraudiorenderer", 0,
+        "OpenWebRTC Audio Renderer");
+    GST_DEBUG_CATEGORY_INIT(_owrbridge_debug, "owrbridge", 0,
+        "OpenWebRTC Bridge");
+    GST_DEBUG_CATEGORY_INIT(_owrcandidate_debug, "owrcandidate", 0,
+        "OpenWebRTC Candidate");
+    GST_DEBUG_CATEGORY_INIT(_owrdatachannel_debug, "owrdatachannel", 0,
+        "OpenWebRTC Data Channel");
+    GST_DEBUG_CATEGORY_INIT(_owrdatasession_debug, "owrdatasession", 0,
+        "OpenWebRTC Data Session");
+    GST_DEBUG_CATEGORY_INIT(_owrdevicelist_debug, "owrdevicelist", 0,
+        "OpenWebRTC Device List");
+    GST_DEBUG_CATEGORY_INIT(_owrimagerenderer_debug, "owrimagerenderer", 0,
+        "OpenWebRTC Image Renderer");
+    GST_DEBUG_CATEGORY_INIT(_owrimageserver_debug, "owrimageserver", 0,
+        "OpenWebRTC Image Server");
+    GST_DEBUG_CATEGORY_INIT(_owrlocal_debug, "owrlocal", 0,
+        "OpenWebRTC Local");
+    GST_DEBUG_CATEGORY_INIT(_owrlocalmediasource_debug, "owrlocalmediasource", 0,
+        "OpenWebRTC Local Media Source");
+    GST_DEBUG_CATEGORY_INIT(_owrmediarenderer_debug, "owrmediarenderer", 0,
+        "OpenWebRTC Media Renderer");
+    GST_DEBUG_CATEGORY_INIT(_owrmediasession_debug, "owrmediasession", 0,
+        "OpenWebRTC Media Session");
+    GST_DEBUG_CATEGORY_INIT(_owrmediasource_debug, "owrmediasource", 0,
+        "OpenWebRTC Media Source");
+    GST_DEBUG_CATEGORY_INIT(_owrpayload_debug, "owrpayload", 0,
+        "OpenWebRTC Payload");
+    GST_DEBUG_CATEGORY_INIT(_owrremotemediasource_debug, "owrremotemediasource", 0,
+        "OpenWebRTC Remote Media Source");
+    GST_DEBUG_CATEGORY_INIT(_owrsession_debug, "owrsession", 0,
+        "OpenWebRTC Session");
+    GST_DEBUG_CATEGORY_INIT(_owrtransportagent_debug, "owrtransportagent", 0,
+        "OpenWebRTC Transport Agent");
+    GST_DEBUG_CATEGORY_INIT(_owrvideopayload_debug, "owrvideopayload", 0,
+        "OpenWebRTC Video Payload");
+    GST_DEBUG_CATEGORY_INIT(_owrvideorenderer_debug, "owrvideorenderer", 0,
+        "OpenWebRTC Video Renderer");
+    GST_DEBUG_CATEGORY_INIT(_owrwindowregistry_debug, "owrwindowregistry", 0,
+        "OpenWebRTC Window Registry");
 
 #ifdef OWR_STATIC
     GST_PLUGIN_STATIC_REGISTER(alaw);
