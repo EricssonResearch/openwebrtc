@@ -38,6 +38,20 @@
 
 G_BEGIN_DECLS
 
+/* Note: OwrIceState mirrors NiceComponentState for our API */
+typedef enum {
+    OWR_ICE_STATE_DISCONNECTED,
+    OWR_ICE_STATE_GATHERING,
+    OWR_ICE_STATE_CONNECTING,
+    OWR_ICE_STATE_CONNECTED,
+    OWR_ICE_STATE_READY,
+    OWR_ICE_STATE_FAILED,
+    OWR_ICE_STATE_LAST
+} OwrIceState;
+
+#define OWR_TYPE_ICE_STATE (owr_ice_state_get_type())
+GType owr_ice_state_get_type(void);
+
 #define OWR_TYPE_SESSION            (owr_session_get_type())
 #define OWR_SESSION(obj)            (G_TYPE_CHECK_INSTANCE_CAST((obj), OWR_TYPE_SESSION, OwrSession))
 #define OWR_SESSION_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST((klass), OWR_TYPE_SESSION, OwrSessionClass))

@@ -30,6 +30,8 @@
 
 #include "owr_session.h"
 
+#include "owr_types.h"
+
 #ifndef __GTK_DOC_IGNORE__
 
 G_BEGIN_DECLS
@@ -41,6 +43,9 @@ void _owr_session_set_on_remote_candidate(OwrSession *session, GClosure *on_remo
 void _owr_session_clear_closures(OwrSession *session);
 
 void _owr_session_set_dtls_peer_certificate(OwrSession *, const gchar *certificate);
+
+void _owr_session_emit_ice_state_changed(OwrSession *session, guint session_id,
+	OwrComponentType component_type, OwrIceState state);
 
 G_END_DECLS
 

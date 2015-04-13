@@ -164,6 +164,7 @@ static void prepare_transport_bin_data_send_elements(OwrTransportAgent *transpor
 static void set_send_ssrc_and_cname(OwrTransportAgent *agent, OwrMediaSession *media_session);
 static void on_new_candidate(NiceAgent *nice_agent, NiceCandidate *nice_candidate, OwrTransportAgent *transport_agent);
 static void on_candidate_gathering_done(NiceAgent *nice_agent, guint stream_id, OwrTransportAgent *transport_agent);
+static void on_component_state_changed(NiceAgent *nice_agent, guint stream_id, guint component_id, OwrIceState state, OwrTransportAgent *transport_agent);
 static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMediaSession *media_session, OwrPayload * payload);
 static void on_new_remote_candidate(OwrTransportAgent *transport_agent, gboolean forced, OwrSession *session);
 
@@ -374,6 +375,8 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
         G_CALLBACK(on_new_candidate), transport_agent);
     g_signal_connect(G_OBJECT(priv->nice_agent), "candidate-gathering-done",
         G_CALLBACK(on_candidate_gathering_done), transport_agent);
+    g_signal_connect(G_OBJECT(priv->nice_agent), "component-state-changed",
+        G_CALLBACK(on_component_state_changed), transport_agent);
 
     pipeline_name = g_strdup_printf("transport-agent-%u", priv->agent_id);
     priv->pipeline = gst_pipeline_new(pipeline_name);
@@ -1567,6 +1570,47 @@ static void on_candidate_gathering_done(NiceAgent *nice_agent, guint stream_id, 
     g_hash_table_insert(args, "session", session);
 
     _owr_schedule_with_hash_table((GSourceFunc)emit_candidate_gathering_done, args);
+}
+
+static gboolean emit_ice_state_changed(GHashTable *args)
+{
+    OwrSession *session;
+    guint session_id;
+    OwrComponentType component_type;
+    OwrIceState state;
+
+    session = g_hash_table_lookup(args, "session");
+    session_id = GPOINTER_TO_UINT(g_hash_table_lookup(args, "session-id"));
+    component_type = GPOINTER_TO_UINT(g_hash_table_lookup(args, "component-type"));
+    state = GPOINTER_TO_UINT(g_hash_table_lookup(args, "ice-state"));
+
+    _owr_session_emit_ice_state_changed(session, session_id, component_type, state);
+
+    g_hash_table_destroy(args);
+    g_object_unref(session);
+
+    return FALSE;
+}
+
+static void on_component_state_changed(NiceAgent *nice_agent, guint stream_id,
+    guint component_id, OwrIceState state, OwrTransportAgent *transport_agent)
+{
+    OwrSession *session;
+    GHashTable *args;
+
+    g_return_if_fail(nice_agent);
+    g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
+
+    session = get_session(transport_agent, stream_id);
+    g_return_if_fail(OWR_IS_SESSION(session));
+
+    args = g_hash_table_new(g_str_hash, g_str_equal);
+    g_hash_table_insert(args, "session", session);
+    g_hash_table_insert(args, "session-id", GUINT_TO_POINTER(stream_id));
+    g_hash_table_insert(args, "component-type", GUINT_TO_POINTER(component_id));
+    g_hash_table_insert(args, "ice-state", GUINT_TO_POINTER(state));
+
+    _owr_schedule_with_hash_table((GSourceFunc)emit_ice_state_changed, args);
 }
 
 static guint get_stream_id(OwrTransportAgent *transport_agent, OwrSession *session)

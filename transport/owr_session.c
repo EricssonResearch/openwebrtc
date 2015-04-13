@@ -56,6 +56,7 @@ GST_DEBUG_CATEGORY_EXTERN(_owrsession_debug);
 #define DEFAULT_DTLS_CLIENT_MODE FALSE
 #define DEFAULT_DTLS_CERTIFICATE "(auto)"
 #define DEFAULT_DTLS_KEY "(auto)"
+#define DEFAULT_ICE_STATE OWR_ICE_STATE_DISCONNECTED
 
 #define OWR_SESSION_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_SESSION, OwrSessionPrivate))
 
@@ -72,6 +73,7 @@ struct _OwrSessionPrivate {
     GSList *forced_remote_candidates;
     gboolean gathering_done;
     GClosure *on_remote_candidate;
+    OwrIceState ice_state, rtp_ice_state, rtcp_ice_state;
 };
 
 enum {
@@ -90,12 +92,34 @@ enum {
     PROP_DTLS_CERTIFICATE,
     PROP_DTLS_KEY,
     PROP_DTLS_PEER_CERTIFICATE,
+    PROP_ICE_STATE,
 
     N_PROPERTIES
 };
 
 static guint session_signals[LAST_SIGNAL] = { 0 };
 static GParamSpec *obj_properties[N_PROPERTIES] = {NULL, };
+
+GType owr_ice_state_get_type(void)
+{
+    static const GEnumValue types[] = {
+        {OWR_ICE_STATE_DISCONNECTED, "ICE state disconnected", "disconnected"},
+        {OWR_ICE_STATE_GATHERING, "ICE state gathering", "gathering"},
+        {OWR_ICE_STATE_CONNECTING, "ICE state connecting", "connecting"},
+        {OWR_ICE_STATE_CONNECTED, "ICE state connected", "connected"},
+        {OWR_ICE_STATE_READY, "ICE state ready", "ready"},
+        {OWR_ICE_STATE_FAILED, "ICE state failed", "failed"},
+        {0, NULL, NULL}
+    };
+    static volatile GType id = 0;
+
+    if (g_once_init_enter((gsize *)&id)) {
+        GType _id = g_enum_register_static("OwrIceStates", types);
+        g_once_init_leave((gsize *)&id, _id);
+    }
+
+    return id;
+}
 
 static gboolean add_remote_candidate(GHashTable *args);
 
@@ -160,6 +184,10 @@ static void owr_session_get_property(GObject *object, guint property_id, GValue 
 
     case PROP_DTLS_PEER_CERTIFICATE:
         g_value_set_string(value, priv->dtls_peer_certificate);
+        break;
+
+    case PROP_ICE_STATE:
+        g_value_set_enum(value, priv->ice_state);
         break;
 
     default:
@@ -265,6 +293,10 @@ static void owr_session_class_init(OwrSessionClass *klass)
         "The X509 certificate of the remote peer, used by DTLS (in PEM format)",
         NULL, G_PARAM_STATIC_STRINGS | G_PARAM_READABLE | G_PARAM_STATIC_STRINGS);
 
+    obj_properties[PROP_ICE_STATE] = g_param_spec_enum("ice-connection-state",
+        "ICE connection state", "The state of the ICE connection",
+        OWR_TYPE_ICE_STATE, DEFAULT_ICE_STATE, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS);
+
     g_object_class_install_properties(gobject_class, N_PROPERTIES, obj_properties);
 
 }
@@ -277,12 +309,30 @@ static void owr_session_init(OwrSession *session)
     priv->dtls_client_mode = DEFAULT_DTLS_CLIENT_MODE;
     priv->dtls_certificate = g_strdup(DEFAULT_DTLS_CERTIFICATE);
     priv->dtls_key = g_strdup(DEFAULT_DTLS_KEY);
+    priv->ice_state = DEFAULT_ICE_STATE;
+    priv->rtp_ice_state = DEFAULT_ICE_STATE;
+    priv->rtcp_ice_state = DEFAULT_ICE_STATE;
     priv->dtls_peer_certificate = NULL;
     priv->local_candidates = NULL;
     priv->remote_candidates = NULL;
     priv->forced_remote_candidates = NULL;
     priv->gathering_done = FALSE;
     priv->on_remote_candidate = NULL;
+}
+
+
+static gchar *owr_ice_state_get_name(OwrIceState state)
+{
+    GEnumClass *enum_class;
+    GEnumValue *enum_value;
+    gchar *name;
+
+    enum_class = G_ENUM_CLASS(g_type_class_ref(OWR_TYPE_ICE_STATE));
+    enum_value = g_enum_get_value(enum_class, state);
+    name = g_strdup(enum_value ? enum_value->value_nick : "unknown");
+    g_type_class_unref(enum_class);
+
+    return name;
 }
 
 /**
@@ -465,4 +515,54 @@ void _owr_session_set_dtls_peer_certificate(OwrSession *session,
     g_warn_if_fail(!priv->dtls_peer_certificate
         || g_str_has_prefix(priv->dtls_peer_certificate, "-----BEGIN CERTIFICATE-----"));
     g_object_notify(G_OBJECT(session), "dtls-peer-certificate");
+}
+
+static OwrIceState owr_session_aggregate_ice_state(OwrIceState rtp_ice_state,
+    OwrIceState rtcp_ice_state)
+{
+    if (rtp_ice_state == OWR_ICE_STATE_FAILED || rtcp_ice_state == OWR_ICE_STATE_FAILED)
+        return OWR_ICE_STATE_FAILED;
+
+    return rtp_ice_state < rtcp_ice_state ? rtp_ice_state : rtcp_ice_state;
+}
+
+void _owr_session_emit_ice_state_changed(OwrSession *session, guint session_id,
+    OwrComponentType component_type, OwrIceState state)
+{
+    OwrIceState old_state, new_state;
+    gchar *old_state_name, *new_state_name;
+
+    old_state = owr_session_aggregate_ice_state(session->priv->rtp_ice_state,
+        session->priv->rtcp_ice_state);
+
+    if (component_type == OWR_COMPONENT_TYPE_RTP)
+        session->priv->rtp_ice_state = state;
+    else
+        session->priv->rtcp_ice_state = state;
+
+    new_state = owr_session_aggregate_ice_state(session->priv->rtp_ice_state,
+        session->priv->rtcp_ice_state);
+
+    if (old_state == new_state)
+        return;
+
+    old_state_name = owr_ice_state_get_name(old_state);
+    new_state_name = owr_ice_state_get_name(new_state);
+
+    if (new_state == OWR_ICE_STATE_FAILED) {
+        GST_ERROR("Session %u, ICE failed to establish a connection!\n"
+            "ICE state changed from %s to %s",
+            session_id, old_state_name, new_state_name);
+    } else if (new_state == OWR_ICE_STATE_CONNECTED || new_state == OWR_ICE_STATE_READY) {
+        GST_INFO("Session %u, ICE state changed from %s to %s",
+            session_id, old_state_name, new_state_name);
+    } else {
+        GST_DEBUG("Session %u, ICE state changed from %s to %s",
+            session_id, old_state_name, new_state_name);
+    }
+    g_free(old_state_name);
+    g_free(new_state_name);
+
+    session->priv->ice_state = new_state;
+    g_object_notify_by_pspec(G_OBJECT(session), obj_properties[PROP_ICE_STATE]);
 }
