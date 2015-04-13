@@ -391,8 +391,16 @@ GstElement * _owr_payload_create_encoder(OwrPayload *payload)
         } else if (!strcmp(factory_name, "vtenc_h264")) {
             g_object_bind_property_full(payload, "bitrate", encoder, "bitrate", G_BINDING_SYNC_CREATE,
                 binding_transform_to_kbps, NULL, NULL, NULL);
-            g_object_set(encoder, "allow-frame-reordering", FALSE, "realtime", TRUE,
-                "quality", 0.5, "max-keyframe-interval", G_MAXINT, NULL);
+            g_object_set(encoder,
+                "allow-frame-reordering", FALSE,
+                "realtime", TRUE,
+#if defined(__APPLE__) && TARGET_OS_IPHONE
+                "quality", 0.0,
+#else
+                "quality", 0.5,
+#endif
+                "max-keyframe-interval", G_MAXINT,
+                NULL);
         } else {
             /* Assume bits/s instead of kbit/s */
             g_object_bind_property(payload, "bitrate", encoder, "bitrate", G_BINDING_SYNC_CREATE);
