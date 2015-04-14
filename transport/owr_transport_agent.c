@@ -2181,9 +2181,9 @@ no_retransmission:
     return NULL;
 }
 
-static void print_rtcp_type(GstRTCPType packet_type)
+static void print_rtcp_type(guint session_id, GstRTCPType packet_type)
 {
-    GST_DEBUG("Received RTCP %s\n",
+    GST_DEBUG("Session %u, Received RTCP %s\n", session_id,
         packet_type == GST_RTCP_TYPE_INVALID ? "Invalid type (INVALID)" :
         packet_type == GST_RTCP_TYPE_SR ? "Sender Report (SR)" :
         packet_type == GST_RTCP_TYPE_RR ? "Receiver Report (RR)" :
@@ -2195,72 +2195,72 @@ static void print_rtcp_type(GstRTCPType packet_type)
         "unknown");
 }
 
-static void print_rtcp_feedback_type(guint fbtype, guint media_ssrc,
+static void print_rtcp_feedback_type(guint session_id, guint fbtype, guint media_ssrc,
     GstRTCPType packet_type, guint8 *fci, gboolean is_received)
 {
     if (fbtype == GST_RTCP_FB_TYPE_INVALID) {
-        GST_INFO("%s RTCP feedback for %u: Invalid type\n",
-            is_received ? "Received" : "Sent", media_ssrc);
+        GST_INFO("Session %u, %s RTCP feedback for %u: Invalid type\n",
+            session_id, is_received ? "Received" : "Sent", media_ssrc);
     } else if (packet_type == GST_RTCP_TYPE_RTPFB) {
         switch (fbtype) {
         case GST_RTCP_RTPFB_TYPE_NACK:
-            GST_INFO("%s RTCP feedback for %u: Generic NACK\n",
-                is_received ? "Received" : "Sent", media_ssrc);
+            GST_INFO("Session %u, %s RTCP feedback for %u: Generic NACK\n",
+                session_id, is_received ? "Received" : "Sent", media_ssrc);
             break;
         case GST_RTCP_RTPFB_TYPE_TMMBR:
-            GST_INFO("%s RTCP feedback for %u: Temporary Maximum Media Stream Bit Rate Request\n",
-                is_received ? "Received" : "Sent", media_ssrc);
+            GST_INFO("Session %u, %s RTCP feedback for %u: Temporary Maximum Media Stream Bit Rate Request\n",
+                session_id, is_received ? "Received" : "Sent", media_ssrc);
             break;
         case GST_RTCP_RTPFB_TYPE_TMMBN:
-            GST_INFO("%s RTCP feedback for %u: Temporary Maximum Media Stream Bit Rate Notification\n",
-                is_received ? "Received" : "Sent", media_ssrc);
+            GST_INFO("Session %u, %s RTCP feedback for %u: Temporary Maximum Media Stream Bit Rate Notification\n",
+                session_id, is_received ? "Received" : "Sent", media_ssrc);
             break;
         case GST_RTCP_RTPFB_TYPE_RTCP_SR_REQ:
-            GST_INFO("%s RTCP feedback for %u: Request an SR packet for early synchronization\n",
-                is_received ? "Received" : "Sent", media_ssrc);
+            GST_INFO("Session %u, %s RTCP feedback for %u: Request an SR packet for early synchronization\n",
+                session_id, is_received ? "Received" : "Sent", media_ssrc);
             break;
         default:
-            GST_WARNING("%s RTCP feedback for %u: Unknown feedback type %u\n",
-                is_received ? "Received" : "Sent", media_ssrc, fbtype);
+            GST_WARNING("Session %u, %s RTCP feedback for %u: Unknown feedback type %u\n",
+                session_id, is_received ? "Received" : "Sent", media_ssrc, fbtype);
             break;
         }
     } else if (packet_type == GST_RTCP_TYPE_PSFB) {
         switch (fbtype) {
         case GST_RTCP_PSFB_TYPE_PLI:
-            GST_INFO("%s RTCP feedback for %u: Picture Loss Indication\n",
-                is_received ? "Received" : "Sent", media_ssrc);
+            GST_INFO("Session %u, %s RTCP feedback for %u: Picture Loss Indication\n",
+                session_id, is_received ? "Received" : "Sent", media_ssrc);
             break;
         case GST_RTCP_PSFB_TYPE_SLI:
-            GST_INFO("%s RTCP feedback for %u: Slice Loss Indication\n",
-                is_received ? "Received" : "Sent", media_ssrc);
+            GST_INFO("Session %u, %s RTCP feedback for %u: Slice Loss Indication\n",
+                session_id, is_received ? "Received" : "Sent", media_ssrc);
             break;
         case GST_RTCP_PSFB_TYPE_RPSI:
-            GST_INFO("%s RTCP feedback for %u: Reference Picture Selection Indication\n",
-                is_received ? "Received" : "Sent", media_ssrc);
+            GST_INFO("Session %u, %s RTCP feedback for %u: Reference Picture Selection Indication\n",
+                session_id, is_received ? "Received" : "Sent", media_ssrc);
             break;
         case GST_RTCP_PSFB_TYPE_AFB:
-            GST_INFO("%s RTCP feedback for %u: Application layer Feedback\n",
-                is_received ? "Received" : "Sent", media_ssrc);
+            GST_INFO("Session %u, %s RTCP feedback for %u: Application layer Feedback\n",
+                session_id, is_received ? "Received" : "Sent", media_ssrc);
             break;
         case GST_RTCP_PSFB_TYPE_FIR:
-            GST_INFO("%s RTCP feedback for %u: Full Intra Request Command\n",
-                is_received ? "Received" : "Sent", fci ? GST_READ_UINT32_BE(fci) : 0);
+            GST_INFO("Session %u, %s RTCP feedback for %u: Full Intra Request Command\n",
+                session_id, is_received ? "Received" : "Sent", fci ? GST_READ_UINT32_BE(fci) : 0);
             break;
         case GST_RTCP_PSFB_TYPE_TSTR:
-            GST_INFO("%s RTCP feedback for %u: Temporal-Spatial Trade-off Request\n",
-                is_received ? "Received" : "Sent", media_ssrc);
+            GST_INFO("Session %u, %s RTCP feedback for %u: Temporal-Spatial Trade-off Request\n",
+                session_id, is_received ? "Received" : "Sent", media_ssrc);
             break;
         case GST_RTCP_PSFB_TYPE_TSTN:
-            GST_INFO("%s RTCP feedback for %u: Temporal-Spatial Trade-off Notification\n",
-                is_received ? "Received" : "Sent", media_ssrc);
+            GST_INFO("Session %u, %s RTCP feedback for %u: Temporal-Spatial Trade-off Notification\n",
+                session_id, is_received ? "Received" : "Sent", media_ssrc);
             break;
         case GST_RTCP_PSFB_TYPE_VBCN:
-            GST_INFO("%s RTCP feedback for %u: Video Back Channel Message\n",
-                is_received ? "Received" : "Sent", media_ssrc);
+            GST_INFO("Session %u, %s RTCP feedback for %u: Video Back Channel Message\n",
+                session_id, is_received ? "Received" : "Sent", media_ssrc);
             break;
         default:
-            GST_WARNING("%s RTCP feedback for %u: Unknown feedback type %u\n",
-                is_received ? "Received" : "Sent", media_ssrc, fbtype);
+            GST_WARNING("Session %u, %s RTCP feedback for %u: Unknown feedback type %u\n",
+                session_id, is_received ? "Received" : "Sent", media_ssrc, fbtype);
             break;
         }
     }
@@ -2282,13 +2282,15 @@ static gboolean on_sending_rtcp(GObject *session, GstBuffer *buffer, gboolean ea
 
     OWR_UNUSED(early);
 
+    session_id = GPOINTER_TO_UINT(g_object_get_data(session, "session_id"));
+
     if (gst_rtcp_buffer_map(buffer, GST_MAP_READ, &rtcp_buffer)) {
         has_packet = gst_rtcp_buffer_get_first_packet(&rtcp_buffer, &rtcp_packet);
         for (; has_packet; has_packet = gst_rtcp_packet_move_to_next(&rtcp_packet)) {
             packet_type = gst_rtcp_packet_get_type(&rtcp_packet);
-            print_rtcp_type(packet_type);
+            print_rtcp_type(session_id, packet_type);
             if (packet_type == GST_RTCP_TYPE_PSFB || packet_type == GST_RTCP_TYPE_RTPFB) {
-                print_rtcp_feedback_type(gst_rtcp_packet_fb_get_type(&rtcp_packet),
+                print_rtcp_feedback_type(session_id, gst_rtcp_packet_fb_get_type(&rtcp_packet),
                     gst_rtcp_packet_fb_get_media_ssrc(&rtcp_packet), packet_type,
                     gst_rtcp_packet_fb_get_fci(&rtcp_packet), FALSE);
                 do_not_suppress = TRUE;
@@ -2300,7 +2302,6 @@ static gboolean on_sending_rtcp(GObject *session, GstBuffer *buffer, gboolean ea
 
     g_return_val_if_fail(OWR_IS_TRANSPORT_AGENT(agent), do_not_suppress);
 
-    session_id = GPOINTER_TO_UINT(g_object_get_data(session, "session_id"));
     media_session = OWR_MEDIA_SESSION(get_session(agent, session_id));
     g_return_val_if_fail(OWR_IS_MEDIA_SESSION(media_session), do_not_suppress);
     send_payload = _owr_media_session_get_send_payload(media_session);
@@ -2325,17 +2326,19 @@ static void on_receiving_rtcp(GObject *session, GstBuffer *buffer,
     GstRTCPPacket rtcp_packet;
     GstRTCPType packet_type;
     gboolean has_packet;
+    guint session_id = 0;
 
     OWR_UNUSED(agent);
-    OWR_UNUSED(session);
+
+    session_id = GPOINTER_TO_UINT(g_object_get_data(session, "session_id"));
 
     if (gst_rtcp_buffer_map(buffer, GST_MAP_READ, &rtcp_buffer)) {
         has_packet = gst_rtcp_buffer_get_first_packet(&rtcp_buffer, &rtcp_packet);
         for (; has_packet; has_packet = gst_rtcp_packet_move_to_next(&rtcp_packet)) {
             packet_type = gst_rtcp_packet_get_type(&rtcp_packet);
-            print_rtcp_type(packet_type);
+            print_rtcp_type(session_id, packet_type);
             if (packet_type == GST_RTCP_TYPE_PSFB || packet_type == GST_RTCP_TYPE_RTPFB) {
-                print_rtcp_feedback_type(gst_rtcp_packet_fb_get_type(&rtcp_packet),
+                print_rtcp_feedback_type(session_id, gst_rtcp_packet_fb_get_type(&rtcp_packet),
                     gst_rtcp_packet_fb_get_media_ssrc(&rtcp_packet), packet_type,
                     gst_rtcp_packet_fb_get_fci(&rtcp_packet), FALSE);
                 break;
