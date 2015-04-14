@@ -50,6 +50,8 @@ libopenwebrtc_la_SOURCES += \
 CLEANFILES += owr_require_symbols.c
 owr_require_symbols.c: symbols_to_source.py
 	python ${srcdir}/symbols_to_source.py $(top_srcdir)/libopenwebrtc.exp $@ ${host}
+else
+libopenwebrtc_la_LDFLAGS += -export-symbols-regex '^owr_'
 endif
 
 includedir = $(prefix)/include/owr
