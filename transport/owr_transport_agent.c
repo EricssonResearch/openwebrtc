@@ -1602,6 +1602,33 @@ static OwrSession * get_session(OwrTransportAgent *transport_agent, guint stream
     return s;
 }
 
+static int rotation_and_mirror_to_video_flip_method(guint rotation, gboolean mirror)
+{
+    static gint mirror_methods[] = {4, 7, 5, 6};
+    g_return_val_if_fail(rotation < 4, 0);
+
+    if (mirror) {
+        return mirror_methods[rotation];
+    } else {
+        return rotation;
+    }
+}
+
+static void update_flip_method(OwrPayload *payload, GParamSpec *pspec, GstElement *flip)
+{
+    guint rotation = 0;
+    gboolean mirror = FALSE;
+    gint flip_method;
+
+    g_return_if_fail(OWR_IS_VIDEO_PAYLOAD(payload));
+    g_return_if_fail(G_IS_PARAM_SPEC(pspec) || !pspec);
+    g_return_if_fail(GST_IS_ELEMENT(flip));
+
+    g_object_get(payload, "rotation", &rotation, "mirror", &mirror, NULL);
+    flip_method = rotation_and_mirror_to_video_flip_method(rotation, mirror);
+    g_object_set(flip, "method", flip_method, NULL);
+}
+
 /* pad is transfer full */
 static void add_pads_to_bin_and_transport_bin(GstPad *pad, GstElement *bin, GstElement *transport_bin,
     const gchar *pad_name)
@@ -1676,7 +1703,15 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
     g_warn_if_fail(sync_ok);
 
     if (media_type == OWR_MEDIA_TYPE_VIDEO) {
-        GstElement *queue = NULL, *encoder_capsfilter;
+        GstElement *flip, *queue = NULL, *encoder_capsfilter;
+
+        name = g_strdup_printf("send-input-video-flip-%u", stream_id);
+        flip = gst_element_factory_make("videoflip", name);
+        g_assert(flip);
+        g_free(name);
+        g_return_if_fail(OWR_IS_VIDEO_PAYLOAD(payload));
+        g_signal_connect_object(payload, "notify::rotation", G_CALLBACK(update_flip_method), flip, 0);
+        g_signal_connect_object(payload, "notify::mirror", G_CALLBACK(update_flip_method), flip, 0);
 
         name = g_strdup_printf("send-input-video-queue-%u", stream_id);
         queue = gst_element_factory_make("queue", name);
@@ -1696,12 +1731,12 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
         g_object_set(encoder_capsfilter, "caps", caps, NULL);
         gst_caps_unref(caps);
 
-        gst_bin_add_many(GST_BIN(send_input_bin), queue, encoder, encoder_capsfilter, payloader, NULL);
+        gst_bin_add_many(GST_BIN(send_input_bin), flip, queue, encoder, encoder_capsfilter, payloader, NULL);
         if (parser) {
             gst_bin_add(GST_BIN(send_input_bin), parser);
-            link_ok &= gst_element_link_many(queue, encoder, parser, encoder_capsfilter, payloader, NULL);
+            link_ok &= gst_element_link_many(flip, queue, encoder, parser, encoder_capsfilter, payloader, NULL);
         } else
-            link_ok &= gst_element_link_many(queue, encoder, encoder_capsfilter, payloader, NULL);
+            link_ok &= gst_element_link_many(flip, queue, encoder, encoder_capsfilter, payloader, NULL);
 
         link_ok &= gst_element_link_many(payloader, rtp_capsfilter, NULL);
 
@@ -1714,9 +1749,10 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
         sync_ok &= gst_element_sync_state_with_parent(encoder_capsfilter);
         sync_ok &= gst_element_sync_state_with_parent(encoder);
         sync_ok &= gst_element_sync_state_with_parent(queue);
+        sync_ok &= gst_element_sync_state_with_parent(flip);
 
         name = g_strdup_printf("video_sink_%u_%u", OWR_CODEC_TYPE_NONE, stream_id);
-        sink_pad = gst_element_get_static_pad(queue, "sink");
+        sink_pad = gst_element_get_static_pad(flip, "sink");
         add_pads_to_bin_and_transport_bin(sink_pad, send_input_bin,
             transport_agent->priv->transport_bin, name);
         gst_object_unref(sink_pad);
