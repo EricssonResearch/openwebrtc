@@ -1322,6 +1322,7 @@
     function RTCDataChannel(settings, whenPeerHandlerCanCreateDataChannels) {
         var _this = this;
         var internalDataChannel;
+        var sendQueue = [];
 
         EventTarget.call(this, {
             "onopen": null,
@@ -1343,14 +1344,15 @@
         };
         domObject.addReadOnlyAttributes(this, a);
 
+        var _binaryType = "blob";
         Object.defineProperty(this, "binaryType", {
-            "get": function () { return "arraybuffer"; },
+            "get": function () { return _binaryType; },
             "set": function (binaryType) {
-                if (binaryType === 'blob') {
-                    throw createError("NotSupportedError", "Blob support not implemented");
-                } else if (binaryType !== 'arraybuffer') {
-                    throw createError("TypeMismatchError", "Unknown binary type: " + binaryType);
+                if (binaryType !== "blob" && binaryType !== "arraybuffer") {
+                    throw createError("TypeMismatchError", "Unknown binary type: " +
+                        entityReplace(binaryType));
                 }
+                _binaryType = binaryType;
             }
         });
 
@@ -1365,32 +1367,52 @@
             });
         });
 
-        function encodeArrayBufferArgument(buffer) {
-            var binary = '';
-            var bufferView = new Uint8Array(buffer);
-            for (var i = 0, len = bufferView.byteLength; i < len; i++) {
-                binary += String.fromCharCode(bufferView[i]);
+        function getDataLength(data) {
+            if (data instanceof Blob)
+                return data.size;
+
+            if (data instanceof ArrayBuffer || ArrayBuffer.isView(data))
+                return (new Uint8Array(data)).byteLength;
+
+            return unescape(encodeURIComponent(data)).length;
+        }
+
+        function processSendQueue() {
+            if (a.readyState != "open")
+                return;
+
+            var data = sendQueue[0];
+            if (data instanceof Blob) {
+                var reader = new FileReader();
+                reader.onloadend = function () {
+                    sendQueue[0] = reader.result;
+                    processSendQueue();
+                };
+                reader.readAsArrayBuffer(data);
+                return;
             }
-            var base64 = btoa(binary);
-            return {
-                "base64": base64,
-                "length": bufferView.byteLength
-            };
+
+            if (data instanceof ArrayBuffer || ArrayBuffer.isView(data))
+                internalDataChannel.sendBinary(data);
+            else
+                internalDataChannel.send(data);
+
+            sendQueue.shift();
+
+            if (sendQueue.length)
+                processSendQueue();
         }
 
         this.send = function (data) {
+            checkArguments("send", "string | ArrayBuffer | ArrayBufferView | Blob", 1, arguments);
+
             if (a.readyState == "connecting")
                 throw createError("InvalidStateError", "send: readyState is \"connecting\"");
 
-            if (data instanceof Blob) {
-                throw createError("NotSupportedError", "Blob support not implemented");
-            } else if ((data instanceof ArrayBuffer) || ArrayBuffer.isView(data)) {
-                data = encodeArrayBufferArgument(data);
-            }
+            a.bufferedAmount += getDataLength(data);
 
-            a.bufferedAmount += data.length;
-            if (a.readyState == "open")
-                internalDataChannel.send(data);
+            if (sendQueue.push(data) == 1)
+                processSendQueue();
         };
 
         this.close = function () {
@@ -1419,7 +1441,9 @@
             };
 
             client.setBufferedAmount = function (bufferedAmount) {
-                a.bufferedAmount = bufferedAmount;
+                a.bufferedAmount = bufferedAmount + sendQueue.reduce(function (prev, item) {
+                    return prev + getDataLength(item);
+                }, 0);
             };
 
             client.gotData = function (data) {

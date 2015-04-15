@@ -380,7 +380,7 @@ function PeerHandler(configuration, client, jsonRpc) {
 }
 
 function createInternalDataChannelRef(internalDataChannel, jsonRpc) {
-    var exports = [ "send", "close" ];
+    var exports = [ "send", "sendBinary", "close" ];
     exports.forEach(function (name) {
         jsonRpc.exportFunctions(internalDataChannel[name]);
     });
@@ -411,12 +411,13 @@ function InternalDataChannel(settings, dataSession, client) {
     dataSession.add_data_channel(channel);
 
     this.send = function (data) {
-        if (data && data.base64) {
-            var arr = base64StringToArray(data.base64);
-            channel.send_binary(arr, arr.length);
-        } else {
-            channel.send(data);
-        }
+        channel.send(data);
+        client.setBufferedAmount(channel.buffered_amount);
+    };
+
+    this.sendBinary = function (data) {
+        var buf = Array.prototype.slice.call(new Uint8Array(data));
+        channel.send_binary(buf, buf.length);
         client.setBufferedAmount(channel.buffered_amount);
     };
 
