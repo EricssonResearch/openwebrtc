@@ -65,7 +65,7 @@ noinst_HEADERS = \
     owr_media_source_private.h \
     owr_utils.h
 
-if HAVE_INTROSPECTION
+if OWR_STATIC
 noinst_HEADERS += \
     Owr-@OWR_API_VERSION@.gir.h
 endif
