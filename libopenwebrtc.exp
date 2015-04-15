@@ -22,6 +22,7 @@ owr_quit
 owr_data_channel_close
 owr_data_channel_get_type
 owr_data_channel_new
+owr_data_channel_ready_state_get_type
 owr_data_channel_send
 owr_data_channel_send_binary
 owr_data_session_add_data_channel
