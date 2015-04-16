@@ -47,7 +47,7 @@
 
     var defaultPayloads = {
         "audio" : [
-            { "encodingName": "OPUS", "type": 111, "clockRate": 48000, "channels": 2 },
+            { "encodingName": "opus", "type": 111, "clockRate": 48000, "channels": 2 },
             { "encodingName": "PCMA", "type": 8, "clockRate": 8000, "channels": 1 },
             { "encodingName": "PCMU", "type": 0, "clockRate": 8000, "channels": 1 },
         ],
