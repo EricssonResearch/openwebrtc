@@ -22,6 +22,8 @@ libopenwebrtc_la_SOURCES = \
     owr.c \
     owr_types.c \
     owr_media_source.c \
+    owr_bus.c \
+    owr_message_origin.c \
     owr_utils.c
 
 libopenwebrtc_la_LIBADD = \
@@ -58,11 +60,15 @@ includedir = $(prefix)/include/owr
 include_HEADERS = \
     owr.h \
     owr_media_source.h \
+    owr_bus.h \
+    owr_message_origin.h \
     owr_types.h
 
 noinst_HEADERS = \
     owr_private.h \
+    owr_bus_private.h \
     owr_media_source_private.h \
+    owr_message_origin_private.h \
     owr_utils.h
 
 if OWR_STATIC
@@ -107,6 +113,10 @@ Owr_@OWR_API_VERSION_UNDERSCORE@_gir_FILES = \
     owr_types.c \
     owr_media_source.h \
     owr_media_source.c \
+    owr_bus.h \
+    owr_bus.c \
+    owr_message_origin.h \
+    owr_message_origin.c \
     ../transport/owr_candidate.h \
     ../transport/owr_candidate.c \
     ../transport/owr_session.h \

@@ -65,6 +65,7 @@ static GMainLoop *owr_main_loop = NULL;
 GST_DEBUG_CATEGORY(_owraudiopayload_debug);
 GST_DEBUG_CATEGORY(_owraudiorenderer_debug);
 GST_DEBUG_CATEGORY(_owrbridge_debug);
+GST_DEBUG_CATEGORY(_owrbus_debug);
 GST_DEBUG_CATEGORY(_owrcandidate_debug);
 GST_DEBUG_CATEGORY(_owrdatachannel_debug);
 GST_DEBUG_CATEGORY(_owrdatasession_debug);
@@ -217,6 +218,8 @@ void owr_init(GMainContext *main_context)
         "OpenWebRTC Audio Renderer");
     GST_DEBUG_CATEGORY_INIT(_owrbridge_debug, "owrbridge", 0,
         "OpenWebRTC Bridge");
+    GST_DEBUG_CATEGORY_INIT(_owrbus_debug, "owrbus", 0,
+        "OpenWebRTC Bus");
     GST_DEBUG_CATEGORY_INIT(_owrcandidate_debug, "owrcandidate", 0,
         "OpenWebRTC Candidate");
     GST_DEBUG_CATEGORY_INIT(_owrdatachannel_debug, "owrdatachannel", 0,
