@@ -97,7 +97,7 @@ C.Helper.add_helper('jobject_wrapper_closure_notify',
 C.Helper.add_helper('gobject_to_jobject',
     C.Function('gobject_to_jobject',
         return_type='jobject',
-        params=['JNIEnv* env', 'gpointer data_pointer', 'jclass clazz', 'gboolean take_ref'],
+        params=['JNIEnv* env', 'gpointer data_pointer', 'gboolean take_ref'],
         body=[
             C.Decl('GObject*', 'gobj'),
             C.Decl('JObjectWrapper*', 'wrapper'),
@@ -114,8 +114,15 @@ C.Helper.add_helper('gobject_to_jobject',
                     C.Return('wrapper->obj'),
                 ], [
                     C.Decl('jobject', 'jobj'),
+                    C.Decl('jclass', 'clazz'),
                     C.Decl('jobject', 'native_pointer'),
                     C.Decl('GWeakRef*', 'ref'),
+                    '',
+                    C.Assign('clazz', C.Call('g_hash_table_lookup', 'gobject_to_java_class_map', C.Call('G_OBJECT_TYPE', 'gobj'))),
+                    C.If('!clazz', [
+                        C.Log.error('Java class not found for GObject type: %s', C.Call('G_OBJECT_TYPE_NAME', 'gobj')),
+                        C.Return('NULL'),
+                    ]),
                     '',
                     C.If('take_ref', C.Call('g_object_ref', 'gobj')),
                     '',
@@ -509,7 +516,7 @@ class GObjectMetaType(ObjectMetaType):
             C.Decl(self.jni_type, self.jni_name),
         ],[
             C.Assign(self.jni_name, C.Helper('gobject_to_jobject',
-                'env', self.c_name, C.Cache.default_class(self), 'TRUE' if not self.transfer_ownership else 'FALSE'))
+                'env', self.c_name, 'TRUE' if not self.transfer_ownership else 'FALSE'))
         ])
 
 

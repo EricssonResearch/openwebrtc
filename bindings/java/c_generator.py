@@ -621,6 +621,10 @@ def gen_source(namespaces, include_headers):
 
     helper_functions = Helper.enumerate_used_helpers()
 
+    gobject_class_cache = [
+        C.Call('g_hash_table_insert', 'gobject_to_java_class_map', C.Call(clazz.glib_get_type), Cache.default_class(clazz.value))
+    for clazz in namespace.classes for namespace in namespaces];
+
     # cached classes need to be enumerated last
     cache_declarations, jni_onload_cache = C.Cache.enumerate_cached_classes()
 
@@ -637,6 +641,10 @@ def gen_source(namespaces, include_headers):
             '',
             jni_onload_cache,
             '',
+            C.Assign('gobject_to_java_class_map', C.Call('g_hash_table_new', 'g_direct_hash', 'g_direct_equal')),
+            '',
+            gobject_class_cache,
+            '',
             C.Return('JNI_VERSION_1_6'),
         ]
     )
@@ -648,6 +656,7 @@ def gen_source(namespaces, include_headers):
         includes,
         HEADER,
         cache_declarations,
+        C.Decl('static GHashTable*', 'gobject_to_java_class_map'),
         GET_JNI_ENV,
         jni_onload,
         jobject_wrapper_struct,
