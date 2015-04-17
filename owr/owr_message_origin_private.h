@@ -32,9 +32,21 @@
 
 #include "owr_message_origin.h"
 
+#include "owr_bus.h"
+
 #ifndef __GTK_DOC_IGNORE__
 
 G_BEGIN_DECLS
+
+typedef struct {
+    GHashTable *table;
+    GMutex mutex;
+} OwrMessageOriginBusSet;
+
+OwrMessageOriginBusSet *owr_message_origin_bus_set_new();
+void owr_message_origin_bus_set_free(OwrMessageOriginBusSet *bus_set);
+OwrMessageOriginBusSet *owr_message_origin_get_bus_set(OwrMessageOrigin *origin);
+void owr_message_origin_post_message(OwrMessageOrigin *origin, OwrMessageType type, const gchar *message_str);
 
 G_END_DECLS
 

@@ -46,6 +46,9 @@ typedef struct _OwrMessageOriginInterface   OwrMessageOriginInterface;
 
 struct _OwrMessageOriginInterface {
     GTypeInterface parent;
+
+    /* private virtual functions */
+    gpointer (*get_bus_set)(OwrMessageOrigin *origin);
 };
 
 GType owr_message_origin_get_type(void) G_GNUC_CONST;

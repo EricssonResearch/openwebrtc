@@ -36,6 +36,14 @@
 
 G_BEGIN_DECLS
 
+typedef struct {
+    OwrMessageType type;
+    OwrMessageOrigin *origin;
+    gchar *message; /* placeholder field */
+} OwrMessage;
+
+void _owr_bus_post_message(OwrBus *bus, OwrMessage *message);
+
 G_END_DECLS
 
 #endif /* __GTK_DOC_IGNORE__ */

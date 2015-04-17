@@ -33,6 +33,7 @@
 #include "owr_bus.h"
 
 #include "owr_bus_private.h"
+#include "owr_message_origin_private.h"
 
 #include "owr_utils.h"
 
@@ -143,16 +144,62 @@ OwrBus *owr_bus_new()
     return g_object_new(OWR_TYPE_BUS, NULL);
 }
 
+/**
+ * owr_bus_add_message_origin:
+ * @bus: the bus to which the message origin is added
+ * @origin: (transfer none): the message origin that is added to the bus
+ *
+ * Adds a message origin to the bus, adding an already existing message origin has no effect.
+ */
 void owr_bus_add_message_origin(OwrBus *bus, OwrMessageOrigin *origin)
 {
-    OWR_UNUSED(bus);
-    OWR_UNUSED(origin);
+    OwrMessageOriginBusSet *bus_set;
+    GWeakRef *ref;
+
+    g_return_if_fail(OWR_IS_BUS(bus));
+    g_return_if_fail(OWR_IS_MESSAGE_ORIGIN(origin));
+
+    bus_set = owr_message_origin_get_bus_set(origin);
+    g_return_if_fail(bus_set);
+
+    ref = g_slice_new0(GWeakRef);
+    g_weak_ref_init(ref, bus);
+
+    GST_DEBUG_OBJECT(bus, "adding message origin %p with weak bus ref: %p", origin, ref);
+
+    g_mutex_lock(&bus_set->mutex);
+    g_hash_table_insert(bus_set->table, bus, ref);
+    g_mutex_unlock(&bus_set->mutex);
 }
 
+/**
+ * owr_bus_remove_message_origin:
+ * @bus: the bus from which the message origin should be removed
+ * @origin: (transfer none): the message origin that should be removed from the bus
+ *
+ * Removes a message origin from the bus if it exists, otherwise nothing is done.
+ */
 void owr_bus_remove_message_origin(OwrBus *bus, OwrMessageOrigin *origin)
 {
+    OwrMessageOriginBusSet *bus_set;
+
+    g_return_if_fail(OWR_IS_BUS(bus));
+    g_return_if_fail(OWR_IS_MESSAGE_ORIGIN(origin));
+
+    bus_set = owr_message_origin_get_bus_set(origin);
+    g_return_if_fail(bus_set);
+
+    g_mutex_lock(&bus_set->mutex);
+    if (g_hash_table_remove(bus_set->table, bus)) {
+        GST_DEBUG_OBJECT(bus, "removed message origin %p", origin);
+    }
+    g_mutex_unlock(&bus_set->mutex);
+}
+
+void _owr_bus_post_message(OwrBus *bus, OwrMessage *message)
+{
     OWR_UNUSED(bus);
-    OWR_UNUSED(origin);
+    OWR_UNUSED(message);
 }
 
 GType owr_message_type_get_type(void)
