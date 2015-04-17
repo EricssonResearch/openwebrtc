@@ -55,6 +55,8 @@ TAG_METHOD = NS + 'method'
 TAG_BITFIELD = NS + 'bitfield'
 TAG_FUNCTION = NS + 'function'
 TAG_SIGNAL = GLIB_NS + 'signal'
+TAG_INTERFACE = NS + 'interface'
+TAG_IMPLEMENTS = NS + 'implements'
 
 ATTR_NAME = 'name'
 ATTR_WHEN = 'when'
@@ -408,7 +410,7 @@ class Class(object):
         self.__dict__.update(**kwargs)
 
     @classmethod
-    def from_tag(cls, type_registry, tag):
+    def from_tag(cls, type_registry, tag, interfaces=None):
         parent = tag.get(ATTR_PARENT)
         if parent == 'GObject.Object':
             parent = None
@@ -430,6 +432,7 @@ class Class(object):
             methods=[Method.from_tag(type_registry, t) for t in tag.findall(TAG_METHOD) if t.get(ATTR_INTROSPECTABLE) != '0'],
             functions=[Function.from_tag(type_registry, t) for t in tag.findall(TAG_FUNCTION) if t.get(ATTR_INTROSPECTABLE) != '0'],
             signals=[Signal.from_tag(type_registry, value, t) for t in tag.findall(TAG_SIGNAL) if t.get(ATTR_INTROSPECTABLE) != '0'],
+            interfaces=[interfaces[t.get(ATTR_NAME)] for t in tag.findall(TAG_IMPLEMENTS)],
         )
 
 
@@ -517,13 +520,17 @@ class Namespace(object):
 
             return map(glib_from_c, c_enums)
 
+        interfaces = [Class.from_tag(type_registry, t) for t in tag.findall(TAG_INTERFACE)]
+        interface_map = {interface.name: interface for interface in interfaces}
+
         self.name = tag.get(ATTR_NAME)
         self.symbol_prefix = tag.get(ATTR_C_SYMBOL_PREFIXES)
         self.identifier_prefix = tag.get(ATTR_C_IDENTIFIER_PREFIXES)
         self.shared_library = tag.get(ATTR_SHARED_LIBRARY)
+        self.interfaces = interfaces
         self.enums = [Enum.from_tag(type_registry, *tags) for tags in find_enum_pairs()]
         self.callbacks = [Callback.from_tag(type_registry, t) for t in tag.findall(TAG_CALLBACK)]
-        self.classes = [Class.from_tag(type_registry, t) for t in tag.findall(TAG_CLASS)]
+        self.classes = [Class.from_tag(type_registry, t, interface_map) for t in tag.findall(TAG_CLASS)]
         self.functions = [Function.from_tag(type_registry, t) for t in tag.findall(TAG_FUNCTION)]
 
 
@@ -538,6 +545,7 @@ class GirParser(object):
             prefix = namespace.get(ATTR_C_SYMBOL_PREFIXES)
             tag_types = {
                 TAG_CLASS: GObjectMetaType,
+                TAG_INTERFACE: GObjectMetaType,
                 TAG_CALLBACK: CallbackMetaType,
                 TAG_ENUMERATION: EnumMetaType,
                 TAG_BITFIELD: BitfieldMetaType,

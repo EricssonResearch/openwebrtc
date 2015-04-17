@@ -479,6 +479,9 @@ def gen_class(package, clazz):
         body += [C.Comment(attr) if getattr(clazz, attr) else None]
         body += map(make_function_gen(package, clazz.name), getattr(clazz, attr))
 
+    for interface in clazz.interfaces:
+        body += map(make_function_gen(package, clazz.name), interface.methods)
+
     body += [C.Comment('signals') if clazz.signals else None]
     body += map(make_callback_gen(package, clazz.name), clazz.signals)
     body += map(gen_signal_accessors, clazz.signals)
