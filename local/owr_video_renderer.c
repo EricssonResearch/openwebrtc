@@ -36,6 +36,7 @@
 
 #include "owr_media_renderer_private.h"
 #include "owr_private.h"
+#include "owr_utils.h"
 #include "owr_video_renderer_private.h"
 #include "owr_window_registry.h"
 #include "owr_window_registry_private.h"
@@ -56,6 +57,8 @@ GST_DEBUG_CATEGORY_EXTERN(_owrvideorenderer_debug);
 #define DEFAULT_WIDTH 0
 #define DEFAULT_HEIGHT 0
 #define DEFAULT_MAX_FRAMERATE 0.0
+#define DEFAULT_ROTATION 0
+#define DEFAULT_MIRROR FALSE
 #define DEFAULT_TAG NULL
 
 #define OWR_VIDEO_RENDERER_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_VIDEO_RENDERER, OwrVideoRendererPrivate))
@@ -69,6 +72,8 @@ enum {
     PROP_WIDTH,
     PROP_HEIGHT,
     PROP_MAX_FRAMERATE,
+    PROP_ROTATION,
+    PROP_MIRROR,
     PROP_TAG,
     N_PROPERTIES
 };
@@ -88,6 +93,8 @@ struct _OwrVideoRendererPrivate {
     guint width;
     guint height;
     gdouble max_framerate;
+    gint rotation;
+    gboolean mirror;
     gchar *tag;
 };
 
@@ -124,6 +131,14 @@ static void owr_video_renderer_class_init(OwrVideoRendererClass *klass)
         "Maximum video frames per second", 0.0, G_MAXDOUBLE,
         DEFAULT_MAX_FRAMERATE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
+    obj_properties[PROP_ROTATION] = g_param_spec_uint("rotation", "rotation",
+        "Video rotation in multiple of 90 degrees", 0, 3, DEFAULT_ROTATION,
+        G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+
+    obj_properties[PROP_MIRROR] = g_param_spec_boolean("mirror", "mirror",
+        "Whether the video should be mirrored around the y-axis", DEFAULT_MIRROR,
+        G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+
     obj_properties[PROP_TAG] = g_param_spec_string("tag", "tag",
         "Tag referencing the window widget into which to draw video (default: NULL, create a new window)",
         DEFAULT_TAG, G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
@@ -148,6 +163,8 @@ static void owr_video_renderer_init(OwrVideoRenderer *renderer)
     priv->height = DEFAULT_HEIGHT;
     priv->max_framerate = DEFAULT_MAX_FRAMERATE;
     priv->tag = DEFAULT_TAG;
+    priv->rotation = DEFAULT_ROTATION;
+    priv->mirror = DEFAULT_MIRROR;
 }
 
 static void owr_video_renderer_set_property(GObject *object, guint property_id,
@@ -167,6 +184,12 @@ static void owr_video_renderer_set_property(GObject *object, guint property_id,
         break;
     case PROP_MAX_FRAMERATE:
         priv->max_framerate = g_value_get_double(value);
+        break;
+    case PROP_ROTATION:
+        priv->rotation = g_value_get_uint(value);
+        break;
+    case PROP_MIRROR:
+        priv->mirror = g_value_get_boolean(value);
         break;
     case PROP_TAG:
         g_free(priv->tag);
@@ -198,6 +221,12 @@ static void owr_video_renderer_get_property(GObject *object, guint property_id,
         break;
     case PROP_MAX_FRAMERATE:
         g_value_set_double(value, priv->max_framerate);
+        break;
+    case PROP_ROTATION:
+        g_value_set_uint(value, priv->rotation);
+        break;
+    case PROP_MIRROR:
+        g_value_set_boolean(value, priv->mirror);
         break;
     case PROP_TAG:
         g_value_set_string(value, priv->tag);
@@ -239,12 +268,39 @@ static void renderer_disabled(OwrMediaRenderer *renderer, GParamSpec *pspec, Gst
     g_object_set(balance, "saturation", (gdouble)!disabled, "brightness", (gdouble)-disabled, NULL);
 }
 
+static int rotation_and_mirrored_to_video_flip_method(guint rotation, gboolean mirrored)
+{
+    static gint mirrored_methods[] = {4, 7, 5, 6};
+    g_return_val_if_fail(rotation < 4, 0);
+
+    if (mirrored) {
+        return mirrored_methods[rotation];
+    } else {
+        return rotation;
+    }
+}
+
+static void update_flip_method(OwrMediaRenderer *renderer, GParamSpec *pspec, GstElement *flip)
+{
+    guint rotation = 0;
+    gboolean mirror = FALSE;
+    gint flip_method;
+
+    g_return_if_fail(OWR_IS_MEDIA_RENDERER(renderer));
+    g_return_if_fail(G_IS_PARAM_SPEC(pspec) || !pspec);
+    g_return_if_fail(GST_IS_ELEMENT(flip));
+
+    g_object_get(renderer, "rotation", &rotation, "mirror", &mirror, NULL);
+    flip_method = rotation_and_mirrored_to_video_flip_method(rotation, mirror);
+    g_object_set(flip, "method", flip_method, NULL);
+}
+
 static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer, guintptr window_handle)
 {
     OwrVideoRenderer *video_renderer;
     OwrVideoRendererPrivate *priv;
     GstElement *renderer_bin;
-    GstElement *balance, *sink;
+    GstElement *balance, *flip, *sink;
     GstPad *ghostpad, *sinkpad;
     gchar *bin_name;
 
@@ -261,6 +317,11 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer, gu
         balance, 0);
     renderer_disabled(renderer, NULL, balance);
 
+    flip = gst_element_factory_make("videoflip", "video-renderer-flip");
+    g_assert(flip);
+    g_signal_connect_object(renderer, "notify::rotation", G_CALLBACK(update_flip_method), flip, 0);
+    g_signal_connect_object(renderer, "notify::mirror", G_CALLBACK(update_flip_method), flip, 0);
+
     sink = gst_element_factory_make(VIDEO_SINK, "video-renderer-sink");
     g_assert(sink);
     g_object_set(sink, "enable-last-sample", FALSE, NULL);
@@ -275,9 +336,10 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer, gu
             g_object_unref(sink_element);
     }
 
-    gst_bin_add_many(GST_BIN(renderer_bin), balance, sink, NULL);
+    gst_bin_add_many(GST_BIN(renderer_bin), balance, flip, sink, NULL);
 
-    LINK_ELEMENTS(balance, sink);
+    LINK_ELEMENTS(flip, sink);
+    LINK_ELEMENTS(balance, flip);
 
     sinkpad = gst_element_get_static_pad(balance, "sink");
     g_assert(sinkpad);
