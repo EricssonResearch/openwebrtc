@@ -45,6 +45,7 @@ owr_media_source_get_dot_data
 owr_media_source_get_type
 owr_media_type_get_type
 owr_message_origin_get_type
+owr_message_type_get_type
 owr_payload_get_type
 owr_remote_media_source_get_type
 owr_session_add_remote_candidate

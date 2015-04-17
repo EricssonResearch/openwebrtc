@@ -37,6 +37,15 @@
 
 G_BEGIN_DECLS
 
+typedef enum {
+    OWR_MESSAGE_TYPE_ERROR = (1 << 0),
+    OWR_MESSAGE_TYPE_STATS = (1 << 1),
+    OWR_MESSAGE_TYPE_EVENT = (1 << 2)
+} OwrMessageType;
+
+#define OWR_TYPE_MESSAGE_TYPE (owr_message_type_get_type())
+GType owr_message_type_get_type(void);
+
 #define OWR_TYPE_BUS            (owr_bus_get_type())
 #define OWR_BUS(obj)            (G_TYPE_CHECK_INSTANCE_CAST((obj), OWR_TYPE_BUS, OwrBus))
 #define OWR_BUS_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST((klass), OWR_TYPE_BUS, OwrBusClass))

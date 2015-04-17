@@ -41,8 +41,11 @@
 GST_DEBUG_CATEGORY_EXTERN(_owrbus_debug);
 #define GST_CAT_DEFAULT _owrbus_debug
 
+#define DEFAULT_MESSAGE_TYPE_MASK (OWR_MESSAGE_TYPE_ERROR | OWR_MESSAGE_TYPE_STATS | OWR_MESSAGE_TYPE_EVENT)
+
 enum {
     PROP_0,
+    PROP_MESSAGE_TYPE_MASK,
     N_PROPERTIES
 };
 
@@ -54,6 +57,7 @@ static GParamSpec *obj_properties[N_PROPERTIES] = {NULL, };
 G_DEFINE_TYPE(OwrBus, owr_bus, G_TYPE_OBJECT)
 
 struct _OwrBusPrivate {
+    OwrMessageType message_type_mask;
 };
 
 static void owr_bus_finalize(GObject *);
@@ -65,6 +69,12 @@ static void owr_bus_class_init(OwrBusClass *klass)
     GObjectClass *gobject_class = G_OBJECT_CLASS(klass);
 
     g_type_class_add_private(klass, sizeof(OwrBusPrivate));
+
+    obj_properties[PROP_MESSAGE_TYPE_MASK] = g_param_spec_flags("message-type-mask", "message-type-mask",
+        "The message types that the bus should forward, other message types will be discarded"
+        " (default: forward all messages)",
+        OWR_TYPE_MESSAGE_TYPE, DEFAULT_MESSAGE_TYPE_MASK,
+        G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
     gobject_class->set_property = owr_bus_set_property;
     gobject_class->get_property = owr_bus_get_property;
@@ -78,6 +88,8 @@ static void owr_bus_init(OwrBus *bus)
 {
     OwrBusPrivate *priv;
     bus->priv = priv = OWR_BUS_GET_PRIVATE(bus);
+
+    priv->message_type_mask = DEFAULT_MESSAGE_TYPE_MASK;
 }
 
 static void owr_bus_finalize(GObject *object)
@@ -99,6 +111,9 @@ static void owr_bus_set_property(GObject *object, guint property_id,
     priv = OWR_BUS_GET_PRIVATE(object);
 
     switch (property_id) {
+    case PROP_MESSAGE_TYPE_MASK:
+        priv->message_type_mask = g_value_get_flags(value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
         break;
@@ -114,6 +129,9 @@ static void owr_bus_get_property(GObject *object, guint property_id,
     priv = OWR_BUS_GET_PRIVATE(object);
 
     switch (property_id) {
+    case PROP_MESSAGE_TYPE_MASK:
+        g_value_set_flags(value, priv->message_type_mask);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
         break;
@@ -135,4 +153,22 @@ void owr_bus_remove_message_origin(OwrBus *bus, OwrMessageOrigin *origin)
 {
     OWR_UNUSED(bus);
     OWR_UNUSED(origin);
+}
+
+GType owr_message_type_get_type(void)
+{
+    static const GFlagsValue types[] = {
+        {OWR_MESSAGE_TYPE_ERROR, "Error", "error"},
+        {OWR_MESSAGE_TYPE_STATS, "State", "state"},
+        {OWR_MESSAGE_TYPE_EVENT, "Event", "event"},
+        {0, NULL, NULL}
+    };
+    static volatile GType id = 0;
+
+    if (g_once_init_enter((gsize *)&id)) {
+        GType _id = g_flags_register_static("OwrMessageTypes", types);
+        g_once_init_leave((gsize *)&id, _id);
+    }
+
+    return id;
 }
