@@ -382,6 +382,7 @@ GstElement * _owr_payload_create_encoder(OwrPayload *payload)
         if (!strcmp(factory_name, "openh264enc")) {
             g_object_set(encoder, "gop-size", 0, NULL);
             gst_util_set_object_arg(G_OBJECT(encoder), "rate-control", "bitrate");
+            gst_util_set_object_arg(G_OBJECT(encoder), "complexity", "low");
             g_object_bind_property(payload, "bitrate", encoder, "bitrate", G_BINDING_SYNC_CREATE);
         } else if (!strcmp(factory_name, "x264enc")) {
             g_object_bind_property_full(payload, "bitrate", encoder, "bitrate", G_BINDING_SYNC_CREATE,
