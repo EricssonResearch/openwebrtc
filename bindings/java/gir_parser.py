@@ -26,7 +26,7 @@ import xml.etree.ElementTree as ET
 import itertools
 from standard_types import VoidType, IntType, LongPtrType, GParamSpecType, JObjectWrapperType
 from standard_types import ClassCallbackMetaType, GObjectMetaType, CallbackMetaType
-from standard_types import EnumMetaType, BitfieldMetaType, GWeakRefType
+from standard_types import EnumMetaType, BitfieldMetaType, GWeakRefType, JDestroyType
 from copy import copy
 
 NS = '{http://www.gtk.org/introspection/core/1.0}'
@@ -65,6 +65,7 @@ ATTR_SCOPE = 'scope'
 ATTR_LENGTH = 'length'
 ATTR_PARENT = 'parent'
 ATTR_CLOSURE = 'closure'
+ATTR_DESTORY = 'destroy'
 ATTR_READABLE = 'readable'
 ATTR_WRITABLE = 'writable'
 ATTR_ALLOW_NONE = 'allow-none'
@@ -132,6 +133,8 @@ def parse_tag_value(type_registry, tag, name=None):
     type_tag = tag.find(TAG_TYPE)
     if type_tag is None:
         type_tag = tag.find(TAG_ARRAY)
+
+    scope = tag.get(ATTR_SCOPE)
     allow_none = tag.get(ATTR_ALLOW_NONE) == '1'
     inner_type_tags = type_tag.findall(TAG_TYPE)
 
@@ -153,7 +156,10 @@ def parse_tag_value(type_registry, tag, name=None):
             c_array_type = type_tag.get(ATTR_C_TYPE)
             value = typ(name, transfer == 'full', allow_none, c_array_type)
         else:
-            value = typ(name, transfer == 'full', allow_none)
+            if scope is not None:
+                value = typ(name, transfer == 'full', allow_none, scope)
+            else:
+                value = typ(name, transfer == 'full', allow_none)
     value.doc = parse_doc(tag)
     return value
 
@@ -203,11 +209,15 @@ class Parameters(object):
             return cls(return_value, None)
 
         closure_refs = {}
+        destroy_refs = {}
         array_refs = {}
         for tag_index, tag in enumerate(params_tag.findall(TAG_PARAMETER)):
             closure = tag.get(ATTR_CLOSURE)
             if closure is not None:
                 closure_refs[int(closure)] = tag_index
+            destroy = tag.get(ATTR_DESTORY)
+            if destroy is not None:
+                destroy_refs[int(destroy)] = tag_index
             array_tag = tag.find(TAG_ARRAY)
             if array_tag is not None:
                 length = array_tag.get(ATTR_LENGTH)
@@ -226,9 +236,18 @@ class Parameters(object):
                 if closure_refs.get(real_tag_index) is not None:
                     name = tag.get(ATTR_NAME)
                     closure_index = closure_refs.get(real_tag_index)
-                    assert closure_index == real_tag_index - 1 or closure_index == real_tag_index
-                    closure = params[-1]
+                    closure = None
+                    if closure_index == real_tag_index - 1:
+                        closure = params[-1]
+                    else:
+                        assert closure_index == real_tag_index
                     params.append(JObjectWrapperType(name, closure, transfer_ownership=True))
+                elif destroy_refs.get(real_tag_index) is not None:
+                    name = tag.get(ATTR_NAME)
+                    destroy_index = destroy_refs.get(real_tag_index)
+                    assert destroy_index == real_tag_index - 2
+                    params[-2].scope == 'notified'
+                    params.append(JDestroyType(name))
                 elif array_refs.get(real_tag_index) is not None:
                     array_index = array_refs.get(real_tag_index)
                     assert array_index == real_tag_index - 1

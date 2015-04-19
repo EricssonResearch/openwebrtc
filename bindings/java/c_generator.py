@@ -592,6 +592,15 @@ def gen_source(namespaces, include_headers):
         _end = '} JObjectWrapper;',
     )
 
+    jobject_callback_wrapper_struct = C.Block(
+        _start = 'typedef struct {',
+        body = [
+            C.Decl('JObjectWrapper', '*wrapper'),
+            C.Decl('gboolean', 'should_destroy'),
+        ],
+        _end = '} JObjectCallbackWrapper;',
+    )
+
     native_destructor = [C.JniExport(
         package=package,
         clazz='NativeInstance',
@@ -663,6 +672,7 @@ def gen_source(namespaces, include_headers):
         GET_JNI_ENV,
         jni_onload,
         jobject_wrapper_struct,
+        jobject_callback_wrapper_struct,
     ] + helper_functions + [native_destructor] + body
 
     body = intersperse(prune_empty(body), '')
