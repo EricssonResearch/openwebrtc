@@ -43,6 +43,8 @@ typedef enum {
     OWR_MESSAGE_TYPE_EVENT = (1 << 2)
 } OwrMessageType;
 
+typedef void (*OwrBusMessageCallback) (OwrMessageType type, OwrMessageOrigin *origin, gchar *message, gpointer user_data);
+
 #define OWR_TYPE_MESSAGE_TYPE (owr_message_type_get_type())
 GType owr_message_type_get_type(void);
 
@@ -73,6 +75,8 @@ struct _OwrBusClass {
 GType owr_bus_get_type(void) G_GNUC_CONST;
 
 OwrBus *owr_bus_new();
+void owr_bus_set_message_callback(OwrBus *bus, OwrBusMessageCallback callback,
+    gpointer user_data, GDestroyNotify destroy_data);
 void owr_bus_add_message_origin(OwrBus *bus, OwrMessageOrigin *origin);
 void owr_bus_remove_message_origin(OwrBus *bus, OwrMessageOrigin *origin);
 

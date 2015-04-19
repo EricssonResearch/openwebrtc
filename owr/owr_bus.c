@@ -59,11 +59,21 @@ G_DEFINE_TYPE(OwrBus, owr_bus, G_TYPE_OBJECT)
 
 struct _OwrBusPrivate {
     OwrMessageType message_type_mask;
+    GThread *thread;
+    GAsyncQueue *queue;
+
+    OwrBusMessageCallback callback_func;
+    gpointer callback_user_data;
+    GDestroyNotify callback_destroy_data;
+    GMutex callback_mutex;
 };
 
 static void owr_bus_finalize(GObject *);
 static void owr_bus_set_property(GObject *, guint property_id, const GValue *, GParamSpec *);
 static void owr_bus_get_property(GObject *, guint property_id, GValue *, GParamSpec *);
+static gpointer bus_thread_func(OwrBus *bus);
+
+static OwrMessage last_message;
 
 static void owr_bus_class_init(OwrBusClass *klass)
 {
@@ -88,9 +98,19 @@ static void owr_bus_class_init(OwrBusClass *klass)
 static void owr_bus_init(OwrBus *bus)
 {
     OwrBusPrivate *priv;
+
     bus->priv = priv = OWR_BUS_GET_PRIVATE(bus);
 
     priv->message_type_mask = DEFAULT_MESSAGE_TYPE_MASK;
+
+    priv->thread = g_thread_new("owr-bus-thread", (GThreadFunc) bus_thread_func, bus);
+
+    priv->queue = g_async_queue_new_full((GDestroyNotify) _owr_message_unref);
+
+    priv->callback_func = NULL;
+    priv->callback_user_data = NULL;
+    priv->callback_destroy_data = NULL;
+    g_mutex_init(&priv->callback_mutex);
 }
 
 static void owr_bus_finalize(GObject *object)
@@ -98,7 +118,23 @@ static void owr_bus_finalize(GObject *object)
     OwrBus *bus = OWR_BUS(object);
     OwrBusPrivate *priv = bus->priv;
 
-    OWR_UNUSED(priv);
+    GST_LOG_OBJECT(bus, "pushing last message");
+    g_async_queue_push(priv->queue, &last_message);
+    g_thread_join(priv->thread);
+    GST_LOG_OBJECT(bus, "joined bus thread");
+    g_thread_unref(priv->thread);
+    priv->thread = NULL;
+
+    g_async_queue_unref(priv->queue);
+    priv->queue = NULL;
+
+    if (priv->callback_destroy_data) {
+        priv->callback_destroy_data(priv->callback_user_data);
+    }
+    priv->callback_func = NULL;
+    priv->callback_user_data = NULL;
+    priv->callback_destroy_data = NULL;
+    g_mutex_clear(&priv->callback_mutex);
 
     G_OBJECT_CLASS(owr_bus_parent_class)->finalize(object);
 }
@@ -139,10 +175,51 @@ static void owr_bus_get_property(GObject *object, guint property_id,
     }
 }
 
+/**
+ * owr_bus_new:
+ * Returns: (transfer full): a new #OwrBus
+ */
 OwrBus *owr_bus_new()
 {
     return g_object_new(OWR_TYPE_BUS, NULL);
 }
+
+/**
+ * OwrBusMessageCallback:
+ * @type: the type of the message
+ * @origin: (transfer none): the origin of the message, an #OwrMessageOrigin
+ * @message: the message
+ * @user_data: (nullable): the data passed to owr_bus_set_message_callback
+ */
+
+/**
+ * owr_bus_set_message_callback:
+ * @bus: an #OwrBus
+ * @callback: (scope notified)
+ * @user_data: (nullable): user data for @callback
+ * @destroy_data: (nullable): a #GDestroyNotify for @user_data
+ */
+void owr_bus_set_message_callback(OwrBus *bus, OwrBusMessageCallback callback,
+    gpointer user_data, GDestroyNotify destroy_data)
+{
+    OwrBusPrivate *priv;
+
+    g_return_if_fail(OWR_IS_BUS(bus));
+    g_return_if_fail(callback);
+    priv = OWR_BUS_GET_PRIVATE(bus);
+
+    g_mutex_lock(&priv->callback_mutex);
+
+    if (priv->callback_destroy_data) {
+        priv->callback_destroy_data(priv->callback_user_data);
+    }
+    priv->callback_func = callback;
+    priv->callback_user_data = user_data;
+    priv->callback_destroy_data = destroy_data;
+
+    g_mutex_unlock(&priv->callback_mutex);
+}
+
 
 /**
  * owr_bus_add_message_origin:
@@ -196,10 +273,70 @@ void owr_bus_remove_message_origin(OwrBus *bus, OwrMessageOrigin *origin)
     g_mutex_unlock(&bus_set->mutex);
 }
 
+/**
+ * _owr_bus_post_message:
+ * @bus: (transfer none): the bus that the message is posted to
+ * @message: (transfer full): the message to post
+ */
 void _owr_bus_post_message(OwrBus *bus, OwrMessage *message)
 {
-    OWR_UNUSED(bus);
-    OWR_UNUSED(message);
+    OwrBusPrivate *priv;
+
+    g_return_if_fail(OWR_IS_BUS(bus));
+    g_return_if_fail(message);
+    priv = OWR_BUS_GET_PRIVATE(bus);
+
+    if (message->type & priv->message_type_mask) {
+        g_async_queue_push(priv->queue, message);
+    } else {
+        _owr_message_unref(message);
+    }
+}
+
+static gpointer bus_thread_func(OwrBus *bus)
+{
+    OwrBusPrivate *priv;
+    OwrMessage *message;
+
+    g_return_val_if_fail(OWR_IS_BUS(bus), NULL);
+    priv = OWR_BUS_GET_PRIVATE(bus);
+
+    GST_DEBUG("bus thread started");
+
+    while ((message = g_async_queue_pop(priv->queue)) != &last_message) {
+        g_mutex_lock(&priv->callback_mutex);
+        if (priv->callback_func) {
+            priv->callback_func(message->type, message->origin, message->message, priv->callback_user_data);
+        }
+        g_mutex_unlock(&priv->callback_mutex);
+
+        g_object_unref(message->origin);
+        _owr_message_unref(message);
+    }
+
+    GST_DEBUG("exiting bus thread");
+
+    return NULL;
+}
+
+OwrMessage *_owr_message_new(OwrMessageType type)
+{
+    OwrMessage *message;
+    message = g_slice_new0(OwrMessage);
+    message->type = type;
+    message->ref_count = 1;
+    return message;
+}
+
+void _owr_message_unref(OwrMessage *message)
+{
+    g_return_if_fail(message);
+
+    if (g_atomic_int_dec_and_test(&message->ref_count)) {
+        GST_TRACE("freeing message: %p", message);
+        g_free(message->message);
+        g_slice_free(OwrMessage, message);
+    }
 }
 
 GType owr_message_type_get_type(void)

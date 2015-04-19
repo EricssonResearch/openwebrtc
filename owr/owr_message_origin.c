@@ -96,9 +96,8 @@ void owr_message_origin_post_message(OwrMessageOrigin *origin, OwrMessageType ty
 
     g_return_if_fail(OWR_IS_MESSAGE_ORIGIN(origin));
 
-    message = g_slice_new0(OwrMessage);
-    message->origin = self;
-    message->type = type;
+    message = _owr_message_new(type);
+    message->origin = origin;
     message->message = g_strdup(message_str);
 
     GST_TRACE_OBJECT(origin, "posting message %p", message);
@@ -112,6 +111,8 @@ void owr_message_origin_post_message(OwrMessageOrigin *origin, OwrMessageType ty
     while (g_hash_table_iter_next(&iter, NULL, (gpointer *) &ref)) {
         bus = g_weak_ref_get(ref);
         if (bus) {
+            message->ref_count += 1;
+            g_object_ref(origin);
             _owr_bus_post_message(bus, message);
             g_object_unref(bus);
         } else {
@@ -124,3 +125,4 @@ void owr_message_origin_post_message(OwrMessageOrigin *origin, OwrMessageType ty
 
     g_mutex_unlock(&bus_set->mutex);
 }
+

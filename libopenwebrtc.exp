@@ -6,6 +6,7 @@ owr_bus_add_message_origin
 owr_bus_get_type
 owr_bus_new
 owr_bus_remove_message_origin
+owr_bus_set_message_callback
 owr_candidate_get_type
 owr_candidate_new
 owr_candidate_type_get_type

@@ -40,9 +40,12 @@ typedef struct {
     OwrMessageType type;
     OwrMessageOrigin *origin;
     gchar *message; /* placeholder field */
+    volatile guint ref_count;
 } OwrMessage;
 
 void _owr_bus_post_message(OwrBus *bus, OwrMessage *message);
+OwrMessage *_owr_message_new();
+void _owr_message_unref(OwrMessage *message);
 
 G_END_DECLS
 
