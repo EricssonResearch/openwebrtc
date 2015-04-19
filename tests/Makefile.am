@@ -21,6 +21,7 @@ bin_PROGRAMS = \
     test-send-receive \
     test-data-channel \
     test-init \
+    test-bus \
     test-client
 
 if OWR_GST
@@ -98,6 +99,16 @@ test_init_CFLAGS = \
     -I$(top_srcdir)/owr
 
 test_init_LDADD = \
+    $(GLIB_LIBS) \
+    $(top_builddir)/owr/libopenwebrtc.la
+
+test_bus_SOURCES = test_bus.c
+
+test_bus_CFLAGS = \
+    $(AM_CFLAGS) \
+    -I$(top_srcdir)/owr
+
+test_bus_LDADD = \
     $(GLIB_LIBS) \
     $(top_builddir)/owr/libopenwebrtc.la
 
