@@ -556,8 +556,9 @@ class GirParser(object):
                 c_type = tag.get(ATTR_C_TYPE)
                 MetaType = tag_types[tag.tag]
 
-                if MetaType == EnumMetaType and tag.get(ATTR_GLIB_TYPE_NAME) is not None:
-                    continue
+                if MetaType == EnumMetaType or MetaType == BitfieldMetaType:
+                    if tag.get(ATTR_GLIB_TYPE_NAME) is not None:
+                        continue
 
                 types.append(MetaType(
                     gir_type=gir_type,
@@ -570,7 +571,8 @@ class GirParser(object):
     def parse_enum_aliases(self):
         aliases = {}
         for namespace in self.xml_root.findall(TAG_NAMESPACE):
-            for tag in namespace.findall(TAG_ENUMERATION):
+            enum_tags = namespace.findall(TAG_ENUMERATION) + namespace.findall(TAG_BITFIELD)
+            for tag in enum_tags:
                 if tag.get(ATTR_GLIB_TYPE_NAME) is not None:
                     alias = tag.get(ATTR_NAME)
                     name = alias[:-1]
