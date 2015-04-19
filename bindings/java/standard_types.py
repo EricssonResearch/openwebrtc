@@ -83,6 +83,37 @@ C.Helper.add_helper('jobject_wrapper_destroy',
     )
 )
 
+C.Helper.add_helper('jobject_callback_wrapper_create',
+    C.Function('jobject_callback_wrapper_create',
+        return_type='JObjectCallbackWrapper*',
+        params=['jobject jobj', 'gboolean should_destroy'],
+        body=[
+            C.Decl('JObjectCallbackWrapper*', 'callback_wrapper'),
+            '',
+            C.Assign('callback_wrapper', C.Call('g_slice_new0', 'JObjectCallbackWrapper')),
+            C.Assert('callback_wrapper'),
+            C.Assign('callback_wrapper->wrapper', C.Helper('jobject_wrapper_create', 'jobj', 'FALSE')),
+            C.Assign('callback_wrapper->should_destroy', 'should_destroy'),
+            '',
+            C.Return('callback_wrapper'),
+        ]
+    )
+)
+
+C.Helper.add_helper('jobject_callback_wrapper_destroy',
+    C.Function('jobject_callback_wrapper_destroy',
+        return_type='void',
+        params=['gpointer user_data'],
+        body=[
+            C.Decl('JObjectCallbackWrapper*', 'callback_wrapper'),
+            '',
+            C.Assign('callback_wrapper', 'user_data', cast='JObjectCallbackWrapper*'),
+            C.Helper('jobject_wrapper_destroy', 'callback_wrapper->wrapper', 'FALSE'),
+            C.Call('g_slice_free', 'JObjectCallbackWrapper', 'callback_wrapper'),
+        ]
+    )
+)
+
 C.Helper.add_helper('jobject_wrapper_closure_notify',
     C.Function('jobject_wrapper_closure_notify',
         return_type='void',
@@ -415,21 +446,39 @@ class JObjectWrapperType(ObjectMetaType(
         if closure is None:
             closure = self
         self.closure = closure
+        self.scope = getattr(closure, 'scope', None)
 
     def transform_to_c(self):
+        create = None
+        if self.scope is None:
+            create = C.Helper('jobject_wrapper_create', self.closure.jni_name, 'FALSE')
+        else:
+            create = C.Helper('jobject_callback_wrapper_create', self.closure.jni_name,
+                'TRUE' if self.scope == 'async' else 'FALSE')
+
         return TypeTransform([
             C.Decl(self.c_type, self.c_name),
         ],[
-            C.Assign(self.c_name, C.Helper('jobject_wrapper_create', self.closure.jni_name, 'FALSE')),
+            C.Assign(self.c_name, create),
+        ], self.scope == 'call' and [
+            C.Helper('jobject_callback_wrapper_destroy', self.c_name),
         ])
 
     def transform_to_jni(self):
+        get = None
+        if self.transfer_ownership:
+            get = '((JObjectCallbackWrapper*) %s)->wrapper->obj;' % self.c_name
+        else:
+            get = '((JObjectWrapper*) %s)->obj;' % self.c_name
+
         return TypeTransform([
             C.Decl(self.jni_type, self.jni_name),
         ],[
-            C.Assign(self.jni_name, '((JObjectWrapper*) ' + self.c_name + ')->obj;'),
+            C.Assign(self.jni_name, get),
         ], self.transfer_ownership and [
-            C.Helper('jobject_wrapper_destroy', self.c_name, 'FALSE'),
+            C.If('((JObjectCallbackWrapper *) %s)->should_destroy' % self.c_name,
+                C.Helper('jobject_callback_wrapper_destroy', self.c_name),
+            ),
         ])
 
 
@@ -460,7 +509,29 @@ class EnumMetaType(ObjectMetaType):
         ])
 
 
+class JDestroyType(ObjectMetaType(
+        gir_type=None,
+        java_type=None,
+        c_type='GDestroyNotify',
+        package=None,
+    )):
+    jni_type=None
+
+    def transform_to_c(self):
+        C.Helper('jobject_callback_wrapper_destroy')
+        return TypeTransform([
+            C.Decl(self.c_type, self.c_name),
+        ],[
+            C.Assign(self.c_name, 'jobject_callback_wrapper_destroy'),
+        ])
+
+
 class CallbackMetaType(ObjectMetaType):
+    def __init__(self, name, transfer_ownership=False, allow_none=False, scope=None):
+        super(CallbackMetaType, self).__init__(name, transfer_ownership, allow_none)
+        assert scope in [None, 'call', 'async', 'notified']
+        self.scope = scope
+
     def __new__(cls, gir_type, c_type, prefix):
         return super(CallbackMetaType, cls).__new__(cls,
             gir_type=gir_type,
