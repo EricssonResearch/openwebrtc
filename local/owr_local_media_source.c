@@ -39,6 +39,7 @@
 
 #include "owr_media_source.h"
 #include "owr_media_source_private.h"
+#include "owr_message_origin.h"
 #include "owr_private.h"
 #include "owr_types.h"
 #include "owr_utils.h"
@@ -77,10 +78,14 @@ static guint unique_bin_id = 0;
 #define OWR_LOCAL_MEDIA_SOURCE_GET_PRIVATE(obj) \
     (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_LOCAL_MEDIA_SOURCE, OwrLocalMediaSourcePrivate))
 
-G_DEFINE_TYPE(OwrLocalMediaSource, owr_local_media_source, OWR_TYPE_MEDIA_SOURCE)
+static void owr_message_origin_interface_init(OwrMessageOriginInterface *interface);
+
+G_DEFINE_TYPE_WITH_CODE(OwrLocalMediaSource, owr_local_media_source, OWR_TYPE_MEDIA_SOURCE,
+    G_IMPLEMENT_INTERFACE(OWR_TYPE_MESSAGE_ORIGIN, owr_message_origin_interface_init))
 
 struct _OwrLocalMediaSourcePrivate {
     gint device_index;
+    OwrMessageOriginBusSet *message_origin_bus_set;
 };
 
 static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_source, GstCaps *caps);
@@ -96,6 +101,13 @@ enum {
     N_PROPERTIES
 };
 
+static void owr_local_media_source_finalize(GObject *object)
+{
+    OwrLocalMediaSource *source = OWR_LOCAL_MEDIA_SOURCE(object);
+
+    owr_message_origin_bus_set_free(source->priv->message_origin_bus_set);
+    source->priv->message_origin_bus_set = NULL;
+}
 
 static void owr_local_media_source_class_init(OwrLocalMediaSourceClass *klass)
 {
@@ -104,6 +116,8 @@ static void owr_local_media_source_class_init(OwrLocalMediaSourceClass *klass)
 
     gobject_class->get_property = owr_local_media_source_get_property;
     gobject_class->set_property = owr_local_media_source_set_property;
+
+    gobject_class->finalize = owr_local_media_source_finalize;
 
     g_type_class_add_private(klass, sizeof(OwrLocalMediaSourcePrivate));
 
@@ -116,11 +130,22 @@ static void owr_local_media_source_class_init(OwrLocalMediaSourceClass *klass)
             G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 }
 
+static gpointer owr_local_media_source_get_bus_set(OwrMessageOrigin *origin)
+{
+    return OWR_LOCAL_MEDIA_SOURCE(origin)->priv->message_origin_bus_set;
+}
+
+static void owr_message_origin_interface_init(OwrMessageOriginInterface *interface)
+{
+    interface->get_bus_set = owr_local_media_source_get_bus_set;
+}
+
 static void owr_local_media_source_init(OwrLocalMediaSource *source)
 {
     OwrLocalMediaSourcePrivate *priv;
     source->priv = priv = OWR_LOCAL_MEDIA_SOURCE_GET_PRIVATE(source);
     priv->device_index = -1;
+    priv->message_origin_bus_set = owr_message_origin_bus_set_new();
 }
 
 static void owr_local_media_source_set_property(GObject *object, guint property_id,
@@ -172,7 +197,8 @@ static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer user_data)
     GstStateChangeReturn change_status;
     gchar *message_type, *debug;
     GError *error;
-    GstPipeline *pipeline = user_data;
+    OwrMediaSource *media_source = user_data;
+    GstElement *pipeline;
 
     g_return_val_if_fail(GST_IS_BUS(bus), TRUE);
 
@@ -180,15 +206,21 @@ static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer user_data)
 
     switch (GST_MESSAGE_TYPE(msg)) {
     case GST_MESSAGE_LATENCY:
+        pipeline = _owr_media_source_get_source_bin(media_source);
+        g_return_val_if_fail(pipeline, TRUE);
         ret = gst_bin_recalculate_latency(GST_BIN(pipeline));
         g_warn_if_fail(ret);
+        g_object_unref(pipeline);
         break;
 
     case GST_MESSAGE_CLOCK_LOST:
-        change_status = gst_element_set_state(GST_ELEMENT(pipeline), GST_STATE_PAUSED);
+        pipeline = _owr_media_source_get_source_bin(media_source);
+        g_return_val_if_fail(pipeline, TRUE);
+        change_status = gst_element_set_state(pipeline, GST_STATE_PAUSED);
         g_warn_if_fail(change_status != GST_STATE_CHANGE_FAILURE);
-        change_status = gst_element_set_state(GST_ELEMENT(pipeline), GST_STATE_PLAYING);
+        change_status = gst_element_set_state(pipeline, GST_STATE_PLAYING);
         g_warn_if_fail(change_status != GST_STATE_CHANGE_FAILURE);
+        g_object_unref(pipeline);
         break;
 
     case GST_MESSAGE_EOS:
@@ -207,6 +239,7 @@ static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer user_data)
             gst_message_parse_error(msg, &error, &debug);
         }
 
+
         g_printerr("==== %s message start ====\n", message_type);
         g_printerr("%s in element %s.\n", message_type, GST_OBJECT_NAME(msg->src));
         g_printerr("%s: %s\n", message_type, error->message);
@@ -214,6 +247,10 @@ static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer user_data)
 
         g_printerr("==== %s message stop ====\n", message_type);
         /*GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(pipeline), GST_DEBUG_GRAPH_SHOW_ALL, "pipeline.dot");*/
+
+        if (!is_warning) {
+            OWR_POST_ERROR(media_source, PROCESSING_ERROR, NULL);
+        }
 
         g_error_free(error);
         g_free(debug);
@@ -280,7 +317,7 @@ static void tee_pad_removed_cb(GstElement *tee, GstPad *old_pad, gpointer user_d
     if (tee->numsrcpads == 1) {
         GHashTable *args;
 
-        args = g_hash_table_new(g_str_hash, g_str_equal);
+        args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(media_source));
         g_hash_table_insert(args, "media_source", media_source);
         g_object_ref(media_source);
 
@@ -444,7 +481,7 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
 
         bus = gst_pipeline_get_bus(GST_PIPELINE(source_pipeline));
         bus_source = gst_bus_create_watch(bus);
-        g_source_set_callback(bus_source, (GSourceFunc) bus_call, source_pipeline, NULL);
+        g_source_set_callback(bus_source, (GSourceFunc) bus_call, media_source, NULL);
         g_source_attach(bus_source, _owr_get_main_context());
         g_source_unref(bus_source);
 

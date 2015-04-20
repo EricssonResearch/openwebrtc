@@ -368,6 +368,7 @@ GType owr_message_sub_type_get_type(void)
 {
     static const GEnumValue types[] = {
         {OWR_ERROR_TYPE_TEST, "Error Test", "error-test"},
+        {OWR_ERROR_TYPE_PROCESSING_ERROR, "Processing error", "processing-error"},
         {OWR_STATS_TYPE_TEST, "Stats Test", "stats-test"},
         {OWR_STATS_TYPE_RENDERER_STARTED, "Renderer started", "renderer-started"},
         {OWR_STATS_TYPE_SCHEDULE, "Schedule", "schedule"},

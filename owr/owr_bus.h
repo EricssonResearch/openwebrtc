@@ -45,6 +45,10 @@ typedef enum {
 
 /**
  * OwrMessageSubType:
+ *
+ * @OWR_ERROR_TYPE_PROCESSING_ERROR: a processing error occured, the origin of the error
+ * will likely not be able to produce or consume anymore data.
+ *
  * @OWR_STATS_TYPE_SCHEDULE: information about a call that was scheduled on the main thread
  * - @function_name: #utf8 the name of the function that scheduled the call
  * - @start_time: #gint64 monotonic time when the call was scheduled
@@ -55,6 +59,7 @@ typedef enum {
  */
 typedef enum {
     OWR_ERROR_TYPE_TEST = 0x1000,
+    OWR_ERROR_TYPE_PROCESSING_ERROR,
     OWR_STATS_TYPE_TEST = 0x2000,
     OWR_STATS_TYPE_RENDERER_STARTED,
     OWR_STATS_TYPE_SCHEDULE,
