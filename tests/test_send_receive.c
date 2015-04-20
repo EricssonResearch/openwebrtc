@@ -85,6 +85,7 @@ static void got_remote_source(OwrMediaSession *session, OwrMediaSource *source, 
         g_print("Creating video renderer\n");
         renderer = owr_video_renderer_new(NULL);
         g_assert(renderer);
+        owr_bus_add_message_origin(bus, OWR_MESSAGE_ORIGIN(renderer));
 
         g_print("Connecting source to video renderer\n");
         owr_media_renderer_set_source(OWR_MEDIA_RENDERER(renderer), source);
@@ -95,6 +96,7 @@ static void got_remote_source(OwrMediaSession *session, OwrMediaSource *source, 
         g_print("Creating audio renderer\n");
         renderer = owr_audio_renderer_new();
         g_assert(renderer);
+        owr_bus_add_message_origin(bus, OWR_MESSAGE_ORIGIN(renderer));
 
         g_print("Connecting source to audio renderer\n");
         owr_media_renderer_set_source(OWR_MEDIA_RENDERER(renderer), source);
@@ -149,6 +151,8 @@ static void got_sources(GList *sources, gpointer user_data)
 
             renderer = owr_video_renderer_new(NULL);
             g_assert(renderer);
+            owr_bus_add_message_origin(bus, OWR_MESSAGE_ORIGIN(renderer));
+
             g_object_set(renderer, "width", 1280, "height", 720, "max-framerate", 30.0, NULL);
             owr_media_renderer_set_source(OWR_MEDIA_RENDERER(renderer), source);
             video_renderer = OWR_MEDIA_RENDERER(renderer);

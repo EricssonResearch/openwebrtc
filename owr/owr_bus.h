@@ -50,10 +50,13 @@ typedef enum {
  * - @start_time: #gint64 monotonic time when the call was scheduled
  * - @call_time: #gint64 monotonic time when the function call started
  * - @end_time: #gint64 monotonic time when the function call completed
+ *
+ * @OWR_STATS_TYPE_RENDERER_STARTED: a renderer was started
  */
 typedef enum {
     OWR_ERROR_TYPE_TEST = 0x1000,
     OWR_STATS_TYPE_TEST = 0x2000,
+    OWR_STATS_TYPE_RENDERER_STARTED,
     OWR_STATS_TYPE_SCHEDULE,
     OWR_EVENT_TYPE_TEST = 0x3000,
 } OwrMessageSubType;
