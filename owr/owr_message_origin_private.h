@@ -48,6 +48,13 @@ void owr_message_origin_bus_set_free(OwrMessageOriginBusSet *bus_set);
 OwrMessageOriginBusSet *owr_message_origin_get_bus_set(OwrMessageOrigin *origin);
 void owr_message_origin_post_message(OwrMessageOrigin *origin, OwrMessageType type, OwrMessageSubType sub_type, GHashTable *data);
 
+#define OWR_POST_MESSAGE(origin, type, sub_type, data) owr_message_origin_post_message\
+    (OWR_MESSAGE_ORIGIN(origin), G_PASTE(OWR_MESSAGE_TYPE_, type)\
+        , G_PASTE(G_PASTE(OWR_, type), G_PASTE(_TYPE_, sub_type)), data)
+#define OWR_POST_ERROR(origin, sub_type, data) OWR_POST_MESSAGE(origin, ERROR, sub_type, data)
+#define OWR_POST_STATS(origin, sub_type, data) OWR_POST_MESSAGE(origin, STATS, sub_type, data)
+#define OWR_POST_EVENT(origin, sub_type, data) OWR_POST_MESSAGE(origin, EVENT, sub_type, data)
+
 G_END_DECLS
 
 #endif /* __GTK_DOC_IGNORE__ */

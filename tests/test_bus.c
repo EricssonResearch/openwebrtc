@@ -260,30 +260,29 @@ static void test_message_type_mask()
 
     owr_bus_set_message_callback(bus, on_message, queue, (GDestroyNotify) g_async_queue_unref);
 
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_ERROR, OWR_ERROR_SUB_TYPE_TEST, NULL);
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_STATS, OWR_STATS_SUB_TYPE_TEST, NULL);
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, OWR_EVENT_SUB_TYPE_TEST, NULL);
+    OWR_POST_ERROR(origin, TEST, NULL);
+    OWR_POST_STATS(origin, TEST, NULL);
+    OWR_POST_EVENT(origin, TEST, NULL);
 
-    g_assert(0x1001 == OWR_ERROR_SUB_TYPE_TEST2);
-    expect_message_received(queue, OWR_ERROR_SUB_TYPE_TEST);
-    expect_message_received(queue, OWR_STATS_SUB_TYPE_TEST);
-    expect_message_received(queue, OWR_EVENT_SUB_TYPE_TEST);
+    expect_message_received(queue, OWR_ERROR_TYPE_TEST);
+    expect_message_received(queue, OWR_STATS_TYPE_TEST);
+    expect_message_received(queue, OWR_EVENT_TYPE_TEST);
 
     g_object_set(bus, "message-type-mask", OWR_MESSAGE_TYPE_EVENT, NULL);
 
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_ERROR, OWR_ERROR_SUB_TYPE_TEST, NULL);
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_STATS, OWR_STATS_SUB_TYPE_TEST, NULL);
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, OWR_EVENT_SUB_TYPE_TEST, NULL);
+    OWR_POST_ERROR(origin, TEST, NULL);
+    OWR_POST_STATS(origin, TEST, NULL);
+    OWR_POST_EVENT(origin, TEST, NULL);
 
-    expect_message_received(queue, OWR_EVENT_SUB_TYPE_TEST);
+    expect_message_received(queue, OWR_EVENT_TYPE_TEST);
 
     g_object_set(bus, "message-type-mask", OWR_MESSAGE_TYPE_STATS, NULL);
 
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_ERROR, OWR_ERROR_SUB_TYPE_TEST, NULL);
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_STATS, OWR_STATS_SUB_TYPE_TEST, NULL);
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, OWR_EVENT_SUB_TYPE_TEST, NULL);
+    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_ERROR, OWR_ERROR_TYPE_TEST, NULL);
+    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_STATS, OWR_STATS_TYPE_TEST, NULL);
+    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, OWR_EVENT_TYPE_TEST, NULL);
 
-    expect_message_received(queue, OWR_STATS_SUB_TYPE_TEST);
+    expect_message_received(queue, OWR_STATS_TYPE_TEST);
 
     g_object_unref(origin);
     g_object_unref(bus);
@@ -318,15 +317,15 @@ static void test_destruction()
     mock_origin_assert_bus_table_size(origin, 1);
     owr_bus_set_message_callback(bus, on_message, queue, (GDestroyNotify) g_async_queue_unref);
 
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, OWR_EVENT_SUB_TYPE_TEST, NULL);
-    expect_message_received(queue, OWR_EVENT_SUB_TYPE_TEST);
+    OWR_POST_EVENT(origin, TEST, NULL);
+    expect_message_received(queue, OWR_EVENT_TYPE_TEST);
 
     g_assert(1 == g_hash_table_size(MOCK_ORIGIN(origin)->bus_set->table));
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, OWR_EVENT_SUB_TYPE_TEST, NULL);
+    OWR_POST_EVENT(origin, TEST, NULL);
     mock_origin_assert_bus_table_size(origin, 1);
     g_object_unref(bus);
     mock_origin_assert_bus_table_size(origin, 1);
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, OWR_EVENT_SUB_TYPE_TEST, NULL);
+    OWR_POST_EVENT(origin, TEST, NULL);
     mock_origin_assert_bus_table_size(origin, 0);
 
     origin2 = mock_origin_new();
@@ -340,10 +339,10 @@ static void test_destruction()
     g_ptr_array_unref(buses);
     mock_origin_assert_bus_table_size(origin, 10);
     mock_origin_assert_bus_table_size(origin2, 10);
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, OWR_EVENT_SUB_TYPE_TEST, NULL);
+    OWR_POST_EVENT(origin, TEST, NULL);
     mock_origin_assert_bus_table_size(origin, 0);
     mock_origin_assert_bus_table_size(origin2, 10);
-    owr_message_origin_post_message(origin2, OWR_MESSAGE_TYPE_EVENT, OWR_EVENT_SUB_TYPE_TEST, NULL);
+    OWR_POST_EVENT(origin2, TEST, NULL);
     mock_origin_assert_bus_table_size(origin2, 0);
 }
 
@@ -361,12 +360,12 @@ static void post_messages(OwrMessageOrigin *origin, gpointer user_data)
 {
     OWR_UNUSED(user_data);
 
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, OWR_EVENT_SUB_TYPE_TEST, NULL);
+    OWR_POST_EVENT(origin, TEST, NULL);
 }
 
 static gpointer post_message_thread_func(OwrMessageOrigin *origin)
 {
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, OWR_EVENT_SUB_TYPE_TEST, NULL);
+    OWR_POST_EVENT(origin, TEST, NULL);
     return NULL;
 }
 
