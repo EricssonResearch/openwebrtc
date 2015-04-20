@@ -153,29 +153,28 @@ static void log_handler(const gchar *log_domain, GLogLevelFlags log_level, const
     expected_log_string = NULL;
 }
 
-static void expect_message_received(GAsyncQueue *queue, gchar *expected)
+static void expect_message_received(GAsyncQueue *queue, OwrMessageSubType expected_sub_type)
 {
-    gchar *message = g_async_queue_pop(queue);
+    OwrMessageSubType sub_type = GPOINTER_TO_INT(g_async_queue_pop(queue)) - 1;
 
-    if (g_strcmp0(expected, message)) {
+    if (sub_type != expected_sub_type) {
         g_print("** ERROR ** message assertion failed:\n");
-        g_print("expected: \"%s\"\n", expected);
-        g_print("but got : \"%s\"\n", message);
+        g_print("expected sub type: %d\n", expected_sub_type);
+        g_print("but got: %d\n", sub_type);
         exit(-1);
     } else {
-        g_print("received expected message: '%s'\n", message);
-        g_free(message);
+        g_print("received expected message with sub type: %d\n", sub_type);
     }
 }
 
-static void on_message(OwrMessageType type, OwrMessageOrigin *origin, gchar *message, gpointer user_data)
+static void on_message(OwrMessageOrigin *origin, OwrMessageType type, OwrMessageSubType sub_type, GHashTable *data, gpointer user_data)
 {
     GAsyncQueue *queue = (GAsyncQueue *) user_data;
-    OWR_UNUSED(type);
     OWR_UNUSED(origin);
-    OWR_UNUSED(message);
+    OWR_UNUSED(type);
+    OWR_UNUSED(data);
 
-    g_async_queue_push(queue, g_strdup(message));
+    g_async_queue_push(queue, GINT_TO_POINTER(sub_type + 1));
 }
 
 
@@ -261,29 +260,30 @@ static void test_message_type_mask()
 
     owr_bus_set_message_callback(bus, on_message, queue, (GDestroyNotify) g_async_queue_unref);
 
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_ERROR, "a");
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_STATS, "b");
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, "c");
+    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_ERROR, OWR_ERROR_SUB_TYPE_TEST, NULL);
+    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_STATS, OWR_STATS_SUB_TYPE_TEST, NULL);
+    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, OWR_EVENT_SUB_TYPE_TEST, NULL);
 
-    expect_message_received(queue, "a");
-    expect_message_received(queue, "b");
-    expect_message_received(queue, "c");
+    g_assert(0x1001 == OWR_ERROR_SUB_TYPE_TEST2);
+    expect_message_received(queue, OWR_ERROR_SUB_TYPE_TEST);
+    expect_message_received(queue, OWR_STATS_SUB_TYPE_TEST);
+    expect_message_received(queue, OWR_EVENT_SUB_TYPE_TEST);
 
     g_object_set(bus, "message-type-mask", OWR_MESSAGE_TYPE_EVENT, NULL);
 
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_ERROR, "a");
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_STATS, "b");
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, "c");
+    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_ERROR, OWR_ERROR_SUB_TYPE_TEST, NULL);
+    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_STATS, OWR_STATS_SUB_TYPE_TEST, NULL);
+    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, OWR_EVENT_SUB_TYPE_TEST, NULL);
 
-    expect_message_received(queue, "c");
+    expect_message_received(queue, OWR_EVENT_SUB_TYPE_TEST);
 
     g_object_set(bus, "message-type-mask", OWR_MESSAGE_TYPE_STATS, NULL);
 
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_ERROR, "a");
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_STATS, "b");
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, "c");
+    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_ERROR, OWR_ERROR_SUB_TYPE_TEST, NULL);
+    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_STATS, OWR_STATS_SUB_TYPE_TEST, NULL);
+    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, OWR_EVENT_SUB_TYPE_TEST, NULL);
 
-    expect_message_received(queue, "b");
+    expect_message_received(queue, OWR_STATS_SUB_TYPE_TEST);
 
     g_object_unref(origin);
     g_object_unref(bus);
@@ -318,15 +318,15 @@ static void test_destruction()
     mock_origin_assert_bus_table_size(origin, 1);
     owr_bus_set_message_callback(bus, on_message, queue, (GDestroyNotify) g_async_queue_unref);
 
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, "a");
-    expect_message_received(queue, "a");
+    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, OWR_EVENT_SUB_TYPE_TEST, NULL);
+    expect_message_received(queue, OWR_EVENT_SUB_TYPE_TEST);
 
     g_assert(1 == g_hash_table_size(MOCK_ORIGIN(origin)->bus_set->table));
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, "a");
+    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, OWR_EVENT_SUB_TYPE_TEST, NULL);
     mock_origin_assert_bus_table_size(origin, 1);
     g_object_unref(bus);
     mock_origin_assert_bus_table_size(origin, 1);
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, "a");
+    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, OWR_EVENT_SUB_TYPE_TEST, NULL);
     mock_origin_assert_bus_table_size(origin, 0);
 
     origin2 = mock_origin_new();
@@ -340,10 +340,10 @@ static void test_destruction()
     g_ptr_array_unref(buses);
     mock_origin_assert_bus_table_size(origin, 10);
     mock_origin_assert_bus_table_size(origin2, 10);
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, "a");
+    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, OWR_EVENT_SUB_TYPE_TEST, NULL);
     mock_origin_assert_bus_table_size(origin, 0);
     mock_origin_assert_bus_table_size(origin2, 10);
-    owr_message_origin_post_message(origin2, OWR_MESSAGE_TYPE_EVENT, "a");
+    owr_message_origin_post_message(origin2, OWR_MESSAGE_TYPE_EVENT, OWR_EVENT_SUB_TYPE_TEST, NULL);
     mock_origin_assert_bus_table_size(origin2, 0);
 }
 
@@ -361,12 +361,12 @@ static void post_messages(OwrMessageOrigin *origin, gpointer user_data)
 {
     OWR_UNUSED(user_data);
 
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, "a");
+    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, OWR_EVENT_SUB_TYPE_TEST, NULL);
 }
 
 static gpointer post_message_thread_func(OwrMessageOrigin *origin)
 {
-    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, "a");
+    owr_message_origin_post_message(origin, OWR_MESSAGE_TYPE_EVENT, OWR_EVENT_SUB_TYPE_TEST, NULL);
     return NULL;
 }
 

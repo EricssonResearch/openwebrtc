@@ -86,7 +86,16 @@ OwrMessageOriginBusSet *owr_message_origin_get_bus_set(OwrMessageOrigin *origin)
     return result;
 }
 
-void owr_message_origin_post_message(OwrMessageOrigin *origin, OwrMessageType type, const gchar *message_str)
+/**
+ * owr_message_origin_post_message:
+ * @origin: (transfer none): the origin that is posting the message
+ * @type: the #OwrMessageType of the message
+ * @sub_type: the #OwrMessageSubType of the message
+ * @data: (element-type utf8 GValue) (nullable) (transfer full): extra data
+ *
+ * Post a new message to all buses that are subscribed to @origin
+ */
+void owr_message_origin_post_message(OwrMessageOrigin *origin, OwrMessageType type, OwrMessageSubType sub_type, GHashTable *data)
 {
     OwrMessage *message;
     OwrMessageOriginBusSet *bus_set;
@@ -96,10 +105,7 @@ void owr_message_origin_post_message(OwrMessageOrigin *origin, OwrMessageType ty
 
     g_return_if_fail(OWR_IS_MESSAGE_ORIGIN(origin));
 
-    message = _owr_message_new(type);
-    message->origin = origin;
-    message->message = g_strdup(message_str);
-
+    message = _owr_message_new(origin, type, sub_type, data);
     GST_TRACE_OBJECT(origin, "posting message %p", message);
 
     bus_set = owr_message_origin_get_bus_set(origin);

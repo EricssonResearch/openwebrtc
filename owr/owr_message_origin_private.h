@@ -46,7 +46,7 @@ typedef struct {
 OwrMessageOriginBusSet *owr_message_origin_bus_set_new();
 void owr_message_origin_bus_set_free(OwrMessageOriginBusSet *bus_set);
 OwrMessageOriginBusSet *owr_message_origin_get_bus_set(OwrMessageOrigin *origin);
-void owr_message_origin_post_message(OwrMessageOrigin *origin, OwrMessageType type, const gchar *message_str);
+void owr_message_origin_post_message(OwrMessageOrigin *origin, OwrMessageType type, OwrMessageSubType sub_type, GHashTable *data);
 
 G_END_DECLS
 

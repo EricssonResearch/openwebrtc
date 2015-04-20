@@ -37,14 +37,15 @@
 G_BEGIN_DECLS
 
 typedef struct {
-    OwrMessageType type;
     OwrMessageOrigin *origin;
-    gchar *message; /* placeholder field */
+    OwrMessageType type;
+    OwrMessageSubType sub_type;
+    GHashTable *data;
     volatile guint ref_count;
 } OwrMessage;
 
 void _owr_bus_post_message(OwrBus *bus, OwrMessage *message);
-OwrMessage *_owr_message_new();
+OwrMessage *_owr_message_new(OwrMessageOrigin *origin, OwrMessageType type, OwrMessageSubType sub_type, GHashTable *data);
 void _owr_message_unref(OwrMessage *message);
 
 G_END_DECLS
