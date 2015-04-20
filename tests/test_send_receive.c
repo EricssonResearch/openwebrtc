@@ -294,11 +294,15 @@ int main(int argc, char **argv)
 
     if (!disable_video) {
         recv_session_video = owr_media_session_new(FALSE);
+        owr_bus_add_message_origin(bus, OWR_MESSAGE_ORIGIN(recv_session_video));
         send_session_video = owr_media_session_new(TRUE);
+        owr_bus_add_message_origin(bus, OWR_MESSAGE_ORIGIN(send_session_video));
     }
     if (!disable_audio) {
         recv_session_audio = owr_media_session_new(FALSE);
+        owr_bus_add_message_origin(bus, OWR_MESSAGE_ORIGIN(recv_session_audio));
         send_session_audio = owr_media_session_new(TRUE);
+        owr_bus_add_message_origin(bus, OWR_MESSAGE_ORIGIN(send_session_audio));
     }
 
     if (!disable_video) {

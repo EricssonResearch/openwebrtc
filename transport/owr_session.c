@@ -60,7 +60,10 @@ GST_DEBUG_CATEGORY_EXTERN(_owrsession_debug);
 
 #define OWR_SESSION_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_SESSION, OwrSessionPrivate))
 
-G_DEFINE_TYPE(OwrSession, owr_session, G_TYPE_OBJECT)
+static void owr_message_origin_interface_init(OwrMessageOriginInterface *interface);
+
+G_DEFINE_TYPE_WITH_CODE(OwrSession, owr_session, G_TYPE_OBJECT,
+    G_IMPLEMENT_INTERFACE(OWR_TYPE_MESSAGE_ORIGIN, owr_message_origin_interface_init))
 
 struct _OwrSessionPrivate {
     gboolean rtcp_mux;
@@ -74,6 +77,7 @@ struct _OwrSessionPrivate {
     gboolean gathering_done;
     GClosure *on_remote_candidate;
     OwrIceState ice_state, rtp_ice_state, rtcp_ice_state;
+    OwrMessageOriginBusSet *message_origin_bus_set;
 };
 
 enum {
@@ -233,6 +237,9 @@ static void owr_session_finalize(GObject *object)
     g_slist_free_full(priv->remote_candidates, (GDestroyNotify)g_object_unref);
     g_slist_free_full(priv->forced_remote_candidates, (GDestroyNotify)g_object_unref);
 
+    owr_message_origin_bus_set_free(priv->message_origin_bus_set);
+    priv->message_origin_bus_set = NULL;
+
     G_OBJECT_CLASS(owr_session_parent_class)->finalize(object);
 }
 
@@ -301,6 +308,16 @@ static void owr_session_class_init(OwrSessionClass *klass)
 
 }
 
+static gpointer owr_session_get_bus_set(OwrMessageOrigin *origin)
+{
+    return OWR_SESSION(origin)->priv->message_origin_bus_set;
+}
+
+static void owr_message_origin_interface_init(OwrMessageOriginInterface *interface)
+{
+    interface->get_bus_set = owr_session_get_bus_set;
+}
+
 static void owr_session_init(OwrSession *session)
 {
     OwrSessionPrivate *priv;
@@ -318,6 +335,7 @@ static void owr_session_init(OwrSession *session)
     priv->forced_remote_candidates = NULL;
     priv->gathering_done = FALSE;
     priv->on_remote_candidate = NULL;
+    priv->message_origin_bus_set = owr_message_origin_bus_set_new();
 }
 
 
@@ -355,7 +373,7 @@ void owr_session_add_remote_candidate(OwrSession *session, OwrCandidate *candida
         return;
     }
 
-    args = g_hash_table_new(g_str_hash, g_str_equal);
+    args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(session));
     g_hash_table_insert(args, "session", session);
     g_hash_table_insert(args, "candidate", candidate);
     g_object_ref(session);
@@ -380,7 +398,7 @@ void owr_session_force_remote_candidate(OwrSession *session, OwrCandidate *candi
     g_return_if_fail(OWR_IS_SESSION(session));
     g_return_if_fail(OWR_IS_CANDIDATE(candidate));
 
-    args = g_hash_table_new(g_str_hash, g_str_equal);
+    args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(session));
     g_hash_table_insert(args, "session", session);
     g_hash_table_insert(args, "candidate", candidate);
     g_hash_table_insert(args, "forced", GINT_TO_POINTER(TRUE));

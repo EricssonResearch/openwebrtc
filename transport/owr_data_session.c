@@ -224,7 +224,7 @@ void owr_data_session_add_data_channel(OwrDataSession *data_session, OwrDataChan
     g_return_if_fail(OWR_IS_DATA_SESSION(data_session));
     g_return_if_fail(OWR_IS_DATA_CHANNEL(data_channel));
 
-    args = g_hash_table_new(g_str_hash, g_str_equal);
+    args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(data_session));
     g_hash_table_insert(args, "data_session", data_session);
     g_hash_table_insert(args, "data_channel", data_channel);
     g_object_ref(data_session);

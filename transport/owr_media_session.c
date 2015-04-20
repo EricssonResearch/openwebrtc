@@ -349,7 +349,7 @@ void owr_media_session_add_receive_payload(OwrMediaSession *media_session, OwrPa
     g_return_if_fail(media_session);
     g_return_if_fail(payload);
 
-    args = g_hash_table_new(g_str_hash, g_str_equal);
+    args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(media_session));
     g_hash_table_insert(args, "media_session", media_session);
     g_hash_table_insert(args, "payload", payload);
 
@@ -371,7 +371,7 @@ void owr_media_session_set_send_payload(OwrMediaSession *media_session, OwrPaylo
     g_return_if_fail(media_session);
     g_return_if_fail(!payload || OWR_IS_PAYLOAD(payload));
 
-    args = g_hash_table_new(g_str_hash, g_str_equal);
+    args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(media_session));
     g_hash_table_insert(args, "media_session", media_session);
     g_hash_table_insert(args, "payload", payload);
     g_object_ref(media_session);
@@ -393,7 +393,7 @@ void owr_media_session_set_send_source(OwrMediaSession *media_session, OwrMediaS
     g_return_if_fail(OWR_IS_MEDIA_SESSION(media_session));
     g_return_if_fail(!source || OWR_IS_MEDIA_SOURCE(source));
 
-    args = g_hash_table_new(g_str_hash, g_str_equal);
+    args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(media_session));
     g_hash_table_insert(args, "media_session", media_session);
     g_hash_table_insert(args, "source", source);
     g_object_ref(media_session);
