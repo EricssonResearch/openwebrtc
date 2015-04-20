@@ -550,14 +550,14 @@ void _owr_session_emit_ice_state_changed(OwrSession *session, guint session_id,
     new_state_name = owr_ice_state_get_name(new_state);
 
     if (new_state == OWR_ICE_STATE_FAILED) {
-        GST_ERROR("Session %u, ICE failed to establish a connection!\n"
+        GST_ERROR_OBJECT(session, "Session %u, ICE failed to establish a connection!\n"
             "ICE state changed from %s to %s",
             session_id, old_state_name, new_state_name);
     } else if (new_state == OWR_ICE_STATE_CONNECTED || new_state == OWR_ICE_STATE_READY) {
-        GST_INFO("Session %u, ICE state changed from %s to %s",
+        GST_INFO_OBJECT(session, "Session %u, ICE state changed from %s to %s",
             session_id, old_state_name, new_state_name);
     } else {
-        GST_DEBUG("Session %u, ICE state changed from %s to %s",
+        GST_DEBUG_OBJECT(session, "Session %u, ICE state changed from %s to %s",
             session_id, old_state_name, new_state_name);
     }
     g_free(old_state_name);
