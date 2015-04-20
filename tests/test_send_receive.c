@@ -273,6 +273,8 @@ int main(int argc, char **argv)
         g_object_set(bus, "message-type-mask", OWR_MESSAGE_TYPE_ERROR, NULL);
     }
 
+    owr_bus_add_message_origin(bus, OWR_MESSAGE_ORIGIN(owr_window_registry_get()));
+
     recv_transport_agent = owr_transport_agent_new(FALSE);
     g_assert(OWR_IS_TRANSPORT_AGENT(recv_transport_agent));
 

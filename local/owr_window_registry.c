@@ -35,6 +35,7 @@
 #include "owr_window_registry.h"
 
 #include "owr_private.h"
+#include "owr_message_origin.h"
 #include "owr_video_renderer.h"
 #include "owr_video_renderer_private.h"
 #include "owr_window_registry_private.h"
@@ -45,7 +46,10 @@ GST_DEBUG_CATEGORY_EXTERN(_owrwindowregistry_debug);
 #define OWR_WINDOW_REGISTRY_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), \
     OWR_TYPE_WINDOW_REGISTRY, OwrWindowRegistryPrivate))
 
-G_DEFINE_TYPE(OwrWindowRegistry, owr_window_registry, G_TYPE_OBJECT);
+static void owr_message_origin_interface_init(OwrMessageOriginInterface *interface);
+
+G_DEFINE_TYPE_WITH_CODE(OwrWindowRegistry, owr_window_registry, G_TYPE_OBJECT,
+    G_IMPLEMENT_INTERFACE(OWR_TYPE_MESSAGE_ORIGIN, owr_message_origin_interface_init));
 
 static OwrWindowRegistry *owr_window_registry_instance = NULL;
 
@@ -53,6 +57,7 @@ G_LOCK_DEFINE_STATIC(owr_window_registry_mutex);
 
 struct _OwrWindowRegistryPrivate {
     GHashTable *registry_hash_table;
+    OwrMessageOriginBusSet *message_origin_bus_set;
 };
 
 typedef struct {
@@ -77,6 +82,9 @@ static void owr_window_registry_finalize(GObject *object)
 
     g_hash_table_unref(window_registry->priv->registry_hash_table);
 
+    owr_message_origin_bus_set_free(window_registry->priv->message_origin_bus_set);
+    window_registry->priv->message_origin_bus_set = NULL;
+
     G_OBJECT_CLASS(owr_window_registry_parent_class)->finalize(object);
 }
 
@@ -89,12 +97,25 @@ static void owr_window_registry_class_init(OwrWindowRegistryClass *klass)
     gobject_class->finalize = owr_window_registry_finalize;
 }
 
+static gpointer owr_window_registry_get_bus_set(OwrMessageOrigin *origin)
+{
+    return OWR_WINDOW_REGISTRY(origin)->priv->message_origin_bus_set;
+}
+
+static void owr_message_origin_interface_init(OwrMessageOriginInterface *interface)
+{
+    interface->get_bus_set = owr_window_registry_get_bus_set;
+}
+
+
 static void owr_window_registry_init(OwrWindowRegistry *window_registry)
 {
     OwrWindowRegistryPrivate *priv = window_registry->priv =
         OWR_WINDOW_REGISTRY_GET_PRIVATE(window_registry);
 
     priv->registry_hash_table = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+
+    priv->message_origin_bus_set = owr_message_origin_bus_set_new();
 }
 
 static gboolean do_register(GHashTable *args)
@@ -161,7 +182,7 @@ void owr_window_registry_register(OwrWindowRegistry *window_registry,
     g_return_if_fail(tag);
     g_return_if_fail(handle);
 
-    args = g_hash_table_new(g_str_hash, g_str_equal);
+    args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(window_registry));
     g_hash_table_insert(args, "window_registry", window_registry);
     g_hash_table_insert(args, "tag", g_strdup(tag));
     g_hash_table_insert(args, "handle", handle);
@@ -213,7 +234,7 @@ void owr_window_registry_unregister(OwrWindowRegistry *window_registry,
     g_return_if_fail(OWR_IS_WINDOW_REGISTRY(window_registry));
     g_return_if_fail(tag);
 
-    args = g_hash_table_new(g_str_hash, g_str_equal);
+    args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(window_registry));
     g_hash_table_insert(args, "window_registry", window_registry);
     g_hash_table_insert(args, "tag", g_strdup(tag));
 
