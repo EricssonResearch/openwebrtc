@@ -281,6 +281,7 @@ int main(int argc, char **argv)
 
     recv_transport_agent = owr_transport_agent_new(FALSE);
     g_assert(OWR_IS_TRANSPORT_AGENT(recv_transport_agent));
+    owr_bus_add_message_origin(bus, OWR_MESSAGE_ORIGIN(recv_transport_agent));
 
     owr_transport_agent_set_local_port_range(recv_transport_agent, 5000, 5999);
     owr_transport_agent_add_local_address(recv_transport_agent, "127.0.0.1");
@@ -288,6 +289,7 @@ int main(int argc, char **argv)
     // SEND
     send_transport_agent = owr_transport_agent_new(TRUE);
     g_assert(OWR_IS_TRANSPORT_AGENT(send_transport_agent));
+    owr_bus_add_message_origin(bus, OWR_MESSAGE_ORIGIN(send_transport_agent));
 
     owr_transport_agent_set_local_port_range(send_transport_agent, 5000, 5999);
     owr_transport_agent_add_local_address(send_transport_agent, "127.0.0.1");
