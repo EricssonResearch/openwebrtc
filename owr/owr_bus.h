@@ -43,9 +43,18 @@ typedef enum {
     OWR_MESSAGE_TYPE_EVENT = (1 << 2)
 } OwrMessageType;
 
+/**
+ * OwrMessageSubType:
+ * @OWR_STATS_TYPE_SCHEDULE: information about a call that was scheduled on the main thread
+ * - @function_name: #utf8 the name of the function that scheduled the call
+ * - @start_time: #gint64 monotonic time when the call was scheduled
+ * - @call_time: #gint64 monotonic time when the function call started
+ * - @end_time: #gint64 monotonic time when the function call completed
+ */
 typedef enum {
     OWR_ERROR_TYPE_TEST = 0x1000,
     OWR_STATS_TYPE_TEST = 0x2000,
+    OWR_STATS_TYPE_SCHEDULE,
     OWR_EVENT_TYPE_TEST = 0x3000,
 } OwrMessageSubType;
 
