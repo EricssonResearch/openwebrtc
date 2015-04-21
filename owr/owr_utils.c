@@ -213,3 +213,39 @@ int _owr_rotation_and_mirror_to_video_flip_method(guint rotation, gboolean mirro
         return method_table[rotation];
     }
 }
+
+static void value_slice_free(gpointer value)
+{
+    g_value_unset(value);
+    g_slice_free(GValue, value);
+}
+
+/**
+ * _owr_value_table_new:
+ * Returns: a #GHashTable
+ *
+ * Creates a table new #GHashTable configured for storing #GValue values
+ * Values should be added using _owr_value_table_add()
+ */
+GHashTable *_owr_value_table_new()
+{
+    return g_hash_table_new_full(g_str_hash, g_str_equal, g_free, value_slice_free);
+}
+
+/**
+ * _owr_value_table_add:
+ * @table: a #GHashTable
+ * @key: the key
+ * @type: a GType that the value is initialized to
+ *
+ * Inserts a new key and value into the hash table using g_hash_table_insert()
+ * The value is initialized with @type and returned, so that it's value can be set
+ */
+GValue *_owr_value_table_add(GHashTable *table, const gchar *key, GType type)
+{
+    GValue *value;
+    value = g_slice_new0(GValue);
+    g_value_init(value, type);
+    g_hash_table_insert(table, g_strdup(key), value);
+    return value;
+}

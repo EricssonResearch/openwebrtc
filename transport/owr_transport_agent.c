@@ -2461,18 +2461,10 @@ static void on_receiving_rtcp(GObject *session, GstBuffer *buffer,
 static gboolean update_stats_hash_table(GQuark field_id, const GValue *src_value,
     GHashTable *stats_hash_table)
 {
-    gchar *key = g_strdup(g_quark_to_string(field_id));
-    GValue *value = g_slice_new0(GValue);
-    value = g_value_init(value, G_VALUE_TYPE(src_value));
+    const gchar *key = g_quark_to_string(field_id);
+    GValue *value = _owr_value_table_add(stats_hash_table, key, G_VALUE_TYPE(src_value));
     g_value_copy(src_value, value);
-    g_hash_table_insert(stats_hash_table, key, value);
     return TRUE;
-}
-
-static void value_slice_free(gpointer value)
-{
-    g_value_unset(value);
-    g_slice_free(GValue, value);
 }
 
 static gboolean emit_stats_signal(GHashTable *stats_hash)
@@ -2499,19 +2491,15 @@ static void prepare_rtcp_stats(OwrMediaSession *media_session, GObject *rtp_sour
     GValue *value;
 
     g_object_get(rtp_source, "stats", &stats, NULL);
-    stats_hash = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, value_slice_free);
-    value = g_slice_new0(GValue);
-    value = g_value_init(value, G_TYPE_STRING);
+    stats_hash = _owr_value_table_new();
+    value = _owr_value_table_add(stats_hash, "type", G_TYPE_STRING);
     g_value_set_string(value, "rtcp");
-    g_hash_table_insert(stats_hash, g_strdup("type"), value);
     gst_structure_foreach(stats,
         (GstStructureForeachFunc)update_stats_hash_table, stats_hash);
     gst_structure_free(stats);
 
-    value = g_slice_new0(GValue);
-    value = g_value_init(value, OWR_TYPE_MEDIA_SESSION);
+    value = _owr_value_table_add(stats_hash, "media_session", OWR_TYPE_MEDIA_SESSION);
     g_value_set_object(value, media_session);
-    g_hash_table_insert(stats_hash, g_strdup("media_session"), value);
 
     _owr_schedule_with_hash_table((GSourceFunc)emit_stats_signal, stats_hash);
 }
