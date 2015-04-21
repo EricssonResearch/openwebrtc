@@ -29,6 +29,7 @@
 #include "owr.h"
 #include "owr_audio_payload.h"
 #include "owr_audio_renderer.h"
+#include "owr_bus.h"
 #include "owr_local.h"
 #include "owr_media_renderer.h"
 #include "owr_media_session.h"
@@ -38,6 +39,7 @@
 #include "owr_transport_agent.h"
 #include "owr_video_payload.h"
 #include "owr_video_renderer.h"
+#include "owr_window_registry.h"
 #include "test_utils.h"
 
 #include <string.h>
@@ -55,12 +57,14 @@ static OwrMediaSource *audio_source = NULL;
 static OwrMediaSource *video_source = NULL;
 static OwrMediaSource *remote_audio_source = NULL;
 static OwrMediaSource *remote_video_source = NULL;
+static OwrBus *bus = NULL;
 
-static gboolean disable_video = FALSE, disable_audio = FALSE;
+static gboolean disable_video = FALSE, disable_audio = FALSE, print_messages = FALSE;
 
 static GOptionEntry entries[] = {
     { "disable-video", 0, 0, G_OPTION_ARG_NONE, &disable_video, "Disable video", NULL },
     { "disable-audio", 0, 0, G_OPTION_ARG_NONE, &disable_audio, "Disable audio", NULL },
+    { "print-messages", 'p', 0, G_OPTION_ARG_NONE, &print_messages, "Prints all messages, instead of just errors", NULL },
     { NULL, }
 };
 
@@ -196,6 +200,43 @@ static gboolean dump_cb(gpointer *user_data)
     return G_SOURCE_REMOVE;
 }
 
+static const gchar *message_origin_name_func(gpointer origin)
+{
+    if (!origin) {
+        return "(null)";
+    } else if (origin == recv_transport_agent) {
+        return "recv TransportAgent";
+    } else if (origin == recv_session_audio) {
+        return "recv SessionAudio";
+    } else if (origin == recv_session_video) {
+        return "recv SessionVideo";
+    } else if (origin == send_transport_agent) {
+        return "send TransportAgent";
+    } else if (origin == send_session_audio) {
+        return "send SessionAudio";
+    } else if (origin == send_session_video) {
+        return "send SessionVideo";
+    } else if (origin == video_renderer) {
+        return "video Renderer";
+    } else if (origin == remote_video_renderer) {
+        return "remote VideoRenderer";
+    } else if (origin == remote_audio_renderer) {
+        return "remote AudioRenderer";
+    } else if (origin == audio_source) {
+        return "audio Source";
+    } else if (origin == video_source) {
+        return "video Source";
+    } else if (origin == remote_audio_source) {
+        return "remote AudioSource";
+    } else if (origin == remote_video_source) {
+        return "remote VideoSource";
+    } else if (origin == owr_window_registry_get()) {
+        return "WindowRegistry";
+    } else {
+        return "(unknown)";
+    }
+}
+
 
 int main(int argc, char **argv)
 {
@@ -219,6 +260,14 @@ int main(int argc, char **argv)
     OwrPayload *receive_payload;
 
     owr_init(NULL);
+
+    bus = owr_bus_new();
+    owr_bus_set_message_callback(bus, (OwrBusMessageCallback) bus_message_print_callback,
+        message_origin_name_func, NULL);
+
+    if (!print_messages) {
+        g_object_set(bus, "message-type-mask", OWR_MESSAGE_TYPE_ERROR, NULL);
+    }
 
     recv_transport_agent = owr_transport_agent_new(FALSE);
     g_assert(OWR_IS_TRANSPORT_AGENT(recv_transport_agent));
