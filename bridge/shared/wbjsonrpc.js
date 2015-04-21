@@ -188,8 +188,13 @@ var JsonRpc = function (msgLink, optionsOrRestricted) {
                         requestId = id + "_" + count++;
                         callbacks[requestId] = params.pop();
                     }
-                    for (var j = 0; j < params.length; j++)
-                        substituteRefObject(params, j);
+                    for (var j = 0; j < params.length; j++) {
+                        var p = params[j];
+                        if (p instanceof ArrayBuffer || ArrayBuffer.isView(p))
+                            params[j] = encodeArrayBufferArgument(p);
+                        else
+                            substituteRefObject(params, j);
+                    }
 
                     var request = {
                         "id": requestId,
@@ -202,6 +207,29 @@ var JsonRpc = function (msgLink, optionsOrRestricted) {
                 };
             })(names[i]);
         }
+    }
+
+    function encodeArrayBufferArgument(buffer) {
+        return {
+            "__argumentType": buffer.constructor.name,
+            "base64": btoa(Array.prototype.map.call(new Uint8Array(buffer),
+                function (byte) {
+                    return String.fromCharCode(byte);
+                }).join(""))
+        };
+    }
+
+    function decodeArrayBufferArgument(obj) {
+        var data = atob(obj.base64 || "");
+        var arr = new Uint8Array(data.length);
+        for (var i = 0; i < data.length; i++)
+            arr[i] = data.charCodeAt(i);
+
+        var constructor = self[obj.__argumentType];
+        if (constructor && constructor.BYTES_PER_ELEMENT)
+            return new constructor(arr);
+
+        return arr.buffer;
     }
 
     function substituteRefObject(parent, pname) {
@@ -288,8 +316,13 @@ var JsonRpc = function (msgLink, optionsOrRestricted) {
             response.id = msg.id;
             if (f instanceof Function) {
                 try {
-                    for (var i = 0; i < msg.params.length; i++)
-                        substituteReferencedObject(msg.params, i);
+                    for (var i = 0; i < msg.params.length; i++) {
+                        var p = msg.params[i];
+                        if (p.__argumentType)
+                            msg.params[i] = decodeArrayBufferArgument(p);
+                        else
+                            substituteReferencedObject(msg.params, i);
+                    }
                     prepareRefObj(msg.params);
                     //var functionScope = !msg.__refId ? thisObj : obj; // FIXME: !!
                     var functionScope = !msg.__refId && obj == scope ? thisObj : obj;
@@ -333,5 +366,12 @@ var JsonRpc = function (msgLink, optionsOrRestricted) {
 };
 
 // for node.js
-if (typeof exports !== "undefined")
+if (typeof exports !== "undefined") {
+    global.btoa = function (s) {
+        return new Buffer(s).toString("base64");
+    };
+    global.atob = function (s) {
+        return new Buffer(s, "base64").toString();
+    };
     module.exports = JsonRpc;
+}
