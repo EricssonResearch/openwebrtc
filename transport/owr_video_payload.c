@@ -220,7 +220,7 @@ static void owr_video_payload_class_init(OwrVideoPayloadClass *klass)
         G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
     obj_properties[PROP_MIRROR] = g_param_spec_boolean("mirror", "mirror",
-        "Whether the video should be mirror around the y-axis "
+        "Whether the video should be mirrored around the y-axis "
         "(NOTE: currently only works for send payloads)", DEFAULT_MIRROR,
         G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
