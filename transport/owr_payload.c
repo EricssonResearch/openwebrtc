@@ -387,8 +387,8 @@ GstElement * _owr_payload_create_encoder(OwrPayload *payload)
         } else if (!strcmp(factory_name, "x264enc")) {
             g_object_bind_property_full(payload, "bitrate", encoder, "bitrate", G_BINDING_SYNC_CREATE,
                 binding_transform_to_kbps, NULL, NULL, NULL);
-            gst_util_set_object_arg(encoder, "speed-preset", "ultrafast");
-            gst_util_set_object_arg(encoder, "tune", "fastdecode+zerolatency");
+            gst_util_set_object_arg(G_OBJECT(encoder), "speed-preset", "ultrafast");
+            gst_util_set_object_arg(G_OBJECT(encoder), "tune", "fastdecode+zerolatency");
         } else if (!strcmp(factory_name, "vtenc_h264")) {
             g_object_bind_property_full(payload, "bitrate", encoder, "bitrate", G_BINDING_SYNC_CREATE,
                 binding_transform_to_kbps, NULL, NULL, NULL);
