@@ -36,4 +36,10 @@ include_HEADERS = \
     owr_gst_media_source.h \
     owr_gst_video_renderer.h
 
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = openwebrtc-gst-@OWR_API_VERSION@.pc
+
+EXTRA_DIST = \
+    openwebrtc-gst-@OWR_API_VERSION@.pc.in
+
 -include $(top_srcdir)/git.mk
