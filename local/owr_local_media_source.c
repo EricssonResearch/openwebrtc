@@ -347,6 +347,22 @@ done:
     return TRUE;
 }
 
+static void on_caps(GstElement *source, GParamSpec *pspec, OwrMediaSource *media_source)
+{
+    gchar *media_source_name;
+    GstCaps *caps;
+
+    OWR_UNUSED(pspec);
+
+    g_object_get(source, "caps", &caps, NULL);
+    g_object_get(media_source, "name", &media_source_name, NULL);
+
+    if (GST_IS_CAPS(caps)) {
+        GST_INFO_OBJECT(source, "%s - configured with caps: %" GST_PTR_FORMAT,
+            media_source_name, caps);
+    }
+}
+
 /*
  * owr_local_media_source_get_pad
  *
@@ -395,7 +411,7 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
         OwrSourceType source_type = OWR_SOURCE_TYPE_UNKNOWN;
         GstElement *source, *source_process = NULL, *capsfilter = NULL, *tee;
         GstElement *queue, *fakesink;
-        GstPad *sinkpad;
+        GstPad *sinkpad, *source_pad;
         GEnumClass *media_enum_class, *source_enum_class;
         GEnumValue *media_enum_value, *source_enum_value;
         gchar *bin_name;
@@ -588,6 +604,10 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
             goto done;
         }
         g_assert(source);
+
+        source_pad = gst_element_get_static_pad(source, "src");
+        g_signal_connect(source_pad, "notify::caps", G_CALLBACK(on_caps), media_source);
+        gst_object_unref(source_pad);
 
         CREATE_ELEMENT(tee, "tee", "source-tee");
 
