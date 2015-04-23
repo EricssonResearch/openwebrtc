@@ -39,6 +39,7 @@ test_gst_io_CFLAGS = \
 test_gst_io_LDADD = \
     $(GSTREAMER_LIBS) \
     $(GLIB_LIBS) \
+    $(top_builddir)/owr/libopenwebrtc.la \
     $(top_builddir)/gst/libopenwebrtc_gst.la
 endif
 
