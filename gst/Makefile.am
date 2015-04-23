@@ -15,7 +15,7 @@ AM_CFLAGS = \
     -Werror \
     $(DEBUG_CFLAGS)
 
-noinst_LTLIBRARIES = libopenwebrtc_gst.la
+lib_LTLIBRARIES = libopenwebrtc_gst.la
 
 libopenwebrtc_gst_la_SOURCES = \
     owr_gst_audio_renderer.c \
