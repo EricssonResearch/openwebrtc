@@ -269,6 +269,22 @@ static void owr_media_renderer_get_property(GObject *object, guint property_id,
     }
 }
 
+static void on_caps(GstElement *sink, GParamSpec *pspec, OwrMediaRenderer *media_renderer)
+{
+    GstCaps *caps;
+
+    OWR_UNUSED(pspec);
+
+    g_object_get(sink, "caps", &caps, NULL);
+
+    if (GST_IS_CAPS(caps)) {
+        GST_INFO_OBJECT(media_renderer, "%s renderer - configured with caps: %" GST_PTR_FORMAT,
+            media_renderer->priv->media_type == OWR_MEDIA_TYPE_AUDIO ? "Audio" :
+            media_renderer->priv->media_type == OWR_MEDIA_TYPE_VIDEO ? "Video" :
+            "Unknown", caps);
+    }
+}
+
 static void maybe_start_renderer(OwrMediaRenderer *renderer)
 {
     OwrMediaRendererPrivate *priv;
@@ -284,6 +300,9 @@ static void maybe_start_renderer(OwrMediaRenderer *renderer)
 
     sinkpad = gst_element_get_static_pad(priv->sink, "sink");
     g_assert(sinkpad);
+
+    g_signal_connect(sinkpad, "notify::caps", G_CALLBACK(on_caps), renderer);
+
     caps = OWR_MEDIA_RENDERER_GET_CLASS(renderer)->get_caps(renderer);
     src = _owr_media_source_request_source(priv->source, caps);
     gst_caps_unref(caps);
