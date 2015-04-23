@@ -132,6 +132,9 @@ AC_HELP_STRING(
 esac],[enable_owr_gst=no])
 AC_MSG_RESULT([$enable_owr_gst])
 if test "x$enable_owr_gst" = xyes; then
+  if test x$enable_owr_static = xyes; then
+    AC_MSG_ERROR(owr-gst is not supported with owr-static)
+  fi
   AC_DEFINE(OWR_GST, 1,
   [Define if building owr-gst])
 fi
