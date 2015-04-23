@@ -308,6 +308,7 @@ bridge/seed/Makefile
 bridge/shared/Makefile
 bridge/worker/Makefile
 gst/Makefile
+gst/openwebrtc-gst-$OWR_API_VERSION.pc
 owr/Makefile
 owr/openwebrtc-$OWR_API_VERSION.pc
 transport/Makefile
