@@ -1688,6 +1688,18 @@ static void add_pads_to_bin_and_transport_bin(GstPad *pad, GstElement *bin, GstE
     ghost_pad_and_add_to_bin(bin_pad, transport_bin, pad_name);
 }
 
+static void on_caps(GstElement *sink, GParamSpec *pspec, OwrSession *session)
+{
+    GstCaps *caps;
+
+    OWR_UNUSED(pspec);
+
+    g_object_get(sink, "caps", &caps, NULL);
+
+    if (GST_IS_CAPS(caps))
+        GST_CAT_INFO_OBJECT(_owrsession_debug, session, "Sending media configured with caps: %" GST_PTR_FORMAT, caps);
+}
+
 static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMediaSession *media_session, OwrPayload * payload)
 {
     guint stream_id;
@@ -1698,7 +1710,7 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
     gchar *name = NULL;
     gboolean link_ok = TRUE, sync_ok = TRUE;
     GstPad *sink_pad = NULL, *rtp_sink_pad = NULL, *rtp_capsfilter_src_pad = NULL,
-        *ghost_src_pad = NULL;
+        *ghost_src_pad = NULL, *encoder_sink_pad;
     OwrMediaType media_type;
     GstPadLinkReturn link_res;
 
@@ -1772,6 +1784,10 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
         payloader = _owr_payload_create_payload_packetizer(payload);
         g_warn_if_fail(payloader && encoder);
 
+        encoder_sink_pad = gst_element_get_static_pad(encoder, "sink");
+        g_signal_connect(encoder_sink_pad, "notify::caps", G_CALLBACK(on_caps), OWR_SESSION(media_session));
+        gst_object_unref(encoder_sink_pad);
+
         name = g_strdup_printf("send-input-video-encoder-capsfilter-%u", stream_id);
         encoder_capsfilter = gst_element_factory_make("capsfilter", name);
         g_free(name);
@@ -1809,6 +1825,10 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
         encoder = _owr_payload_create_encoder(payload);
         parser = _owr_payload_create_parser(payload);
         payloader = _owr_payload_create_payload_packetizer(payload);
+
+        encoder_sink_pad = gst_element_get_static_pad(encoder, "sink");
+        g_signal_connect(encoder_sink_pad, "notify::caps", G_CALLBACK(on_caps), OWR_SESSION(media_session));
+        gst_object_unref(encoder_sink_pad);
 
         gst_bin_add_many(GST_BIN(send_input_bin), encoder, payloader, NULL);
         if (parser) {
