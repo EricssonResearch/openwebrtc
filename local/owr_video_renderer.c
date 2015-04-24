@@ -270,18 +270,6 @@ static void renderer_disabled(OwrMediaRenderer *renderer, GParamSpec *pspec, Gst
     g_object_set(balance, "saturation", (gdouble)!disabled, "brightness", (gdouble)-disabled, NULL);
 }
 
-static int rotation_and_mirrored_to_video_flip_method(guint rotation, gboolean mirrored)
-{
-    static gint mirrored_methods[] = {4, 7, 5, 6};
-    g_return_val_if_fail(rotation < 4, 0);
-
-    if (mirrored) {
-        return mirrored_methods[rotation];
-    } else {
-        return rotation;
-    }
-}
-
 static void update_flip_method(OwrMediaRenderer *renderer, GParamSpec *pspec, GstElement *flip)
 {
     guint rotation = 0;
@@ -293,7 +281,7 @@ static void update_flip_method(OwrMediaRenderer *renderer, GParamSpec *pspec, Gs
     g_return_if_fail(GST_IS_ELEMENT(flip));
 
     g_object_get(renderer, "rotation", &rotation, "mirror", &mirror, NULL);
-    flip_method = rotation_and_mirrored_to_video_flip_method(rotation, mirror);
+    flip_method = _owr_rotation_and_mirror_to_video_flip_method(rotation, mirror);
     g_object_set(flip, "method", flip_method, NULL);
 }
 
@@ -323,6 +311,7 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer, gu
     g_assert(flip);
     g_signal_connect_object(renderer, "notify::rotation", G_CALLBACK(update_flip_method), flip, 0);
     g_signal_connect_object(renderer, "notify::mirror", G_CALLBACK(update_flip_method), flip, 0);
+    update_flip_method(renderer, NULL, flip);
 
     sink = OWR_MEDIA_RENDERER_GET_CLASS(renderer)->get_sink(renderer);
     g_assert(sink);

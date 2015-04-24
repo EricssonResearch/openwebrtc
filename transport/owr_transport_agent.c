@@ -1651,18 +1651,6 @@ static OwrSession * get_session(OwrTransportAgent *transport_agent, guint stream
     return s;
 }
 
-static int rotation_and_mirror_to_video_flip_method(guint rotation, gboolean mirror)
-{
-    static gint mirror_methods[] = {4, 7, 5, 6};
-    g_return_val_if_fail(rotation < 4, 0);
-
-    if (mirror) {
-        return mirror_methods[rotation];
-    } else {
-        return rotation;
-    }
-}
-
 static void update_flip_method(OwrPayload *payload, GParamSpec *pspec, GstElement *flip)
 {
     guint rotation = 0;
@@ -1674,7 +1662,7 @@ static void update_flip_method(OwrPayload *payload, GParamSpec *pspec, GstElemen
     g_return_if_fail(GST_IS_ELEMENT(flip));
 
     g_object_get(payload, "rotation", &rotation, "mirror", &mirror, NULL);
-    flip_method = rotation_and_mirror_to_video_flip_method(rotation, mirror);
+    flip_method = _owr_rotation_and_mirror_to_video_flip_method(rotation, mirror);
     g_object_set(flip, "method", flip_method, NULL);
 }
 
@@ -1773,6 +1761,7 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
         g_return_if_fail(OWR_IS_VIDEO_PAYLOAD(payload));
         g_signal_connect_object(payload, "notify::rotation", G_CALLBACK(update_flip_method), flip, 0);
         g_signal_connect_object(payload, "notify::mirror", G_CALLBACK(update_flip_method), flip, 0);
+        update_flip_method(payload, NULL, flip);
 
         name = g_strdup_printf("send-input-video-queue-%u", stream_id);
         queue = gst_element_factory_make("queue", name);
