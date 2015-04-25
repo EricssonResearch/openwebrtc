@@ -792,19 +792,24 @@ class GHashTableType(ContainerMetaType(
             C.Decl(self.inner_value.c_type, self.inner_value.c_name),
             inner_transforms.declarations,
         ], [
-            C.Assign(self.jni_name, C.Env.new('HashMap')),
-            C.ExceptionCheck.default(self),
-            C.Call('g_hash_table_iter_init', '&' + it, self.c_name),
-            C.While(C.Call('g_hash_table_iter_next', '&' + it, '(void **) &' + self.inner_key.c_name, '(void **) &' + self.inner_value.c_name),
-                inner_transforms.conversion,
-                C.Env.method(self.jni_name, ('HashMap', 'put'), self.inner_key.jni_name, self.inner_value.jni_name),
+            C.Assign(self.jni_name, 'NULL'),
+            C.If(self.c_name, [
+                C.Assign(self.jni_name, C.Env.new('HashMap')),
                 C.ExceptionCheck.default(self),
-                C.Env('DeleteLocalRef', self.inner_key.jni_name) if self.inner_value.has_local_ref else [],
-                C.Env('DeleteLocalRef', self.inner_value.jni_name) if self.inner_value.has_local_ref else [],
-                inner_transforms.cleanup,
-            )
+                C.Call('g_hash_table_iter_init', '&' + it, self.c_name),
+                C.While(C.Call('g_hash_table_iter_next', '&' + it, '(void **) &' + self.inner_key.c_name, '(void **) &' + self.inner_value.c_name),
+                    inner_transforms.conversion,
+                    C.Env.method(self.jni_name, ('HashMap', 'put'), self.inner_key.jni_name, self.inner_value.jni_name),
+                    C.ExceptionCheck.default(self),
+                    C.Env('DeleteLocalRef', self.inner_key.jni_name) if self.inner_value.has_local_ref else [],
+                    C.Env('DeleteLocalRef', self.inner_value.jni_name) if self.inner_value.has_local_ref else [],
+                    inner_transforms.cleanup,
+                ),
+            ]),
         ], self.transfer_ownership and [
-            C.Call('g_hash_table_unref', self.c_name),
+            C.If(self.c_name, [
+                C.Call('g_hash_table_unref', self.c_name),
+            ]),
         ])
 
 
