@@ -117,12 +117,10 @@ void owr_message_origin_post_message(OwrMessageOrigin *origin, OwrMessageType ty
     while (g_hash_table_iter_next(&iter, NULL, (gpointer *) &ref)) {
         bus = g_weak_ref_get(ref);
         if (bus) {
-            message->ref_count += 1;
-            g_object_ref(origin);
             _owr_bus_post_message(bus, message);
             g_object_unref(bus);
         } else {
-            GST_DEBUG_OBJECT(origin, "message origin finalized, removing weak ref: %p", ref);
+            GST_DEBUG_OBJECT(origin, "message bus finalized, removing weak ref: %p", ref);
             g_hash_table_iter_remove(&iter);
         }
     }

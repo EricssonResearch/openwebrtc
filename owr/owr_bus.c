@@ -288,9 +288,8 @@ void _owr_bus_post_message(OwrBus *bus, OwrMessage *message)
     priv = OWR_BUS_GET_PRIVATE(bus);
 
     if (message->type & priv->message_type_mask) {
+        _owr_message_ref(message);
         g_async_queue_push(priv->queue, message);
-    } else {
-        _owr_message_unref(message);
     }
 }
 
@@ -311,7 +310,6 @@ static gpointer bus_thread_func(OwrBus *bus)
         }
         g_mutex_unlock(&priv->callback_mutex);
 
-        g_object_unref(msg->origin);
         _owr_message_unref(msg);
     }
 
@@ -325,7 +323,7 @@ OwrMessage *_owr_message_new(OwrMessageOrigin *origin, OwrMessageType type, OwrM
     OwrMessage *message;
 
     message = g_slice_new0(OwrMessage);
-    message->origin = origin;
+    message->origin = g_object_ref(origin);
     message->type = type;
     message->sub_type = sub_type;
     message->data = data;
@@ -337,6 +335,7 @@ OwrMessage *_owr_message_new(OwrMessageOrigin *origin, OwrMessageType type, OwrM
 void _owr_message_unref(OwrMessage *message)
 {
     g_return_if_fail(message);
+    g_object_unref(message->origin);
 
     if (g_atomic_int_dec_and_test(&message->ref_count)) {
         GST_TRACE("freeing message: %p", message);
@@ -344,6 +343,13 @@ void _owr_message_unref(OwrMessage *message)
             g_hash_table_unref(message->data);
         g_slice_free(OwrMessage, message);
     }
+}
+
+void _owr_message_ref(OwrMessage *message)
+{
+    g_return_if_fail(message);
+    g_object_ref(message->origin);
+    g_atomic_int_inc(&message->ref_count);
 }
 
 GType owr_message_type_get_type(void)

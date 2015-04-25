@@ -447,6 +447,89 @@ static void test_mass_messaging()
     g_ptr_array_foreach(origins, (GFunc) mock_origin_assert_bus_table_size, GUINT_TO_POINTER(0));
 }
 
+static void assert_weak_ref(GWeakRef *weak_ref, gboolean expect_object, guint line)
+{
+    gpointer object;
+
+    object = g_weak_ref_get(weak_ref);
+
+    if (object) {
+        g_object_unref(object);
+    }
+
+    if (object && !expect_object) {
+        g_print("** ERROR ** ref assertion failed:\n");
+        g_print("%u: expected object to be finalized, but got ref\n", line);
+        exit(-1);
+    } else if (!object && expect_object) {
+        g_print("** ERROR ** ref assertion failed:\n");
+        g_print("%u: expected ref, but object was finalized\n", line);
+        exit(-1);
+    }
+}
+
+static void test_refcounting()
+{
+    OwrBus *bus;
+    OwrMessageOrigin *origin;
+    GWeakRef weak_ref;
+    GAsyncQueue *queue;
+
+    queue = g_async_queue_new();
+
+    bus = owr_bus_new();
+    owr_bus_set_message_callback(bus, on_message, queue, NULL);
+    origin = mock_origin_new();
+    owr_bus_add_message_origin(bus, origin);
+    g_weak_ref_init(&weak_ref, bus);
+    OWR_POST_STATS(origin, TEST, NULL);
+    g_object_unref(bus); /* this should finalize the bus, pending messages should not keep it alive */
+    assert_weak_ref(&weak_ref, FALSE, __LINE__);
+    g_weak_ref_clear(&weak_ref);
+
+    bus = owr_bus_new();
+    owr_bus_set_message_callback(bus, on_message, queue, NULL);
+    owr_bus_add_message_origin(bus, origin);
+    g_weak_ref_init(&weak_ref, origin);
+    OWR_POST_STATS(origin, TEST, NULL);
+    g_object_unref(origin); /* the origin should be kept alive though */
+    g_object_ref(origin);
+    assert_weak_ref(&weak_ref, TRUE, __LINE__);
+    g_object_unref(origin);
+    g_assert(g_async_queue_timeout_pop(queue, G_USEC_PER_SEC));
+    g_usleep(1000); /* messages are cleaned up after all callbacks have happened, so wait a bit more */
+    assert_weak_ref(&weak_ref, FALSE, __LINE__); /* but be cleaned up after the message was handled */
+    g_weak_ref_clear(&weak_ref);
+
+
+    /* same as previous tests, but with message filter */
+    origin = mock_origin_new();
+    owr_bus_add_message_origin(bus, origin);
+    g_weak_ref_init(&weak_ref, origin);
+    g_object_set(bus, "message-type-mask", OWR_MESSAGE_TYPE_STATS, NULL);
+    OWR_POST_STATS(origin, TEST, NULL);
+    OWR_POST_EVENT(origin, TEST, NULL);
+    OWR_POST_ERROR(origin, TEST, NULL);
+    g_object_unref(origin);
+    g_object_ref(origin);
+    assert_weak_ref(&weak_ref, TRUE, __LINE__);
+    g_object_unref(origin);
+    g_assert(g_async_queue_timeout_pop(queue, G_USEC_PER_SEC));
+    g_usleep(1000);
+    assert_weak_ref(&weak_ref, FALSE, __LINE__);
+    g_weak_ref_clear(&weak_ref);
+
+    origin = mock_origin_new();
+    owr_bus_add_message_origin(bus, origin);
+    g_weak_ref_init(&weak_ref, bus);
+    OWR_POST_STATS(origin, TEST, NULL);
+    OWR_POST_EVENT(origin, TEST, NULL);
+    OWR_POST_ERROR(origin, TEST, NULL);
+    g_object_unref(bus);
+    assert_weak_ref(&weak_ref, FALSE, __LINE__);
+    g_weak_ref_clear(&weak_ref);
+}
+
 int main()
 {
     guint64 start_time;
@@ -465,6 +548,7 @@ int main()
     test_message_type_mask();
     test_destruction();
     test_mass_messaging();
+    test_refcounting();
 
     end_time = g_get_monotonic_time();
 
