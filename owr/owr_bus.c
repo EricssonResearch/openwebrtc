@@ -380,6 +380,8 @@ GType owr_message_sub_type_get_type(void)
         {OWR_EVENT_TYPE_TEST, "Event Test", "event-test"},
         {OWR_EVENT_TYPE_RENDERER_STARTED, "Renderer started", "renderer-started"},
         {OWR_EVENT_TYPE_RENDERER_STOPPED, "Renderer stopped", "renderer-stopped"},
+        {OWR_EVENT_TYPE_LOCAL_SOURCE_STARTED, "Local source started", "local-source-started"},
+        {OWR_EVENT_TYPE_LOCAL_SOURCE_STOPPED, "Local source stopped", "local-source-stopped"},
         {0, NULL, NULL}
     };
     static volatile GType id = 0;

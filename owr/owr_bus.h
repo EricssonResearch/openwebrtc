@@ -58,6 +58,14 @@ typedef enum {
  * @OWR_EVENT_TYPE_RENDERER_STARTED: a renderer was started
  *
  * @OWR_EVENT_TYPE_RENDERER_STOPPED: a renderer was stopped
+ *
+ * @OWR_EVENT_TYPE_LOCAL_SOURCE_STARTED: a local media source was started
+ * - @start_time: #gint64 monotonic time when the pipeline setup began
+ * - @end_time: #gint64 monotonic time when the pipeline setup was completed
+ *
+ * @OWR_EVENT_TYPE_LOCAL_SOURCE_STOPPED: a local media source was stopped
+ * - @start_time: #gint64 monotonic time when the pipeline teardown began
+ * - @end_time: #gint64 monotonic time when the pipeline teardown was completed
  */
 typedef enum {
     OWR_ERROR_TYPE_TEST = 0x1000,
@@ -67,6 +75,8 @@ typedef enum {
     OWR_EVENT_TYPE_TEST = 0x3000,
     OWR_EVENT_TYPE_RENDERER_STARTED,
     OWR_EVENT_TYPE_RENDERER_STOPPED,
+    OWR_EVENT_TYPE_LOCAL_SOURCE_STARTED,
+    OWR_EVENT_TYPE_LOCAL_SOURCE_STOPPED,
 } OwrMessageSubType;
 
 typedef void (*OwrBusMessageCallback) (OwrMessageOrigin *origin, OwrMessageType type, OwrMessageSubType sub_type, GHashTable *data, gpointer user_data);

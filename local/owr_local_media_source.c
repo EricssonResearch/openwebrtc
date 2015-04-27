@@ -267,6 +267,12 @@ static gboolean shutdown_media_source(GHashTable *args)
 {
     OwrMediaSource *media_source;
     GstElement *source_pipeline, *source_tee;
+    GHashTable *event_data;
+    GValue *value;
+
+    event_data = _owr_value_table_new();
+    value = _owr_value_table_add(event_data, "start_time", G_TYPE_INT64);
+    g_value_set_int64(value, g_get_monotonic_time());
 
     media_source = g_hash_table_lookup(args, "media_source");
     g_assert(media_source);
@@ -300,6 +306,10 @@ static gboolean shutdown_media_source(GHashTable *args)
     gst_element_set_state(source_pipeline, GST_STATE_NULL);
     gst_object_unref(source_pipeline);
     gst_object_unref(source_tee);
+
+    value = _owr_value_table_add(event_data, "end_time", G_TYPE_INT64);
+    g_value_set_int64(value, g_get_monotonic_time());
+    OWR_POST_EVENT(media_source, LOCAL_SOURCE_STOPPED, event_data);
 
     g_object_unref(media_source);
     g_hash_table_unref(args);
@@ -432,6 +442,8 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
     OwrLocalMediaSourcePrivate *priv;
     GstElement *source_element = NULL;
     GstElement *source_pipeline;
+    GHashTable *event_data;
+    GValue *value;
 #if defined(__linux__) && !defined(__ANDROID__)
     gchar *tmp;
 #endif
@@ -455,6 +467,10 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
         GstCaps *source_caps;
         GstBus *bus;
         GSource *bus_source;
+
+        event_data = _owr_value_table_new();
+        value = _owr_value_table_add(event_data, "start_time", G_TYPE_INT64);
+        g_value_set_int64(value, g_get_monotonic_time());
 
         g_object_get(media_source, "media-type", &media_type, "type", &source_type, NULL);
 
@@ -699,6 +715,10 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
             GST_ERROR("Failed to set local source pipeline %s to playing", GST_OBJECT_NAME(source_pipeline));
             /* FIXME: We should handle this and don't expose the source */
         }
+
+        value = _owr_value_table_add(event_data, "end_time", G_TYPE_INT64);
+        g_value_set_int64(value, g_get_monotonic_time());
+        OWR_POST_EVENT(media_source, LOCAL_SOURCE_STARTED, event_data);
 
         g_signal_connect(tee, "pad-removed", G_CALLBACK(tee_pad_removed_cb), media_source);
     }
