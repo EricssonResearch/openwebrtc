@@ -340,8 +340,8 @@ static void maybe_start_renderer(OwrMediaRenderer *renderer)
         GST_ERROR("Failed to link source with renderer (%d)", pad_link_return);
         return;
     }
-    OWR_POST_STATS(renderer, RENDERER_STARTED, NULL);
     gst_element_set_state(priv->pipeline, GST_STATE_PLAYING);
+    OWR_POST_EVENT(renderer, RENDERER_STARTED, NULL);
 }
 
 static gboolean set_source(GHashTable *args)
@@ -379,6 +379,7 @@ static gboolean set_source(GHashTable *args)
     if (!source) {
         /* Shut down the pipeline if we have no source */
         gst_element_set_state(priv->pipeline, GST_STATE_NULL);
+        OWR_POST_EVENT(renderer, RENDERER_STOPPED, NULL);
         g_mutex_unlock(&priv->media_renderer_lock);
         goto end;
     }

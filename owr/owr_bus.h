@@ -55,15 +55,18 @@ typedef enum {
  * - @call_time: #gint64 monotonic time when the function call started
  * - @end_time: #gint64 monotonic time when the function call completed
  *
- * @OWR_STATS_TYPE_RENDERER_STARTED: a renderer was started
+ * @OWR_EVENT_TYPE_RENDERER_STARTED: a renderer was started
+ *
+ * @OWR_EVENT_TYPE_RENDERER_STOPPED: a renderer was stopped
  */
 typedef enum {
     OWR_ERROR_TYPE_TEST = 0x1000,
     OWR_ERROR_TYPE_PROCESSING_ERROR,
     OWR_STATS_TYPE_TEST = 0x2000,
-    OWR_STATS_TYPE_RENDERER_STARTED,
     OWR_STATS_TYPE_SCHEDULE,
     OWR_EVENT_TYPE_TEST = 0x3000,
+    OWR_EVENT_TYPE_RENDERER_STARTED,
+    OWR_EVENT_TYPE_RENDERER_STOPPED,
 } OwrMessageSubType;
 
 typedef void (*OwrBusMessageCallback) (OwrMessageOrigin *origin, OwrMessageType type, OwrMessageSubType sub_type, GHashTable *data, gpointer user_data);
