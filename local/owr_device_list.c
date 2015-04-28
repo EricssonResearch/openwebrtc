@@ -378,6 +378,12 @@ static gboolean enumerate_video_source_devices(GClosure *callback)
     GDir *dev_dir;
     const gchar *filename;
 
+#if TARGET_RPI
+    source = _owr_local_media_source_new_cached(-1, "RPiCam",
+                                                OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE);
+    sources = g_list_prepend(sources, source);
+#endif
+
     dev_dir = g_dir_open("/dev", 0, &error);
 
     while ((filename = g_dir_read_name(dev_dir))) {

@@ -186,6 +186,11 @@ esac
 AM_CONDITIONAL(TARGET_APPLE, test x$is_apple = xyes)
 dnl We substitute OWR_DEVICE_LIST_EXT_LIBS in the end
 
+AC_CHECK_LIB([bcm_host], [bcm_host_init],
+[AC_DEFINE(TARGET_RPI, 1, [Define if building for the Raspberry Pi])],
+[AC_DEFINE(TARGET_RPI, 0, [Define if building for the Raspberry Pi])]
+)
+
 dnl generate java bindings or not
 AC_MSG_CHECKING([whether to generate java bindings or not])
 AC_ARG_ENABLE(owr-java,
