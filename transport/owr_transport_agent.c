@@ -783,14 +783,25 @@ static void maybe_handle_new_send_source_with_payload(OwrTransportAgent *transpo
 {
     OwrPayload *payload = NULL;
     OwrMediaSource *media_source = NULL;
+    GHashTable *event_data;
+    GValue *value;
 
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
     g_return_if_fail(OWR_IS_MEDIA_SESSION(media_session));
 
     if ((payload = _owr_media_session_get_send_payload(media_session))
         && (media_source = _owr_media_session_get_send_source(media_session))) {
+
+        event_data = _owr_value_table_new();
+        value = _owr_value_table_add(event_data, "start_time", G_TYPE_INT64);
+        g_value_set_int64(value, g_get_monotonic_time());
+
         handle_new_send_payload(transport_agent, media_session, payload);
         handle_new_send_source(transport_agent, media_session, media_source, payload);
+
+        value = _owr_value_table_add(event_data, "end_time", G_TYPE_INT64);
+        g_value_set_int64(value, g_get_monotonic_time());
+        OWR_POST_STATS(media_session, SEND_PIPELINE_ADDED, event_data);
     }
 
     if (payload)
@@ -807,8 +818,14 @@ static void remove_existing_send_source_and_payload(OwrTransportAgent *transport
     GstPad *bin_src_pad, *sinkpad;
     GstElement *send_input_bin, *source_bin;
     OwrMediaType media_type = OWR_MEDIA_TYPE_UNKNOWN;
+    GHashTable *event_data;
+    GValue *value;
 
     g_assert(media_source);
+
+    event_data = _owr_value_table_new();
+    value = _owr_value_table_add(event_data, "start_time", G_TYPE_INT64);
+    g_value_set_int64(value, g_get_monotonic_time());
 
     /* Setting a new, different source but have one already */
 
@@ -850,6 +867,10 @@ static void remove_existing_send_source_and_payload(OwrTransportAgent *transport
     gst_pad_set_active(sinkpad, FALSE);
     gst_element_remove_pad(transport_agent->priv->transport_bin, sinkpad);
     gst_object_unref(sinkpad);
+
+    value = _owr_value_table_add(event_data, "end_time", G_TYPE_INT64);
+    g_value_set_int64(value, g_get_monotonic_time());
+    OWR_POST_STATS(media_session, SEND_PIPELINE_REMOVED, event_data);
 }
 
 static void on_new_send_payload(OwrTransportAgent *transport_agent,

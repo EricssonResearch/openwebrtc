@@ -55,6 +55,14 @@ typedef enum {
  * - @call_time: #gint64 monotonic time when the function call started
  * - @end_time: #gint64 monotonic time when the function call completed
  *
+ * @OWR_STATS_TYPE_SEND_PIPELINE_ADDED: a send pipeline was added to a media session
+ * - @start_time: #gint64 monotonic time when the pipeline setup began
+ * - @end_time: #gint64 monotonic time when the pipeline setup was completed
+ *
+ * @OWR_STATS_TYPE_SEND_PIPELINE_REMOVED: a send pipeline was removed to a media session
+ * - @start_time: #gint64 monotonic time when the pipeline teardown began
+ * - @end_time: #gint64 monotonic time when the pipeline teardown was completed
+ *
  * @OWR_EVENT_TYPE_RENDERER_STARTED: a renderer was started
  *
  * @OWR_EVENT_TYPE_RENDERER_STOPPED: a renderer was stopped
@@ -72,6 +80,8 @@ typedef enum {
     OWR_ERROR_TYPE_PROCESSING_ERROR,
     OWR_STATS_TYPE_TEST = 0x2000,
     OWR_STATS_TYPE_SCHEDULE,
+    OWR_STATS_TYPE_SEND_PIPELINE_ADDED,
+    OWR_STATS_TYPE_SEND_PIPELINE_REMOVED,
     OWR_EVENT_TYPE_TEST = 0x3000,
     OWR_EVENT_TYPE_RENDERER_STARTED,
     OWR_EVENT_TYPE_RENDERER_STOPPED,
