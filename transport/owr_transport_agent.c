@@ -1032,8 +1032,11 @@ static GstElement *add_nice_element(OwrTransportAgent *transport_agent, guint st
         "component", is_rtcp
         ? NICE_COMPONENT_TYPE_RTCP : NICE_COMPONENT_TYPE_RTP, NULL);
 
-    if (is_sink)
-        g_object_set(nice_element, "sync", FALSE, "async", FALSE, "enable-last-sample", FALSE, NULL);
+    if (is_sink) {
+        g_object_set(nice_element, "enable-last-sample", FALSE, NULL);
+        if (is_rtcp)
+            g_object_set(nice_element, "sync", FALSE, "async", FALSE, NULL);
+    }
 
     added_ok = gst_bin_add(GST_BIN(bin), nice_element);
     g_warn_if_fail(added_ok);
