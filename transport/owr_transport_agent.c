@@ -1354,7 +1354,7 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
 static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_agent,
     guint stream_id, gboolean rtcp_mux)
 {
-    GstElement *nice_element, *dtls_srtp_bin;
+    GstElement *nice_element, *dtls_srtp_bin, *funnel;
     GstPad *rtp_src_pad, *rtcp_src_pad;
     gchar *rtpbin_pad_name;
     gboolean linked_ok, synced_ok;
@@ -1401,6 +1401,7 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
 #endif
     g_warn_if_fail(linked_ok);
     g_free(rtpbin_pad_name);
+
     synced_ok = gst_element_sync_state_with_parent(dtls_srtp_bin);
     g_warn_if_fail(synced_ok);
     linked_ok = gst_element_link(nice_element, dtls_srtp_bin);
@@ -1409,10 +1410,19 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
     g_warn_if_fail(synced_ok);
 
     if (!rtcp_mux) {
+        funnel = gst_element_factory_make("funnel", NULL);
+        gst_bin_add(GST_BIN(receive_input_bin), funnel);
+
+        linked_ok = gst_element_link_pads(dtls_srtp_bin, "rtcp_src", funnel, "sink_0");
+        g_warn_if_fail(linked_ok);
+
         nice_element = add_nice_element(transport_agent, stream_id, FALSE, TRUE, receive_input_bin);
         dtls_srtp_bin = add_dtls_srtp_bin(transport_agent, stream_id, FALSE, TRUE, receive_input_bin);
 
-        rtcp_src_pad = gst_element_get_static_pad(dtls_srtp_bin, "rtp_src");
+        linked_ok = gst_element_link_pads(dtls_srtp_bin, "rtcp_src", funnel, "sink_1");
+        g_warn_if_fail(linked_ok);
+
+        rtcp_src_pad = gst_element_get_static_pad(funnel, "src");
         ghost_pad_and_add_to_bin(rtcp_src_pad, receive_input_bin, "rtcp_src");
         gst_object_unref(rtcp_src_pad);
 
@@ -1421,12 +1431,23 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
             transport_agent->priv->rtpbin, rtpbin_pad_name);
         g_warn_if_fail(linked_ok);
         g_free(rtpbin_pad_name);
+        synced_ok = gst_element_sync_state_with_parent(funnel);
+        g_warn_if_fail(synced_ok);
         synced_ok = gst_element_sync_state_with_parent(dtls_srtp_bin);
         g_warn_if_fail(synced_ok);
         linked_ok = gst_element_link(nice_element, dtls_srtp_bin);
         g_warn_if_fail(linked_ok);
         synced_ok = gst_element_sync_state_with_parent(nice_element);
         g_warn_if_fail(synced_ok);
+    } else {
+        rtcp_src_pad = gst_element_get_static_pad(dtls_srtp_bin, "rtcp_src");
+        ghost_pad_and_add_to_bin(rtcp_src_pad, receive_input_bin, "rtcp_src");
+        gst_object_unref(rtcp_src_pad);
+        rtpbin_pad_name = g_strdup_printf("recv_rtcp_sink_%u", stream_id);
+        linked_ok = gst_element_link_pads(receive_input_bin, "rtcp_src",
+            transport_agent->priv->rtpbin, rtpbin_pad_name);
+        g_warn_if_fail(linked_ok);
+        g_free(rtpbin_pad_name);
     }
 }
 
