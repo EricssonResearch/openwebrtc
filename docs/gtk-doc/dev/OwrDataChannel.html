@@ -1,0 +1,358 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>OwrDataChannel</title>
+<meta name="generator" content="DocBook XSL Stylesheets V1.71.0">
+<link rel="start" href="index.html" title="openwebrtc Reference Manual">
+<link rel="up" href="ch01.html" title="[Insert title here]">
+<link rel="prev" href="OwrCandidate.html" title="OwrCandidate">
+<link rel="next" href="OwrDataSession.html" title="OwrDataSession">
+<meta name="generator" content="GTK-Doc V1.21 (XML mode)">
+<link rel="stylesheet" href="style.css" type="text/css">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="5"><tr valign="middle">
+<td width="100%" align="left" class="shortcuts">
+<a href="#" class="shortcut">Top</a><span id="nav_description">  <span class="dim">|</span> 
+                  <a href="#OwrDataChannel.description" class="shortcut">Description</a></span><span id="nav_hierarchy">  <span class="dim">|</span> 
+                  <a href="#OwrDataChannel.object-hierarchy" class="shortcut">Object Hierarchy</a></span><span id="nav_properties">  <span class="dim">|</span> 
+                  <a href="#OwrDataChannel.properties" class="shortcut">Properties</a></span><span id="nav_signals">  <span class="dim">|</span> 
+                  <a href="#OwrDataChannel.signals" class="shortcut">Signals</a></span>
+</td>
+<td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
+<td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
+<td><a accesskey="p" href="OwrCandidate.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
+<td><a accesskey="n" href="OwrDataSession.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
+</tr></table>
+<div class="refentry" lang="en">
+<a name="OwrDataChannel"></a><div class="titlepage"></div>
+<div class="refnamediv"><table width="100%"><tr>
+<td valign="top">
+<h2><span class="refentrytitle"><a name="OwrDataChannel.top_of_page"></a>OwrDataChannel</span></h2>
+<p>OwrDataChannel</p>
+</td>
+<td class="gallery_image" valign="top" align="right"></td>
+</tr></table></div>
+<div class="refsect1" lang="en">
+<a name="OwrDataChannel.functions"></a><h2>Functions</h2>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a href="OwrDataChannel.html#OWR-DATA-CHANNEL-READY-STATE-TYPE:CAPS" title="OWR_DATA_CHANNEL_READY_STATE_TYPE">OWR_DATA_CHANNEL_READY_STATE_TYPE</a></td>
+</tr>
+<tr>
+<td class="function_type">
+<a href="OwrDataChannel.html" title="OwrDataChannel"><span class="returnvalue">OwrDataChannel</span></a> *
+</td>
+<td class="function_name">
+<a href="OwrDataChannel.html#owr-data-channel-new" title="owr_data_channel_new ()">owr_data_channel_new</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
+<a href="OwrDataChannel.html#owr-data-channel-send" title="owr_data_channel_send ()">owr_data_channel_send</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
+<a href="OwrDataChannel.html#owr-data-channel-send-binary" title="owr_data_channel_send_binary ()">owr_data_channel_send_binary</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
+<a href="OwrDataChannel.html#owr-data-channel-close" title="owr_data_channel_close ()">owr_data_channel_close</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrDataChannel.properties"></a><h2>Properties</h2>
+<div class="informaltable"><table border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="property_type"><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a></td>
+<td class="property_name"><a href="OwrDataChannel.html#OwrDataChannel--buffered-amount" title="The “buffered-amount” property">buffered-amount</a></td>
+<td class="property_flags">Read</td>
+</tr>
+<tr>
+<td class="property_type"><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a></td>
+<td class="property_name"><a href="OwrDataChannel.html#OwrDataChannel--id" title="The “id” property">id</a></td>
+<td class="property_flags">Read / Write / Construct Only</td>
+</tr>
+<tr>
+<td class="property_type">
+<a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</td>
+<td class="property_name"><a href="OwrDataChannel.html#OwrDataChannel--label" title="The “label” property">label</a></td>
+<td class="property_flags">Read / Write / Construct Only</td>
+</tr>
+<tr>
+<td class="property_type"><a href="../glib/glib-Basic-Types.html#gint"><span class="type">gint</span></a></td>
+<td class="property_name"><a href="OwrDataChannel.html#OwrDataChannel--max-packet-life-time" title="The “max-packet-life-time” property">max-packet-life-time</a></td>
+<td class="property_flags">Read / Write / Construct Only</td>
+</tr>
+<tr>
+<td class="property_type"><a href="../glib/glib-Basic-Types.html#gint"><span class="type">gint</span></a></td>
+<td class="property_name"><a href="OwrDataChannel.html#OwrDataChannel--max-retransmits" title="The “max-retransmits” property">max-retransmits</a></td>
+<td class="property_flags">Read / Write / Construct Only</td>
+</tr>
+<tr>
+<td class="property_type"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></td>
+<td class="property_name"><a href="OwrDataChannel.html#OwrDataChannel--negotiated" title="The “negotiated” property">negotiated</a></td>
+<td class="property_flags">Read / Write / Construct Only</td>
+</tr>
+<tr>
+<td class="property_type"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></td>
+<td class="property_name"><a href="OwrDataChannel.html#OwrDataChannel--ordered" title="The “ordered” property">ordered</a></td>
+<td class="property_flags">Read / Write / Construct Only</td>
+</tr>
+<tr>
+<td class="property_type">
+<a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</td>
+<td class="property_name"><a href="OwrDataChannel.html#OwrDataChannel--protocol" title="The “protocol” property">protocol</a></td>
+<td class="property_flags">Read / Write / Construct Only</td>
+</tr>
+<tr>
+<td class="property_type"><span class="type">OwrDataChannelReadyStates</span></td>
+<td class="property_name"><a href="OwrDataChannel.html#OwrDataChannel--ready-state" title="The “ready-state” property">ready-state</a></td>
+<td class="property_flags">Read</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrDataChannel.signals"></a><h2>Signals</h2>
+<div class="informaltable"><table border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="signal_type"><span class="returnvalue">void</span></td>
+<td class="signal_name"><a href="OwrDataChannel.html#OwrDataChannel-on-binary-data" title="The “on-binary-data” signal">on-binary-data</a></td>
+<td class="signal_flags"><a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-FIRST:CAPS">Run First</a></td>
+</tr>
+<tr>
+<td class="signal_type"><span class="returnvalue">void</span></td>
+<td class="signal_name"><a href="OwrDataChannel.html#OwrDataChannel-on-data" title="The “on-data” signal">on-data</a></td>
+<td class="signal_flags"><a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-FIRST:CAPS">Run First</a></td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrDataChannel.object-hierarchy"></a><h2>Object Hierarchy</h2>
+<pre class="screen">    <a href="../gobject/gobject-The-Base-Object-Type.html#GObject">GObject</a>
+    <span class="lineart">╰──</span> OwrDataChannel
+</pre>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrDataChannel.description"></a><h2>Description</h2>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrDataChannel.functions_details"></a><h2>Functions</h2>
+<div class="refsect2" lang="en">
+<a name="OWR-DATA-CHANNEL-READY-STATE-TYPE:CAPS"></a><h3>OWR_DATA_CHANNEL_READY_STATE_TYPE</h3>
+<pre class="programlisting">#define OWR_DATA_CHANNEL_READY_STATE_TYPE (owr_data_channel_ready_state_get_type())
+</pre>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="owr-data-channel-new"></a><h3>owr_data_channel_new ()</h3>
+<pre class="programlisting"><a href="OwrDataChannel.html" title="OwrDataChannel"><span class="returnvalue">OwrDataChannel</span></a> *
+owr_data_channel_new (<em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> ordered</code></em>,
+                      <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gint"><span class="type">gint</span></a> max_packet_life_time</code></em>,
+                      <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gint"><span class="type">gint</span></a> max_retransmits</code></em>,
+                      <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *protocol</code></em>,
+                      <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> negotiated</code></em>,
+                      <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#guint16"><span class="type">guint16</span></a> id</code></em>,
+                      <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *label</code></em>);</pre>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="owr-data-channel-send"></a><h3>owr_data_channel_send ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+owr_data_channel_send (<em class="parameter"><code><a href="OwrDataChannel.html" title="OwrDataChannel"><span class="type">OwrDataChannel</span></a> *data_channel</code></em>,
+                       <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *data</code></em>);</pre>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="owr-data-channel-send-binary"></a><h3>owr_data_channel_send_binary ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+owr_data_channel_send_binary (<em class="parameter"><code><a href="OwrDataChannel.html" title="OwrDataChannel"><span class="type">OwrDataChannel</span></a> *data_channel</code></em>,
+                              <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#guint8"><span class="type">guint8</span></a> *data</code></em>,
+                              <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#guint16"><span class="type">guint16</span></a> length</code></em>);</pre>
+<div class="refsect3" lang="en">
+<a name="idm491946906656"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody><tr>
+<td class="parameter_name"><p>data</p></td>
+<td class="parameter_description"><p>. </p></td>
+<td class="parameter_annotations"><span class="annotation">[<acronym title="Parameter points to an array of items."><span class="acronym">array</span></acronym> length=length]</span></td>
+</tr></tbody>
+</table></div>
+</div>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="owr-data-channel-close"></a><h3>owr_data_channel_close ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+owr_data_channel_close (<em class="parameter"><code><a href="OwrDataChannel.html" title="OwrDataChannel"><span class="type">OwrDataChannel</span></a> *data_channel</code></em>);</pre>
+</div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrDataChannel.other_details"></a><h2>Types and Values</h2>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrDataChannel.property-details"></a><h2>Property Details</h2>
+<div class="refsect2" lang="en">
+<a name="OwrDataChannel--buffered-amount"></a><h3>The <code class="literal">“buffered-amount”</code> property</h3>
+<pre class="programlisting">  “buffered-amount”          <a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a></pre>
+<p>The amount of buffered outgoing data on this data channel.</p>
+<p>Flags: Read</p>
+<p>Default value: 0</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrDataChannel--id"></a><h3>The <code class="literal">“id”</code> property</h3>
+<pre class="programlisting">  “id”                       <a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a></pre>
+<p>Channel id. Unless otherwise defined or negotiated, the id are picked based on the DTLS role; client picks even identifiers and server picks odd. However, the application is responsible for avoiding conflicts. In case of conflict, the channel should fail.</p>
+<p>Flags: Read / Write / Construct Only</p>
+<p>Allowed values: &lt;= 65535</p>
+<p>Default value: 0</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrDataChannel--label"></a><h3>The <code class="literal">“label”</code> property</h3>
+<pre class="programlisting">  “label”                    <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</pre>
+<p>The label of the channel.</p>
+<p>Flags: Read / Write / Construct Only</p>
+<p>Default value: ""</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrDataChannel--max-packet-life-time"></a><h3>The <code class="literal">“max-packet-life-time”</code> property</h3>
+<pre class="programlisting">  “max-packet-life-time”     <a href="../glib/glib-Basic-Types.html#gint"><span class="type">gint</span></a></pre>
+<p>The maximum time to try to retransmit a packet.</p>
+<p>Flags: Read / Write / Construct Only</p>
+<p>Allowed values: [-1,65535]</p>
+<p>Default value: -1</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrDataChannel--max-retransmits"></a><h3>The <code class="literal">“max-retransmits”</code> property</h3>
+<pre class="programlisting">  “max-retransmits”          <a href="../glib/glib-Basic-Types.html#gint"><span class="type">gint</span></a></pre>
+<p>The maximum number of retransmits for a packet.</p>
+<p>Flags: Read / Write / Construct Only</p>
+<p>Allowed values: [-1,65535]</p>
+<p>Default value: -1</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrDataChannel--negotiated"></a><h3>The <code class="literal">“negotiated”</code> property</h3>
+<pre class="programlisting">  “negotiated”               <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></pre>
+<p>Datachannel already negotiated.</p>
+<p>Flags: Read / Write / Construct Only</p>
+<p>Default value: FALSE</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrDataChannel--ordered"></a><h3>The <code class="literal">“ordered”</code> property</h3>
+<pre class="programlisting">  “ordered”                  <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></pre>
+<p>Send data ordered.</p>
+<p>Flags: Read / Write / Construct Only</p>
+<p>Default value: TRUE</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrDataChannel--protocol"></a><h3>The <code class="literal">“protocol”</code> property</h3>
+<pre class="programlisting">  “protocol”                 <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</pre>
+<p>Sub-protocol used for this channel.</p>
+<p>Flags: Read / Write / Construct Only</p>
+<p>Default value: ""</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrDataChannel--ready-state"></a><h3>The <code class="literal">“ready-state”</code> property</h3>
+<pre class="programlisting">  “ready-state”              <span class="type">OwrDataChannelReadyStates</span></pre>
+<p>The ready state of the data channel.</p>
+<p>Flags: Read</p>
+<p>Default value: Ready State connecting</p>
+</div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrDataChannel.signal-details"></a><h2>Signal Details</h2>
+<div class="refsect2" lang="en">
+<a name="OwrDataChannel-on-binary-data"></a><h3>The <code class="literal">“on-binary-data”</code> signal</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+user_function (<a href="OwrDataChannel.html" title="OwrDataChannel"><span class="type">OwrDataChannel</span></a> *data_channel,
+               <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>        binary_data,
+               <a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a>           length,
+               <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>        user_data)</pre>
+<div class="refsect3" lang="en">
+<a name="idm491947393520"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="parameter_name"><p>binary_data</p></td>
+<td class="parameter_description"><p>. </p></td>
+<td class="parameter_annotations"><span class="annotation">[<acronym title="Parameter points to an array of items."><span class="acronym">array</span></acronym> length=length][<acronym title="Generics and defining elements of containers and arrays."><span class="acronym">element-type</span></acronym> guint8]</span></td>
+</tr>
+<tr>
+<td class="parameter_name"><p>user_data</p></td>
+<td class="parameter_description"><p>user data set when the signal handler was connected.</p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<p>Flags: <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-FIRST:CAPS">Run First</a></p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrDataChannel-on-data"></a><h3>The <code class="literal">“on-data”</code> signal</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+user_function (<a href="OwrDataChannel.html" title="OwrDataChannel"><span class="type">OwrDataChannel</span></a> *owrdatachannel,
+               <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>          *arg1,
+               <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>        user_data)</pre>
+<p>Flags: <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-FIRST:CAPS">Run First</a></p>
+</div>
+</div>
+</div>
+<div class="footer">
+<hr>
+          Generated by GTK-Doc V1.21</div>
+</body>
+</html>

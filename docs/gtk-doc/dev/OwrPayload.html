@@ -1,0 +1,197 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>OwrPayload</title>
+<meta name="generator" content="DocBook XSL Stylesheets V1.71.0">
+<link rel="start" href="index.html" title="openwebrtc Reference Manual">
+<link rel="up" href="ch01.html" title="[Insert title here]">
+<link rel="prev" href="OwrMessageOrigin.html" title="OwrMessageOrigin">
+<link rel="next" href="OwrRemoteMediaSource.html" title="OwrRemoteMediaSource">
+<meta name="generator" content="GTK-Doc V1.21 (XML mode)">
+<link rel="stylesheet" href="style.css" type="text/css">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="5"><tr valign="middle">
+<td width="100%" align="left" class="shortcuts">
+<a href="#" class="shortcut">Top</a><span id="nav_description">  <span class="dim">|</span> 
+                  <a href="#OwrPayload.description" class="shortcut">Description</a></span><span id="nav_hierarchy">  <span class="dim">|</span> 
+                  <a href="#OwrPayload.object-hierarchy" class="shortcut">Object Hierarchy</a></span><span id="nav_properties">  <span class="dim">|</span> 
+                  <a href="#OwrPayload.properties" class="shortcut">Properties</a></span>
+</td>
+<td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
+<td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
+<td><a accesskey="p" href="OwrMessageOrigin.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
+<td><a accesskey="n" href="OwrRemoteMediaSource.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
+</tr></table>
+<div class="refentry" lang="en">
+<a name="OwrPayload"></a><div class="titlepage"></div>
+<div class="refnamediv"><table width="100%"><tr>
+<td valign="top">
+<h2><span class="refentrytitle"><a name="OwrPayload.top_of_page"></a>OwrPayload</span></h2>
+<p>OwrPayload</p>
+</td>
+<td class="gallery_image" valign="top" align="right"></td>
+</tr></table></div>
+<div class="refsect1" lang="en">
+<a name="OwrPayload.properties"></a><h2>Properties</h2>
+<div class="informaltable"><table border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="property_type"><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a></td>
+<td class="property_name"><a href="OwrPayload.html#OwrPayload--bitrate" title="The “bitrate” property">bitrate</a></td>
+<td class="property_flags">Read / Write</td>
+</tr>
+<tr>
+<td class="property_type"><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a></td>
+<td class="property_name"><a href="OwrPayload.html#OwrPayload--clock-rate" title="The “clock-rate” property">clock-rate</a></td>
+<td class="property_flags">Read / Write / Construct Only</td>
+</tr>
+<tr>
+<td class="property_type"><span class="type">OwrCodecTypes</span></td>
+<td class="property_name"><a href="OwrPayload.html#OwrPayload--codec-type" title="The “codec-type” property">codec-type</a></td>
+<td class="property_flags">Read / Write / Construct Only</td>
+</tr>
+<tr>
+<td class="property_type"><span class="type">OwrMediaTypes</span></td>
+<td class="property_name"><a href="OwrPayload.html#OwrPayload--media-type" title="The “media-type” property">media-type</a></td>
+<td class="property_flags">Read</td>
+</tr>
+<tr>
+<td class="property_type"><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a></td>
+<td class="property_name"><a href="OwrPayload.html#OwrPayload--mtu" title="The “mtu” property">mtu</a></td>
+<td class="property_flags">Read / Write</td>
+</tr>
+<tr>
+<td class="property_type"><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a></td>
+<td class="property_name"><a href="OwrPayload.html#OwrPayload--payload-type" title="The “payload-type” property">payload-type</a></td>
+<td class="property_flags">Read / Write / Construct Only</td>
+</tr>
+<tr>
+<td class="property_type"><a href="../glib/glib-Basic-Types.html#gint"><span class="type">gint</span></a></td>
+<td class="property_name"><a href="OwrPayload.html#OwrPayload--rtx-payload-type" title="The “rtx-payload-type” property">rtx-payload-type</a></td>
+<td class="property_flags">Read / Write</td>
+</tr>
+<tr>
+<td class="property_type"><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a></td>
+<td class="property_name"><a href="OwrPayload.html#OwrPayload--rtx-time" title="The “rtx-time” property">rtx-time</a></td>
+<td class="property_flags">Read / Write</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrPayload.other"></a><h2>Types and Values</h2>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+</colgroup>
+<tbody><tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a href="OwrPayload.html#OWR-RTX-PAYLOAD-TYPE-DISABLED:CAPS" title="OWR_RTX_PAYLOAD_TYPE_DISABLED">OWR_RTX_PAYLOAD_TYPE_DISABLED</a></td>
+</tr></tbody>
+</table></div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrPayload.object-hierarchy"></a><h2>Object Hierarchy</h2>
+<pre class="screen">    <a href="../gobject/gobject-The-Base-Object-Type.html#GObject">GObject</a>
+    <span class="lineart">╰──</span> OwrPayload
+        <span class="lineart">├──</span> <a href="OwrAudioPayload.html" title="OwrAudioPayload">OwrAudioPayload</a>
+        <span class="lineart">╰──</span> <a href="OwrVideoPayload.html" title="OwrVideoPayload">OwrVideoPayload</a>
+</pre>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrPayload.description"></a><h2>Description</h2>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrPayload.functions_details"></a><h2>Functions</h2>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrPayload.other_details"></a><h2>Types and Values</h2>
+<div class="refsect2" lang="en">
+<a name="OWR-RTX-PAYLOAD-TYPE-DISABLED:CAPS"></a><h3>OWR_RTX_PAYLOAD_TYPE_DISABLED</h3>
+<pre class="programlisting">#define OWR_RTX_PAYLOAD_TYPE_DISABLED -1
+</pre>
+</div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrPayload.property-details"></a><h2>Property Details</h2>
+<div class="refsect2" lang="en">
+<a name="OwrPayload--bitrate"></a><h3>The <code class="literal">“bitrate”</code> property</h3>
+<pre class="programlisting">  “bitrate”                  <a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a></pre>
+<p>The bitrate (bits per second) for the encoder. (0 - automatic).</p>
+<p>Flags: Read / Write</p>
+<p>Default value: 0</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrPayload--clock-rate"></a><h3>The <code class="literal">“clock-rate”</code> property</h3>
+<pre class="programlisting">  “clock-rate”               <a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a></pre>
+<p>The clock-rate.</p>
+<p>Flags: Read / Write / Construct Only</p>
+<p>Allowed values: &lt;= 90000</p>
+<p>Default value: 8000</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrPayload--codec-type"></a><h3>The <code class="literal">“codec-type”</code> property</h3>
+<pre class="programlisting">  “codec-type”               <span class="type">OwrCodecTypes</span></pre>
+<p>The type of codec.</p>
+<p>Flags: Read / Write / Construct Only</p>
+<p>Default value: u-law PCM</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrPayload--media-type"></a><h3>The <code class="literal">“media-type”</code> property</h3>
+<pre class="programlisting">  “media-type”               <span class="type">OwrMediaTypes</span></pre>
+<p>The type of media.</p>
+<p>Flags: Read</p>
+<p>Default value: Audio media</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrPayload--mtu"></a><h3>The <code class="literal">“mtu”</code> property</h3>
+<pre class="programlisting">  “mtu”                      <a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a></pre>
+<p>The maximum size of one RTP packet (in bytes).</p>
+<p>Flags: Read / Write</p>
+<p>Default value: 1200</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrPayload--payload-type"></a><h3>The <code class="literal">“payload-type”</code> property</h3>
+<pre class="programlisting">  “payload-type”             <a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a></pre>
+<p>The payload type number.</p>
+<p>Flags: Read / Write / Construct Only</p>
+<p>Allowed values: &lt;= 127</p>
+<p>Default value: 0</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrPayload--rtx-payload-type"></a><h3>The <code class="literal">“rtx-payload-type”</code> property</h3>
+<pre class="programlisting">  “rtx-payload-type”         <a href="../glib/glib-Basic-Types.html#gint"><span class="type">gint</span></a></pre>
+<p>The payload type to use for retransmission. (-1 means no retransmission).</p>
+<p>Flags: Read / Write</p>
+<p>Allowed values: [-1,127]</p>
+<p>Default value: -1</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrPayload--rtx-time"></a><h3>The <code class="literal">“rtx-time”</code> property</h3>
+<pre class="programlisting">  “rtx-time”                 <a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a></pre>
+<p>How long a packet should be kept in buffers for retransmission (milliseconds, 0 means use the default).</p>
+<p>Flags: Read / Write</p>
+<p>Default value: 0</p>
+</div>
+</div>
+</div>
+<div class="footer">
+<hr>
+          Generated by GTK-Doc V1.21</div>
+</body>
+</html>

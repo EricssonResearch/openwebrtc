@@ -1,0 +1,463 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>OwrMediaSession</title>
+<meta name="generator" content="DocBook XSL Stylesheets V1.71.0">
+<link rel="start" href="index.html" title="openwebrtc Reference Manual">
+<link rel="up" href="ch01.html" title="[Insert title here]">
+<link rel="prev" href="OwrMediaRenderer.html" title="OwrMediaRenderer">
+<link rel="next" href="OwrMediaSource.html" title="OwrMediaSource">
+<meta name="generator" content="GTK-Doc V1.21 (XML mode)">
+<link rel="stylesheet" href="style.css" type="text/css">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="5"><tr valign="middle">
+<td width="100%" align="left" class="shortcuts">
+<a href="#" class="shortcut">Top</a><span id="nav_description">  <span class="dim">|</span> 
+                  <a href="#OwrMediaSession.description" class="shortcut">Description</a></span><span id="nav_hierarchy">  <span class="dim">|</span> 
+                  <a href="#OwrMediaSession.object-hierarchy" class="shortcut">Object Hierarchy</a></span><span id="nav_properties">  <span class="dim">|</span> 
+                  <a href="#OwrMediaSession.properties" class="shortcut">Properties</a></span><span id="nav_signals">  <span class="dim">|</span> 
+                  <a href="#OwrMediaSession.signals" class="shortcut">Signals</a></span>
+</td>
+<td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
+<td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
+<td><a accesskey="p" href="OwrMediaRenderer.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
+<td><a accesskey="n" href="OwrMediaSource.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
+</tr></table>
+<div class="refentry" lang="en">
+<a name="OwrMediaSession"></a><div class="titlepage"></div>
+<div class="refnamediv"><table width="100%"><tr>
+<td valign="top">
+<h2><span class="refentrytitle"><a name="OwrMediaSession.top_of_page"></a>OwrMediaSession</span></h2>
+<p>OwrMediaSession — OwrMediaSession</p>
+</td>
+<td class="gallery_image" valign="top" align="right"></td>
+</tr></table></div>
+<div class="refsect1" lang="en">
+<a name="OwrMediaSession.functions"></a><h2>Functions</h2>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="function_type">
+<a href="OwrMediaSession.html" title="OwrMediaSession"><span class="returnvalue">OwrMediaSession</span></a> *
+</td>
+<td class="function_name">
+<a href="OwrMediaSession.html#owr-media-session-new" title="owr_media_session_new ()">owr_media_session_new</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
+<a href="OwrMediaSession.html#owr-media-session-add-receive-payload" title="owr_media_session_add_receive_payload ()">owr_media_session_add_receive_payload</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
+<a href="OwrMediaSession.html#owr-media-session-set-send-payload" title="owr_media_session_set_send_payload ()">owr_media_session_set_send_payload</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
+<a href="OwrMediaSession.html#owr-media-session-set-send-source" title="owr_media_session_set_send_source ()">owr_media_session_set_send_source</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrMediaSession.properties"></a><h2>Properties</h2>
+<div class="informaltable"><table border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="property_type">
+<a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</td>
+<td class="property_name"><a href="OwrMediaSession.html#OwrMediaSession--cname" title="The “cname” property">cname</a></td>
+<td class="property_flags">Read</td>
+</tr>
+<tr>
+<td class="property_type">
+<a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</td>
+<td class="property_name"><a href="OwrMediaSession.html#OwrMediaSession--incoming-srtp-key" title="The “incoming-srtp-key” property">incoming-srtp-key</a></td>
+<td class="property_flags">Read / Write</td>
+</tr>
+<tr>
+<td class="property_type"><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a></td>
+<td class="property_name"><a href="OwrMediaSession.html#OwrMediaSession--jitter-buffer-latency" title="The “jitter-buffer-latency” property">jitter-buffer-latency</a></td>
+<td class="property_flags">Read / Write</td>
+</tr>
+<tr>
+<td class="property_type">
+<a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</td>
+<td class="property_name"><a href="OwrMediaSession.html#OwrMediaSession--outgoing-srtp-key" title="The “outgoing-srtp-key” property">outgoing-srtp-key</a></td>
+<td class="property_flags">Read / Write</td>
+</tr>
+<tr>
+<td class="property_type"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></td>
+<td class="property_name"><a href="OwrMediaSession.html#OwrMediaSession--rtcp-mux" title="The “rtcp-mux” property">rtcp-mux</a></td>
+<td class="property_flags">Read / Write</td>
+</tr>
+<tr>
+<td class="property_type"><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a></td>
+<td class="property_name"><a href="OwrMediaSession.html#OwrMediaSession--send-ssrc" title="The “send-ssrc” property">send-ssrc</a></td>
+<td class="property_flags">Read</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrMediaSession.signals"></a><h2>Signals</h2>
+<div class="informaltable"><table border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="signal_type"><span class="returnvalue">void</span></td>
+<td class="signal_name"><a href="OwrMediaSession.html#OwrMediaSession-on-incoming-source" title="The “on-incoming-source” signal">on-incoming-source</a></td>
+<td class="signal_flags">Cleanup</td>
+</tr>
+<tr>
+<td class="signal_type"><span class="returnvalue">void</span></td>
+<td class="signal_name"><a href="OwrMediaSession.html#OwrMediaSession-on-new-stats" title="The “on-new-stats” signal">on-new-stats</a></td>
+<td class="signal_flags">Cleanup</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrMediaSession.other"></a><h2>Types and Values</h2>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+</colgroup>
+<tbody><tr>
+<td class="datatype_keyword">struct</td>
+<td class="function_name"><a href="OwrMediaSession.html#OwrMediaSessionClass" title="struct OwrMediaSessionClass">OwrMediaSessionClass</a></td>
+</tr></tbody>
+</table></div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrMediaSession.object-hierarchy"></a><h2>Object Hierarchy</h2>
+<pre class="screen">    <a href="../gobject/gobject-The-Base-Object-Type.html#GObject">GObject</a>
+    <span class="lineart">╰──</span> <a href="OwrSession.html" title="OwrSession">OwrSession</a>
+        <span class="lineart">╰──</span> OwrMediaSession
+</pre>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrMediaSession.description"></a><h2>Description</h2>
+<p>OwrMediaSession - Represents one incoming and one outgoing media stream.</p>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrMediaSession.functions_details"></a><h2>Functions</h2>
+<div class="refsect2" lang="en">
+<a name="owr-media-session-new"></a><h3>owr_media_session_new ()</h3>
+<pre class="programlisting"><a href="OwrMediaSession.html" title="OwrMediaSession"><span class="returnvalue">OwrMediaSession</span></a> *
+owr_media_session_new (<em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> dtls_client_mode</code></em>);</pre>
+<p>Constructs the OwrMediaSession object.</p>
+<div class="refsect3" lang="en">
+<a name="idm491948888032"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody><tr>
+<td class="parameter_name"><p>dtls_client_mode</p></td>
+<td class="parameter_description"><p>TRUE if the connection for the session should be setup using DTLS client role</p></td>
+<td class="parameter_annotations"> </td>
+</tr></tbody>
+</table></div>
+</div>
+<div class="refsect3" lang="en">
+<a name="idm491950666640"></a><h4>Returns</h4>
+<p> the created media session</p>
+<p></p>
+</div>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="owr-media-session-add-receive-payload"></a><h3>owr_media_session_add_receive_payload ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+owr_media_session_add_receive_payload (<em class="parameter"><code><a href="OwrMediaSession.html" title="OwrMediaSession"><span class="type">OwrMediaSession</span></a> *media_session</code></em>,
+                                       <em class="parameter"><code><a href="OwrPayload.html" title="OwrPayload"><span class="type">OwrPayload</span></a> *payload</code></em>);</pre>
+<p>The function adds support for receiving the given payload type.</p>
+<div class="refsect3" lang="en">
+<a name="idm491956311104"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="parameter_name"><p>media_session</p></td>
+<td class="parameter_description"><p>the media session on which to add the receive payload.</p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+<tr>
+<td class="parameter_name"><p>payload</p></td>
+<td class="parameter_description"><p> the receive payload to add. </p></td>
+<td class="parameter_annotations"><span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>]</span></td>
+</tr>
+</tbody>
+</table></div>
+</div>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="owr-media-session-set-send-payload"></a><h3>owr_media_session_set_send_payload ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+owr_media_session_set_send_payload (<em class="parameter"><code><a href="OwrMediaSession.html" title="OwrMediaSession"><span class="type">OwrMediaSession</span></a> *media_session</code></em>,
+                                    <em class="parameter"><code><a href="OwrPayload.html" title="OwrPayload"><span class="type">OwrPayload</span></a> *payload</code></em>);</pre>
+<p>Sets what payload that will be sent.</p>
+<div class="refsect3" lang="en">
+<a name="idm491948805696"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="parameter_name"><p>media_session</p></td>
+<td class="parameter_description"><p>The media session on which set the send payload.</p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+<tr>
+<td class="parameter_name"><p>payload</p></td>
+<td class="parameter_description"><p> the send payload to set. </p></td>
+<td class="parameter_annotations"><span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>][<acronym title="NULL is OK, both for passing and for returning."><span class="acronym">allow-none</span></acronym>]</span></td>
+</tr>
+</tbody>
+</table></div>
+</div>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="owr-media-session-set-send-source"></a><h3>owr_media_session_set_send_source ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+owr_media_session_set_send_source (<em class="parameter"><code><a href="OwrMediaSession.html" title="OwrMediaSession"><span class="type">OwrMediaSession</span></a> *media_session</code></em>,
+                                   <em class="parameter"><code><a href="OwrMediaSource.html" title="OwrMediaSource"><span class="type">OwrMediaSource</span></a> *source</code></em>);</pre>
+<p>Sets the source from which data will be sent.</p>
+<div class="refsect3" lang="en">
+<a name="idm491947382720"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="parameter_name"><p>media_session</p></td>
+<td class="parameter_description"><p>The media session on which to set the send source.</p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+<tr>
+<td class="parameter_name"><p>source</p></td>
+<td class="parameter_description"><p> the send source to set. </p></td>
+<td class="parameter_annotations"><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>][<acronym title="NULL is OK, both for passing and for returning."><span class="acronym">allow-none</span></acronym>]</span></td>
+</tr>
+</tbody>
+</table></div>
+</div>
+</div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrMediaSession.other_details"></a><h2>Types and Values</h2>
+<div class="refsect2" lang="en">
+<a name="OwrMediaSessionClass"></a><h3>struct OwrMediaSessionClass</h3>
+<pre class="programlisting">struct OwrMediaSessionClass {
+    OwrSessionClass parent_class;
+
+    /* signals */
+    void (*on_new_stats)(OwrMediaSession *media_session, GHashTable *stats);
+    void (*on_incoming_source)(OwrMediaSession *media_session, OwrRemoteMediaSource *source);
+};
+</pre>
+<p>The session class.</p>
+<div class="refsect3" lang="en">
+<a name="idm491950735600"></a><h4>Members</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="struct_member_name"><p><a href="OwrSession.html#OwrSessionClass" title="struct OwrSessionClass"><span class="type">OwrSessionClass</span></a> <em class="structfield"><code><a name="OwrMediaSessionClass.parent-class"></a>parent_class</code></em>;</p></td>
+<td class="struct_member_description"><p>the GObject parent</p></td>
+<td class="struct_member_annotations"> </td>
+</tr>
+<tr>
+<td class="struct_member_name"><p><em class="structfield"><code><a name="OwrMediaSessionClass.on-new-stats"></a>on_new_stats</code></em> ()</p></td>
+<td class="struct_member_description"><p>emitted when there's new stats</p></td>
+<td class="struct_member_annotations"> </td>
+</tr>
+<tr>
+<td class="struct_member_name"><p><em class="structfield"><code><a name="OwrMediaSessionClass.on-incoming-source"></a>on_incoming_source</code></em> ()</p></td>
+<td class="struct_member_description"><p>emitted to notify of a new incoming source</p></td>
+<td class="struct_member_annotations"> </td>
+</tr>
+</tbody>
+</table></div>
+</div>
+</div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrMediaSession.property-details"></a><h2>Property Details</h2>
+<div class="refsect2" lang="en">
+<a name="OwrMediaSession--cname"></a><h3>The <code class="literal">“cname”</code> property</h3>
+<pre class="programlisting">  “cname”                    <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</pre>
+<p>The canonical name identifying this endpoint.</p>
+<p>Flags: Read</p>
+<p>Default value: NULL</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrMediaSession--incoming-srtp-key"></a><h3>The <code class="literal">“incoming-srtp-key”</code> property</h3>
+<pre class="programlisting">  “incoming-srtp-key”        <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</pre>
+<p>Key used to decrypt incoming SRTP packets (base64 encoded).</p>
+<p>Flags: Read / Write</p>
+<p>Default value: NULL</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrMediaSession--jitter-buffer-latency"></a><h3>The <code class="literal">“jitter-buffer-latency”</code> property</h3>
+<pre class="programlisting">  “jitter-buffer-latency”    <a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a></pre>
+<p>The latency introduced by the jitter buffer for this session in ms.</p>
+<p>Flags: Read / Write</p>
+<p>Default value: 50</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrMediaSession--outgoing-srtp-key"></a><h3>The <code class="literal">“outgoing-srtp-key”</code> property</h3>
+<pre class="programlisting">  “outgoing-srtp-key”        <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</pre>
+<p>Key used to encrypt outgoing SRTP packets (base64 encoded).</p>
+<p>Flags: Read / Write</p>
+<p>Default value: NULL</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrMediaSession--rtcp-mux"></a><h3>The <code class="literal">“rtcp-mux”</code> property</h3>
+<pre class="programlisting">  “rtcp-mux”                 <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></pre>
+<p>Whether to use RTP/RTCP multiplexing or not. Once RTP/RTCP multiplexing has been enabled, it cannot be disabled again.</p>
+<p>Flags: Read / Write</p>
+<p>Default value: FALSE</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrMediaSession--send-ssrc"></a><h3>The <code class="literal">“send-ssrc”</code> property</h3>
+<pre class="programlisting">  “send-ssrc”                <a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a></pre>
+<p>The ssrc used for the outgoing RTP media stream.</p>
+<p>Flags: Read</p>
+<p>Default value: 0</p>
+</div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrMediaSession.signal-details"></a><h2>Signal Details</h2>
+<div class="refsect2" lang="en">
+<a name="OwrMediaSession-on-incoming-source"></a><h3>The <code class="literal">“on-incoming-source”</code> signal</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+user_function (<a href="OwrMediaSession.html" title="OwrMediaSession"><span class="type">OwrMediaSession</span></a>      *media_session,
+               <a href="OwrRemoteMediaSource.html" title="OwrRemoteMediaSource"><span class="type">OwrRemoteMediaSource</span></a> *source,
+               <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>              user_data)</pre>
+<p>Notify of a new incoming source for a <a href="OwrMediaSession.html" title="OwrMediaSession"><span class="type">OwrMediaSession</span></a>.</p>
+<div class="refsect3" lang="en">
+<a name="idm491947951696"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="parameter_name"><p>media_session</p></td>
+<td class="parameter_description"><p>the object which received the signal</p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+<tr>
+<td class="parameter_name"><p>source</p></td>
+<td class="parameter_description"><p> the new incoming source. </p></td>
+<td class="parameter_annotations"><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></td>
+</tr>
+<tr>
+<td class="parameter_name"><p>user_data</p></td>
+<td class="parameter_description"><p>user data set when the signal handler was connected.</p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<p>Flags: Cleanup</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrMediaSession-on-new-stats"></a><h3>The <code class="literal">“on-new-stats”</code> signal</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+user_function (<a href="OwrMediaSession.html" title="OwrMediaSession"><span class="type">OwrMediaSession</span></a> *media_session,
+               <a href="../glib/glib-Hash-Tables.html#GHashTable"><span class="type">GHashTable</span></a>      *stats,
+               <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>         user_data)</pre>
+<p>Notify of new stats for a <a href="OwrMediaSession.html" title="OwrMediaSession"><span class="type">OwrMediaSession</span></a>.</p>
+<div class="refsect3" lang="en">
+<a name="idm491948121664"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="parameter_name"><p>media_session</p></td>
+<td class="parameter_description"><p>the <a href="OwrMediaSession.html" title="OwrMediaSession"><span class="type">OwrMediaSession</span></a> object which received the signal</p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+<tr>
+<td class="parameter_name"><p>stats</p></td>
+<td class="parameter_description"><p> the stats <a href="../glib/glib-Hash-Tables.html#GHashTable"><span class="type">GHashTable</span></a>. </p></td>
+<td class="parameter_annotations"><span class="annotation">[<acronym title="Generics and defining elements of containers and arrays."><span class="acronym">element-type</span></acronym> utf8 GValue][<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></td>
+</tr>
+<tr>
+<td class="parameter_name"><p>user_data</p></td>
+<td class="parameter_description"><p>user data set when the signal handler was connected.</p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<p>Flags: Cleanup</p>
+</div>
+</div>
+</div>
+<div class="footer">
+<hr>
+          Generated by GTK-Doc V1.21</div>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>OwrMediaSource</title>
+<meta name="generator" content="DocBook XSL Stylesheets V1.71.0">
+<link rel="start" href="index.html" title="openwebrtc Reference Manual">
+<link rel="up" href="ch01.html" title="[Insert title here]">
+<link rel="prev" href="OwrMediaSession.html" title="OwrMediaSession">
+<link rel="next" href="OwrMessageOrigin.html" title="OwrMessageOrigin">
+<meta name="generator" content="GTK-Doc V1.21 (XML mode)">
+<link rel="stylesheet" href="style.css" type="text/css">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="5"><tr valign="middle">
+<td width="100%" align="left" class="shortcuts">
+<a href="#" class="shortcut">Top</a><span id="nav_description">  <span class="dim">|</span> 
+                  <a href="#OwrMediaSource.description" class="shortcut">Description</a></span><span id="nav_hierarchy">  <span class="dim">|</span> 
+                  <a href="#OwrMediaSource.object-hierarchy" class="shortcut">Object Hierarchy</a></span><span id="nav_properties">  <span class="dim">|</span> 
+                  <a href="#OwrMediaSource.properties" class="shortcut">Properties</a></span>
+</td>
+<td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
+<td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
+<td><a accesskey="p" href="OwrMediaSession.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
+<td><a accesskey="n" href="OwrMessageOrigin.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
+</tr></table>
+<div class="refentry" lang="en">
+<a name="OwrMediaSource"></a><div class="titlepage"></div>
+<div class="refnamediv"><table width="100%"><tr>
+<td valign="top">
+<h2><span class="refentrytitle"><a name="OwrMediaSource.top_of_page"></a>OwrMediaSource</span></h2>
+<p>OwrMediaSource</p>
+</td>
+<td class="gallery_image" valign="top" align="right"></td>
+</tr></table></div>
+<div class="refsect1" lang="en">
+<a name="OwrMediaSource.functions"></a><h2>Functions</h2>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+</colgroup>
+<tbody><tr>
+<td class="function_type">
+<a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
+</td>
+<td class="function_name">
+<a href="OwrMediaSource.html#owr-media-source-get-dot-data" title="owr_media_source_get_dot_data ()">owr_media_source_get_dot_data</a> <span class="c_punctuation">()</span>
+</td>
+</tr></tbody>
+</table></div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrMediaSource.properties"></a><h2>Properties</h2>
+<div class="informaltable"><table border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="property_type"><span class="type">OwrMediaTypes</span></td>
+<td class="property_name"><a href="OwrMediaSource.html#OwrMediaSource--media-type" title="The “media-type” property">media-type</a></td>
+<td class="property_flags">Read / Write / Construct Only</td>
+</tr>
+<tr>
+<td class="property_type">
+<a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</td>
+<td class="property_name"><a href="OwrMediaSource.html#OwrMediaSource--name" title="The “name” property">name</a></td>
+<td class="property_flags">Read / Write / Construct Only</td>
+</tr>
+<tr>
+<td class="property_type"><span class="type">OwrSourceTypes</span></td>
+<td class="property_name"><a href="OwrMediaSource.html#OwrMediaSource--type" title="The “type” property">type</a></td>
+<td class="property_flags">Read / Write / Construct Only</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrMediaSource.object-hierarchy"></a><h2>Object Hierarchy</h2>
+<pre class="screen">    <a href="../gobject/gobject-The-Base-Object-Type.html#GObject">GObject</a>
+    <span class="lineart">╰──</span> OwrMediaSource
+        <span class="lineart">├──</span> <a href="OwrLocalMediaSource.html" title="OwrLocalMediaSource">OwrLocalMediaSource</a>
+        <span class="lineart">╰──</span> <a href="OwrRemoteMediaSource.html" title="OwrRemoteMediaSource">OwrRemoteMediaSource</a>
+</pre>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrMediaSource.description"></a><h2>Description</h2>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrMediaSource.functions_details"></a><h2>Functions</h2>
+<div class="refsect2" lang="en">
+<a name="owr-media-source-get-dot-data"></a><h3>owr_media_source_get_dot_data ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
+owr_media_source_get_dot_data (<em class="parameter"><code><a href="OwrMediaSource.html" title="OwrMediaSource"><span class="type">OwrMediaSource</span></a> *source</code></em>);</pre>
+</div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrMediaSource.other_details"></a><h2>Types and Values</h2>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrMediaSource.property-details"></a><h2>Property Details</h2>
+<div class="refsect2" lang="en">
+<a name="OwrMediaSource--media-type"></a><h3>The <code class="literal">“media-type”</code> property</h3>
+<pre class="programlisting">  “media-type”               <span class="type">OwrMediaTypes</span></pre>
+<p>The type of media provided by this source.</p>
+<p>Flags: Read / Write / Construct Only</p>
+<p>Default value: Unknown media</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrMediaSource--name"></a><h3>The <code class="literal">“name”</code> property</h3>
+<pre class="programlisting">  “name”                     <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</pre>
+<p>Human readable and meaningful source name.</p>
+<p>Flags: Read / Write / Construct Only</p>
+<p>Default value: NULL</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrMediaSource--type"></a><h3>The <code class="literal">“type”</code> property</h3>
+<pre class="programlisting">  “type”                     <span class="type">OwrSourceTypes</span></pre>
+<p>The type of source in terms of how it generates media.</p>
+<p>Flags: Read / Write / Construct Only</p>
+<p>Default value: Unknown source</p>
+</div>
+</div>
+</div>
+<div class="footer">
+<hr>
+          Generated by GTK-Doc V1.21</div>
+</body>
+</html>

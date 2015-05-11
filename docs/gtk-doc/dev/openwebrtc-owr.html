@@ -1,0 +1,135 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>owr</title>
+<meta name="generator" content="DocBook XSL Stylesheets V1.71.0">
+<link rel="start" href="index.html" title="openwebrtc Reference Manual">
+<link rel="up" href="ch01.html" title="[Insert title here]">
+<link rel="prev" href="ch01.html" title="[Insert title here]">
+<link rel="next" href="OwrAudioPayload.html" title="OwrAudioPayload">
+<meta name="generator" content="GTK-Doc V1.21 (XML mode)">
+<link rel="stylesheet" href="style.css" type="text/css">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="5"><tr valign="middle">
+<td width="100%" align="left" class="shortcuts">
+<a href="#" class="shortcut">Top</a><span id="nav_description">  <span class="dim">|</span> 
+                  <a href="#openwebrtc-owr.description" class="shortcut">Description</a></span>
+</td>
+<td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
+<td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
+<td><a accesskey="p" href="ch01.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
+<td><a accesskey="n" href="OwrAudioPayload.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
+</tr></table>
+<div class="refentry" lang="en">
+<a name="openwebrtc-owr"></a><div class="titlepage"></div>
+<div class="refnamediv"><table width="100%"><tr>
+<td valign="top">
+<h2><span class="refentrytitle"><a name="openwebrtc-owr.top_of_page"></a>owr</span></h2>
+<p>owr</p>
+</td>
+<td class="gallery_image" valign="top" align="right"></td>
+</tr></table></div>
+<div class="refsect1" lang="en">
+<a name="openwebrtc-owr.functions"></a><h2>Functions</h2>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
+<a href="openwebrtc-owr.html#owr-init" title="owr_init ()">owr_init</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
+<a href="openwebrtc-owr.html#owr-run" title="owr_run ()">owr_run</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
+<a href="openwebrtc-owr.html#owr-run-in-background" title="owr_run_in_background ()">owr_run_in_background</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
+<a href="openwebrtc-owr.html#owr-quit" title="owr_quit ()">owr_quit</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<div class="refsect1" lang="en">
+<a name="openwebrtc-owr.description"></a><h2>Description</h2>
+<p>Functions to initialize the OpenWebRTC library.</p>
+</div>
+<div class="refsect1" lang="en">
+<a name="openwebrtc-owr.functions_details"></a><h2>Functions</h2>
+<div class="refsect2" lang="en">
+<a name="owr-init"></a><h3>owr_init ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+owr_init (<em class="parameter"><code><a href="../glib/glib-The-Main-Event-Loop.html#GMainContext"><span class="type">GMainContext</span></a> *main_context</code></em>);</pre>
+<p>Initializes the OpenWebRTC library.</p>
+<div class="refsect3" lang="en">
+<a name="idm491946526224"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody><tr>
+<td class="parameter_name"><p>ctx</p></td>
+<td class="parameter_description"><p><a href="../glib/glib-The-Main-Event-Loop.html#GMainContext"><span class="type">GMainContext</span></a> to use inside OpenWebRTC, if NULL is passed the default main context is used.</p></td>
+<td class="parameter_annotations"> </td>
+</tr></tbody>
+</table></div>
+</div>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="owr-run"></a><h3>owr_run ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+owr_run (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
+<p>Runs the OpenWebRTC main-loop inside the current thread.</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="owr-run-in-background"></a><h3>owr_run_in_background ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+owr_run_in_background (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
+<p>Creates a new thread and runs the OpenWebRTC main-loop inside that thread.
+This function does not return until the thread has started and the mainloop is running.</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="owr-quit"></a><h3>owr_quit ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+owr_quit (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
+<p>Quits the OpenWebRTC main-loop, and stops the background thread if owr_run_in_background was used.</p>
+</div>
+</div>
+<div class="refsect1" lang="en">
+<a name="openwebrtc-owr.other_details"></a><h2>Types and Values</h2>
+</div>
+</div>
+<div class="footer">
+<hr>
+          Generated by GTK-Doc V1.21</div>
+</body>
+</html>

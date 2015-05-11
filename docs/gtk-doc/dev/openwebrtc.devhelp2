@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE book PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "">
+<book xmlns="http://www.devhelp.net/book" title="openwebrtc Reference Manual" link="index.html" author="" name="openwebrtc" version="2" language="c">
+  <chapters>
+    <sub name="[Insert title here]" link="ch01.html">
+      <sub name="owr" link="openwebrtc-owr.html"/>
+      <sub name="OwrAudioPayload" link="OwrAudioPayload.html"/>
+      <sub name="OwrAudioRenderer" link="OwrAudioRenderer.html"/>
+      <sub name="OwrBus" link="OwrBus.html"/>
+      <sub name="OwrCandidate" link="OwrCandidate.html"/>
+      <sub name="OwrDataChannel" link="OwrDataChannel.html"/>
+      <sub name="OwrDataSession" link="OwrDataSession.html"/>
+      <sub name="OwrImageRenderer" link="OwrImageRenderer.html"/>
+      <sub name="OwrImageServer" link="OwrImageServer.html"/>
+      <sub name="owr_local" link="openwebrtc-owr-local.html"/>
+      <sub name="OwrLocalMediaSource" link="OwrLocalMediaSource.html"/>
+      <sub name="OwrMediaRenderer" link="OwrMediaRenderer.html"/>
+      <sub name="OwrMediaSession" link="OwrMediaSession.html"/>
+      <sub name="OwrMediaSource" link="OwrMediaSource.html"/>
+      <sub name="OwrMessageOrigin" link="OwrMessageOrigin.html"/>
+      <sub name="OwrPayload" link="OwrPayload.html"/>
+      <sub name="OwrRemoteMediaSource" link="OwrRemoteMediaSource.html"/>
+      <sub name="OwrSession" link="OwrSession.html"/>
+      <sub name="OwrTransportAgent" link="OwrTransportAgent.html"/>
+      <sub name="owr_types" link="openwebrtc-owr-types.html"/>
+      <sub name="OwrVideoPayload" link="OwrVideoPayload.html"/>
+      <sub name="OwrVideoRenderer" link="OwrVideoRenderer.html"/>
+      <sub name="OwrWindowRegistry" link="OwrWindowRegistry.html"/>
+    </sub>
+    <sub name="Object Hierarchy" link="object-tree.html"/>
+    <sub name="API Index" link="api-index-full.html"/>
+    <sub name="Index of deprecated API" link="deprecated-api-index.html"/>
+    <sub name="Annotation Glossary" link="annotation-glossary.html"/>
+  </chapters>
+  <functions>
+    <keyword type="function" name="owr_init ()" link="openwebrtc-owr.html#owr-init"/>
+    <keyword type="function" name="owr_run ()" link="openwebrtc-owr.html#owr-run"/>
+    <keyword type="function" name="owr_run_in_background ()" link="openwebrtc-owr.html#owr-run-in-background"/>
+    <keyword type="function" name="owr_quit ()" link="openwebrtc-owr.html#owr-quit"/>
+    <keyword type="function" name="owr_audio_payload_new ()" link="OwrAudioPayload.html#owr-audio-payload-new"/>
+    <keyword type="property" name="The “channels” property" link="OwrAudioPayload.html#OwrAudioPayload--channels"/>
+    <keyword type="property" name="The “ptime” property" link="OwrAudioPayload.html#OwrAudioPayload--ptime"/>
+    <keyword type="function" name="owr_audio_renderer_new ()" link="OwrAudioRenderer.html#owr-audio-renderer-new"/>
+    <keyword type="function" name="OwrBusMessageCallback ()" link="OwrBus.html#OwrBusMessageCallback"/>
+    <keyword type="function" name="owr_bus_new ()" link="OwrBus.html#owr-bus-new"/>
+    <keyword type="function" name="owr_bus_set_message_callback ()" link="OwrBus.html#owr-bus-set-message-callback"/>
+    <keyword type="function" name="owr_bus_add_message_origin ()" link="OwrBus.html#owr-bus-add-message-origin"/>
+    <keyword type="function" name="owr_bus_remove_message_origin ()" link="OwrBus.html#owr-bus-remove-message-origin"/>
+    <keyword type="enum" name="enum OwrMessageSubType" link="OwrBus.html#OwrMessageSubType"/>
+    <keyword type="property" name="The “message-type-mask” property" link="OwrBus.html#OwrBus--message-type-mask"/>
+    <keyword type="function" name="owr_candidate_new ()" link="OwrCandidate.html#owr-candidate-new"/>
+    <keyword type="property" name="The “address” property" link="OwrCandidate.html#OwrCandidate--address"/>
+    <keyword type="property" name="The “base-address” property" link="OwrCandidate.html#OwrCandidate--base-address"/>
+    <keyword type="property" name="The “base-port” property" link="OwrCandidate.html#OwrCandidate--base-port"/>
+    <keyword type="property" name="The “component-type” property" link="OwrCandidate.html#OwrCandidate--component-type"/>
+    <keyword type="property" name="The “foundation” property" link="OwrCandidate.html#OwrCandidate--foundation"/>
+    <keyword type="property" name="The “password” property" link="OwrCandidate.html#OwrCandidate--password"/>
+    <keyword type="property" name="The “port” property" link="OwrCandidate.html#OwrCandidate--port"/>
+    <keyword type="property" name="The “priority” property" link="OwrCandidate.html#OwrCandidate--priority"/>
+    <keyword type="property" name="The “transport-type” property" link="OwrCandidate.html#OwrCandidate--transport-type"/>
+    <keyword type="property" name="The “type” property" link="OwrCandidate.html#OwrCandidate--type"/>
+    <keyword type="property" name="The “ufrag” property" link="OwrCandidate.html#OwrCandidate--ufrag"/>
+    <keyword type="macro" name="OWR_DATA_CHANNEL_READY_STATE_TYPE" link="OwrDataChannel.html#OWR-DATA-CHANNEL-READY-STATE-TYPE:CAPS"/>
+    <keyword type="function" name="owr_data_channel_new ()" link="OwrDataChannel.html#owr-data-channel-new"/>
+    <keyword type="function" name="owr_data_channel_send ()" link="OwrDataChannel.html#owr-data-channel-send"/>
+    <keyword type="function" name="owr_data_channel_send_binary ()" link="OwrDataChannel.html#owr-data-channel-send-binary"/>
+    <keyword type="function" name="owr_data_channel_close ()" link="OwrDataChannel.html#owr-data-channel-close"/>
+    <keyword type="property" name="The “buffered-amount” property" link="OwrDataChannel.html#OwrDataChannel--buffered-amount"/>
+    <keyword type="property" name="The “id” property" link="OwrDataChannel.html#OwrDataChannel--id"/>
+    <keyword type="property" name="The “label” property" link="OwrDataChannel.html#OwrDataChannel--label"/>
+    <keyword type="property" name="The “max-packet-life-time” property" link="OwrDataChannel.html#OwrDataChannel--max-packet-life-time"/>
+    <keyword type="property" name="The “max-retransmits” property" link="OwrDataChannel.html#OwrDataChannel--max-retransmits"/>
+    <keyword type="property" name="The “negotiated” property" link="OwrDataChannel.html#OwrDataChannel--negotiated"/>
+    <keyword type="property" name="The “ordered” property" link="OwrDataChannel.html#OwrDataChannel--ordered"/>
+    <keyword type="property" name="The “protocol” property" link="OwrDataChannel.html#OwrDataChannel--protocol"/>
+    <keyword type="property" name="The “ready-state” property" link="OwrDataChannel.html#OwrDataChannel--ready-state"/>
+    <keyword type="signal" name="The “on-binary-data” signal" link="OwrDataChannel.html#OwrDataChannel-on-binary-data"/>
+    <keyword type="signal" name="The “on-data” signal" link="OwrDataChannel.html#OwrDataChannel-on-data"/>
+    <keyword type="function" name="owr_data_session_new ()" link="OwrDataSession.html#owr-data-session-new"/>
+    <keyword type="function" name="owr_data_session_add_data_channel ()" link="OwrDataSession.html#owr-data-session-add-data-channel"/>
+    <keyword type="struct" name="struct OwrDataSessionClass" link="OwrDataSession.html#OwrDataSessionClass"/>
+    <keyword type="property" name="The “sctp-local-port” property" link="OwrDataSession.html#OwrDataSession--sctp-local-port"/>
+    <keyword type="property" name="The “sctp-remote-port” property" link="OwrDataSession.html#OwrDataSession--sctp-remote-port"/>
+    <keyword type="property" name="The “use-sock-stream” property" link="OwrDataSession.html#OwrDataSession--use-sock-stream"/>
+    <keyword type="signal" name="The “on-data-channel-requested” signal" link="OwrDataSession.html#OwrDataSession-on-data-channel-requested"/>
+    <keyword type="function" name="owr_image_renderer_new ()" link="OwrImageRenderer.html#owr-image-renderer-new"/>
+    <keyword type="property" name="The “height” property" link="OwrImageRenderer.html#OwrImageRenderer--height"/>
+    <keyword type="property" name="The “max-framerate” property" link="OwrImageRenderer.html#OwrImageRenderer--max-framerate"/>
+    <keyword type="property" name="The “width” property" link="OwrImageRenderer.html#OwrImageRenderer--width"/>
+    <keyword type="function" name="owr_image_server_new ()" link="OwrImageServer.html#owr-image-server-new"/>
+    <keyword type="function" name="owr_image_server_add_image_renderer ()" link="OwrImageServer.html#owr-image-server-add-image-renderer"/>
+    <keyword type="function" name="owr_image_server_remove_image_renderer ()" link="OwrImageServer.html#owr-image-server-remove-image-renderer"/>
+    <keyword type="property" name="The “allow-origin” property" link="OwrImageServer.html#OwrImageServer--allow-origin"/>
+    <keyword type="property" name="The “port” property" link="OwrImageServer.html#OwrImageServer--port"/>
+    <keyword type="function" name="OwrCaptureSourcesCallback ()" link="openwebrtc-owr-local.html#OwrCaptureSourcesCallback"/>
+    <keyword type="function" name="owr_get_capture_sources ()" link="openwebrtc-owr-local.html#owr-get-capture-sources"/>
+    <keyword type="property" name="The “device-index” property" link="OwrLocalMediaSource.html#OwrLocalMediaSource--device-index"/>
+    <keyword type="function" name="owr_media_renderer_set_source ()" link="OwrMediaRenderer.html#owr-media-renderer-set-source"/>
+    <keyword type="function" name="owr_media_renderer_get_dot_data ()" link="OwrMediaRenderer.html#owr-media-renderer-get-dot-data"/>
+    <keyword type="property" name="The “disabled” property" link="OwrMediaRenderer.html#OwrMediaRenderer--disabled"/>
+    <keyword type="property" name="The “media-type” property" link="OwrMediaRenderer.html#OwrMediaRenderer--media-type"/>
+    <keyword type="function" name="owr_media_session_new ()" link="OwrMediaSession.html#owr-media-session-new"/>
+    <keyword type="function" name="owr_media_session_add_receive_payload ()" link="OwrMediaSession.html#owr-media-session-add-receive-payload"/>
+    <keyword type="function" name="owr_media_session_set_send_payload ()" link="OwrMediaSession.html#owr-media-session-set-send-payload"/>
+    <keyword type="function" name="owr_media_session_set_send_source ()" link="OwrMediaSession.html#owr-media-session-set-send-source"/>
+    <keyword type="struct" name="struct OwrMediaSessionClass" link="OwrMediaSession.html#OwrMediaSessionClass"/>
+    <keyword type="property" name="The “cname” property" link="OwrMediaSession.html#OwrMediaSession--cname"/>
+    <keyword type="property" name="The “incoming-srtp-key” property" link="OwrMediaSession.html#OwrMediaSession--incoming-srtp-key"/>
+    <keyword type="property" name="The “jitter-buffer-latency” property" link="OwrMediaSession.html#OwrMediaSession--jitter-buffer-latency"/>
+    <keyword type="property" name="The “outgoing-srtp-key” property" link="OwrMediaSession.html#OwrMediaSession--outgoing-srtp-key"/>
+    <keyword type="property" name="The “rtcp-mux” property" link="OwrMediaSession.html#OwrMediaSession--rtcp-mux"/>
+    <keyword type="property" name="The “send-ssrc” property" link="OwrMediaSession.html#OwrMediaSession--send-ssrc"/>
+    <keyword type="signal" name="The “on-incoming-source” signal" link="OwrMediaSession.html#OwrMediaSession-on-incoming-source"/>
+    <keyword type="signal" name="The “on-new-stats” signal" link="OwrMediaSession.html#OwrMediaSession-on-new-stats"/>
+    <keyword type="function" name="owr_media_source_get_dot_data ()" link="OwrMediaSource.html#owr-media-source-get-dot-data"/>
+    <keyword type="property" name="The “media-type” property" link="OwrMediaSource.html#OwrMediaSource--media-type"/>
+    <keyword type="property" name="The “name” property" link="OwrMediaSource.html#OwrMediaSource--name"/>
+    <keyword type="property" name="The “type” property" link="OwrMediaSource.html#OwrMediaSource--type"/>
+    <keyword type="struct" name="struct OwrMessageOriginInterface" link="OwrMessageOrigin.html#OwrMessageOriginInterface"/>
+    <keyword type="macro" name="OWR_RTX_PAYLOAD_TYPE_DISABLED" link="OwrPayload.html#OWR-RTX-PAYLOAD-TYPE-DISABLED:CAPS"/>
+    <keyword type="property" name="The “bitrate” property" link="OwrPayload.html#OwrPayload--bitrate"/>
+    <keyword type="property" name="The “clock-rate” property" link="OwrPayload.html#OwrPayload--clock-rate"/>
+    <keyword type="property" name="The “codec-type” property" link="OwrPayload.html#OwrPayload--codec-type"/>
+    <keyword type="property" name="The “media-type” property" link="OwrPayload.html#OwrPayload--media-type"/>
+    <keyword type="property" name="The “mtu” property" link="OwrPayload.html#OwrPayload--mtu"/>
+    <keyword type="property" name="The “payload-type” property" link="OwrPayload.html#OwrPayload--payload-type"/>
+    <keyword type="property" name="The “rtx-payload-type” property" link="OwrPayload.html#OwrPayload--rtx-payload-type"/>
+    <keyword type="property" name="The “rtx-time” property" link="OwrPayload.html#OwrPayload--rtx-time"/>
+    <keyword type="function" name="owr_session_add_remote_candidate ()" link="OwrSession.html#owr-session-add-remote-candidate"/>
+    <keyword type="function" name="owr_session_force_remote_candidate ()" link="OwrSession.html#owr-session-force-remote-candidate"/>
+    <keyword type="struct" name="struct OwrSessionClass" link="OwrSession.html#OwrSessionClass"/>
+    <keyword type="property" name="The “dtls-certificate” property" link="OwrSession.html#OwrSession--dtls-certificate"/>
+    <keyword type="property" name="The “dtls-client-mode” property" link="OwrSession.html#OwrSession--dtls-client-mode"/>
+    <keyword type="property" name="The “dtls-key” property" link="OwrSession.html#OwrSession--dtls-key"/>
+    <keyword type="property" name="The “dtls-peer-certificate” property" link="OwrSession.html#OwrSession--dtls-peer-certificate"/>
+    <keyword type="property" name="The “ice-connection-state” property" link="OwrSession.html#OwrSession--ice-connection-state"/>
+    <keyword type="signal" name="The “on-candidate-gathering-done” signal" link="OwrSession.html#OwrSession-on-candidate-gathering-done"/>
+    <keyword type="signal" name="The “on-new-candidate” signal" link="OwrSession.html#OwrSession-on-new-candidate"/>
+    <keyword type="function" name="owr_transport_agent_new ()" link="OwrTransportAgent.html#owr-transport-agent-new"/>
+    <keyword type="function" name="owr_transport_agent_add_helper_server ()" link="OwrTransportAgent.html#owr-transport-agent-add-helper-server"/>
+    <keyword type="function" name="owr_transport_agent_add_local_address ()" link="OwrTransportAgent.html#owr-transport-agent-add-local-address"/>
+    <keyword type="function" name="owr_transport_agent_set_local_port_range ()" link="OwrTransportAgent.html#owr-transport-agent-set-local-port-range"/>
+    <keyword type="function" name="owr_transport_agent_add_session ()" link="OwrTransportAgent.html#owr-transport-agent-add-session"/>
+    <keyword type="function" name="owr_transport_agent_get_dot_data ()" link="OwrTransportAgent.html#owr-transport-agent-get-dot-data"/>
+    <keyword type="enum" name="enum OwrHelperServerType" link="OwrTransportAgent.html#OwrHelperServerType"/>
+    <keyword type="property" name="The “ice-controlling-mode” property" link="OwrTransportAgent.html#OwrTransportAgent--ice-controlling-mode"/>
+    <keyword type="function" name="owr_video_payload_new ()" link="OwrVideoPayload.html#owr-video-payload-new"/>
+    <keyword type="property" name="The “ccm-fir” property" link="OwrVideoPayload.html#OwrVideoPayload--ccm-fir"/>
+    <keyword type="property" name="The “framerate” property" link="OwrVideoPayload.html#OwrVideoPayload--framerate"/>
+    <keyword type="property" name="The “height” property" link="OwrVideoPayload.html#OwrVideoPayload--height"/>
+    <keyword type="property" name="The “mirror” property" link="OwrVideoPayload.html#OwrVideoPayload--mirror"/>
+    <keyword type="property" name="The “nack-pli” property" link="OwrVideoPayload.html#OwrVideoPayload--nack-pli"/>
+    <keyword type="property" name="The “rotation” property" link="OwrVideoPayload.html#OwrVideoPayload--rotation"/>
+    <keyword type="property" name="The “width” property" link="OwrVideoPayload.html#OwrVideoPayload--width"/>
+    <keyword type="function" name="owr_video_renderer_new ()" link="OwrVideoRenderer.html#owr-video-renderer-new"/>
+    <keyword type="property" name="The “height” property" link="OwrVideoRenderer.html#OwrVideoRenderer--height"/>
+    <keyword type="property" name="The “max-framerate” property" link="OwrVideoRenderer.html#OwrVideoRenderer--max-framerate"/>
+    <keyword type="property" name="The “mirror” property" link="OwrVideoRenderer.html#OwrVideoRenderer--mirror"/>
+    <keyword type="property" name="The “rotation” property" link="OwrVideoRenderer.html#OwrVideoRenderer--rotation"/>
+    <keyword type="property" name="The “tag” property" link="OwrVideoRenderer.html#OwrVideoRenderer--tag"/>
+    <keyword type="property" name="The “width” property" link="OwrVideoRenderer.html#OwrVideoRenderer--width"/>
+    <keyword type="function" name="owr_window_registry_get ()" link="OwrWindowRegistry.html#owr-window-registry-get"/>
+    <keyword type="function" name="owr_window_registry_register ()" link="OwrWindowRegistry.html#owr-window-registry-register"/>
+    <keyword type="function" name="owr_window_registry_unregister ()" link="OwrWindowRegistry.html#owr-window-registry-unregister"/>
+    <keyword type="typedef" name="OwrWindowHandle" link="OwrWindowRegistry.html#OwrWindowHandle"/>
+  </functions>
+</book>

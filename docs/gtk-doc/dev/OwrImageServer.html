@@ -1,0 +1,189 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>OwrImageServer</title>
+<meta name="generator" content="DocBook XSL Stylesheets V1.71.0">
+<link rel="start" href="index.html" title="openwebrtc Reference Manual">
+<link rel="up" href="ch01.html" title="[Insert title here]">
+<link rel="prev" href="OwrImageRenderer.html" title="OwrImageRenderer">
+<link rel="next" href="openwebrtc-owr-local.html" title="owr_local">
+<meta name="generator" content="GTK-Doc V1.21 (XML mode)">
+<link rel="stylesheet" href="style.css" type="text/css">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="5"><tr valign="middle">
+<td width="100%" align="left" class="shortcuts">
+<a href="#" class="shortcut">Top</a><span id="nav_description">  <span class="dim">|</span> 
+                  <a href="#OwrImageServer.description" class="shortcut">Description</a></span><span id="nav_hierarchy">  <span class="dim">|</span> 
+                  <a href="#OwrImageServer.object-hierarchy" class="shortcut">Object Hierarchy</a></span><span id="nav_properties">  <span class="dim">|</span> 
+                  <a href="#OwrImageServer.properties" class="shortcut">Properties</a></span>
+</td>
+<td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
+<td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
+<td><a accesskey="p" href="OwrImageRenderer.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
+<td><a accesskey="n" href="openwebrtc-owr-local.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
+</tr></table>
+<div class="refentry" lang="en">
+<a name="OwrImageServer"></a><div class="titlepage"></div>
+<div class="refnamediv"><table width="100%"><tr>
+<td valign="top">
+<h2><span class="refentrytitle"><a name="OwrImageServer.top_of_page"></a>OwrImageServer</span></h2>
+<p>OwrImageServer</p>
+</td>
+<td class="gallery_image" valign="top" align="right"></td>
+</tr></table></div>
+<div class="refsect1" lang="en">
+<a name="OwrImageServer.functions"></a><h2>Functions</h2>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="function_type">
+<a href="OwrImageServer.html" title="OwrImageServer"><span class="returnvalue">OwrImageServer</span></a> *
+</td>
+<td class="function_name">
+<a href="OwrImageServer.html#owr-image-server-new" title="owr_image_server_new ()">owr_image_server_new</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
+<a href="OwrImageServer.html#owr-image-server-add-image-renderer" title="owr_image_server_add_image_renderer ()">owr_image_server_add_image_renderer</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
+<a href="OwrImageServer.html#owr-image-server-remove-image-renderer" title="owr_image_server_remove_image_renderer ()">owr_image_server_remove_image_renderer</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrImageServer.properties"></a><h2>Properties</h2>
+<div class="informaltable"><table border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="property_type">
+<a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</td>
+<td class="property_name"><a href="OwrImageServer.html#OwrImageServer--allow-origin" title="The “allow-origin” property">allow-origin</a></td>
+<td class="property_flags">Read / Write</td>
+</tr>
+<tr>
+<td class="property_type"><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a></td>
+<td class="property_name"><a href="OwrImageServer.html#OwrImageServer--port" title="The “port” property">port</a></td>
+<td class="property_flags">Read / Write / Construct Only</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrImageServer.object-hierarchy"></a><h2>Object Hierarchy</h2>
+<pre class="screen">    <a href="../gobject/gobject-The-Base-Object-Type.html#GObject">GObject</a>
+    <span class="lineart">╰──</span> OwrImageServer
+</pre>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrImageServer.description"></a><h2>Description</h2>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrImageServer.functions_details"></a><h2>Functions</h2>
+<div class="refsect2" lang="en">
+<a name="owr-image-server-new"></a><h3>owr_image_server_new ()</h3>
+<pre class="programlisting"><a href="OwrImageServer.html" title="OwrImageServer"><span class="returnvalue">OwrImageServer</span></a> *
+owr_image_server_new (<em class="parameter"><code><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a> port</code></em>);</pre>
+<div class="refsect3" lang="en">
+<a name="idm491944740032"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody><tr>
+<td class="parameter_name"><p>port</p></td>
+<td class="parameter_description"><p>The port to listen on for incoming connections</p></td>
+<td class="parameter_annotations"> </td>
+</tr></tbody>
+</table></div>
+</div>
+<div class="refsect3" lang="en">
+<a name="idm491944971520"></a><h4>Returns</h4>
+<p> The new <a href="OwrImageServer.html" title="OwrImageServer"><span class="type">OwrImageServer</span></a></p>
+<p></p>
+</div>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="owr-image-server-add-image-renderer"></a><h3>owr_image_server_add_image_renderer ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+owr_image_server_add_image_renderer (<em class="parameter"><code><a href="OwrImageServer.html" title="OwrImageServer"><span class="type">OwrImageServer</span></a> *image_server</code></em>,
+                                     <em class="parameter"><code><a href="OwrImageRenderer.html" title="OwrImageRenderer"><span class="type">OwrImageRenderer</span></a> *image_renderer</code></em>,
+                                     <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *tag</code></em>);</pre>
+<div class="refsect3" lang="en">
+<a name="idm491940809232"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody><tr>
+<td class="parameter_name"><p>image_renderer</p></td>
+<td class="parameter_description"><p>. </p></td>
+<td class="parameter_annotations"><span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>]</span></td>
+</tr></tbody>
+</table></div>
+</div>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="owr-image-server-remove-image-renderer"></a><h3>owr_image_server_remove_image_renderer ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+owr_image_server_remove_image_renderer
+                               (<em class="parameter"><code><a href="OwrImageServer.html" title="OwrImageServer"><span class="type">OwrImageServer</span></a> *image_server</code></em>,
+                                <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *tag</code></em>);</pre>
+</div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrImageServer.other_details"></a><h2>Types and Values</h2>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrImageServer.property-details"></a><h2>Property Details</h2>
+<div class="refsect2" lang="en">
+<a name="OwrImageServer--allow-origin"></a><h3>The <code class="literal">“allow-origin”</code> property</h3>
+<pre class="programlisting">  “allow-origin”             <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</pre>
+<p>Space-separated list of origins allowed for cross-origin resource sharing (alternatively, "null" for none or "*" for all).</p>
+<p>Flags: Read / Write</p>
+<p>Default value: "null"</p>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="OwrImageServer--port"></a><h3>The <code class="literal">“port”</code> property</h3>
+<pre class="programlisting">  “port”                     <a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a></pre>
+<p>The port to listen on for incoming connections.</p>
+<p>Flags: Read / Write / Construct Only</p>
+<p>Allowed values: &lt;= 65535</p>
+<p>Default value: 3325</p>
+</div>
+</div>
+</div>
+<div class="footer">
+<hr>
+          Generated by GTK-Doc V1.21</div>
+</body>
+</html>

@@ -1,0 +1,421 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>OwrBus</title>
+<meta name="generator" content="DocBook XSL Stylesheets V1.71.0">
+<link rel="start" href="index.html" title="openwebrtc Reference Manual">
+<link rel="up" href="ch01.html" title="[Insert title here]">
+<link rel="prev" href="OwrAudioRenderer.html" title="OwrAudioRenderer">
+<link rel="next" href="OwrCandidate.html" title="OwrCandidate">
+<meta name="generator" content="GTK-Doc V1.21 (XML mode)">
+<link rel="stylesheet" href="style.css" type="text/css">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="5"><tr valign="middle">
+<td width="100%" align="left" class="shortcuts">
+<a href="#" class="shortcut">Top</a><span id="nav_description">  <span class="dim">|</span> 
+                  <a href="#OwrBus.description" class="shortcut">Description</a></span><span id="nav_hierarchy">  <span class="dim">|</span> 
+                  <a href="#OwrBus.object-hierarchy" class="shortcut">Object Hierarchy</a></span><span id="nav_properties">  <span class="dim">|</span> 
+                  <a href="#OwrBus.properties" class="shortcut">Properties</a></span>
+</td>
+<td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
+<td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
+<td><a accesskey="p" href="OwrAudioRenderer.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
+<td><a accesskey="n" href="OwrCandidate.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
+</tr></table>
+<div class="refentry" lang="en">
+<a name="OwrBus"></a><div class="titlepage"></div>
+<div class="refnamediv"><table width="100%"><tr>
+<td valign="top">
+<h2><span class="refentrytitle"><a name="OwrBus.top_of_page"></a>OwrBus</span></h2>
+<p>OwrBus</p>
+</td>
+<td class="gallery_image" valign="top" align="right"></td>
+</tr></table></div>
+<div class="refsect1" lang="en">
+<a name="OwrBus.functions"></a><h2>Functions</h2>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
+<span class="c_punctuation">(</span><a href="OwrBus.html#OwrBusMessageCallback" title="OwrBusMessageCallback ()">*OwrBusMessageCallback</a><span class="c_punctuation">)</span> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<a href="OwrBus.html" title="OwrBus"><span class="returnvalue">OwrBus</span></a> *
+</td>
+<td class="function_name">
+<a href="OwrBus.html#owr-bus-new" title="owr_bus_new ()">owr_bus_new</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
+<a href="OwrBus.html#owr-bus-set-message-callback" title="owr_bus_set_message_callback ()">owr_bus_set_message_callback</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
+<a href="OwrBus.html#owr-bus-add-message-origin" title="owr_bus_add_message_origin ()">owr_bus_add_message_origin</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
+<a href="OwrBus.html#owr-bus-remove-message-origin" title="owr_bus_remove_message_origin ()">owr_bus_remove_message_origin</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrBus.properties"></a><h2>Properties</h2>
+<div class="informaltable"><table border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody><tr>
+<td class="property_type"><span class="type">OwrMessageTypes</span></td>
+<td class="property_name"><a href="OwrBus.html#OwrBus--message-type-mask" title="The “message-type-mask” property">message-type-mask</a></td>
+<td class="property_flags">Read / Write</td>
+</tr></tbody>
+</table></div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrBus.other"></a><h2>Types and Values</h2>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+</colgroup>
+<tbody><tr>
+<td class="datatype_keyword">enum</td>
+<td class="function_name"><a href="OwrBus.html#OwrMessageSubType" title="enum OwrMessageSubType">OwrMessageSubType</a></td>
+</tr></tbody>
+</table></div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrBus.object-hierarchy"></a><h2>Object Hierarchy</h2>
+<pre class="screen">    <a href="../gobject/gobject-The-Base-Object-Type.html#GObject">GObject</a>
+    <span class="lineart">╰──</span> OwrBus
+</pre>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrBus.description"></a><h2>Description</h2>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrBus.functions_details"></a><h2>Functions</h2>
+<div class="refsect2" lang="en">
+<a name="OwrBusMessageCallback"></a><h3>OwrBusMessageCallback ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+<span class="c_punctuation">(</span>*OwrBusMessageCallback<span class="c_punctuation">)</span> (<em class="parameter"><code><a href="OwrMessageOrigin.html" title="OwrMessageOrigin"><span class="type">OwrMessageOrigin</span></a> *origin</code></em>,
+                          <em class="parameter"><code><span class="type">OwrMessageType</span> type</code></em>,
+                          <em class="parameter"><code><a href="OwrBus.html#OwrMessageSubType" title="enum OwrMessageSubType"><span class="type">OwrMessageSubType</span></a> sub_type</code></em>,
+                          <em class="parameter"><code><a href="../glib/glib-Hash-Tables.html#GHashTable"><span class="type">GHashTable</span></a> *data</code></em>,
+                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a> user_data</code></em>);</pre>
+<div class="refsect3" lang="en">
+<a name="idm491950638080"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="parameter_name"><p>origin</p></td>
+<td class="parameter_description"><p> the origin of the message, an <a href="OwrMessageOrigin.html" title="OwrMessageOrigin"><span class="type">OwrMessageOrigin</span></a>. </p></td>
+<td class="parameter_annotations"><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></td>
+</tr>
+<tr>
+<td class="parameter_name"><p>type</p></td>
+<td class="parameter_description"><p>the <span class="type">OwrMessageType</span> of the message</p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+<tr>
+<td class="parameter_name"><p>sub_type</p></td>
+<td class="parameter_description"><p>the <a href="OwrBus.html#OwrMessageSubType" title="enum OwrMessageSubType"><span class="type">OwrMessageSubType</span></a> of the message</p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+<tr>
+<td class="parameter_name"><p>data</p></td>
+<td class="parameter_description"><p> the data passed to owr_bus_set_message_callback. </p></td>
+<td class="parameter_annotations"><span class="annotation">[<acronym title="Generics and defining elements of containers and arrays."><span class="acronym">element-type</span></acronym> utf8 GValue][<acronym title="NULL may be passed as the value in, out, in-out; or as a return value."><span class="acronym">nullable</span></acronym>][<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></td>
+</tr>
+<tr>
+<td class="parameter_name"><p>user_data</p></td>
+<td class="parameter_description"><p> the data passed to owr_bus_set_message_callback. </p></td>
+<td class="parameter_annotations"><span class="annotation">[<acronym title="NULL may be passed as the value in, out, in-out; or as a return value."><span class="acronym">nullable</span></acronym>]</span></td>
+</tr>
+</tbody>
+</table></div>
+</div>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="owr-bus-new"></a><h3>owr_bus_new ()</h3>
+<pre class="programlisting"><a href="OwrBus.html" title="OwrBus"><span class="returnvalue">OwrBus</span></a> *
+owr_bus_new ();</pre>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="owr-bus-set-message-callback"></a><h3>owr_bus_set_message_callback ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+owr_bus_set_message_callback (<em class="parameter"><code><a href="OwrBus.html" title="OwrBus"><span class="type">OwrBus</span></a> *bus</code></em>,
+                              <em class="parameter"><code><a href="OwrBus.html#OwrBusMessageCallback" title="OwrBusMessageCallback ()"><span class="type">OwrBusMessageCallback</span></a> callback</code></em>,
+                              <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a> user_data</code></em>,
+                              <em class="parameter"><code><a href="../glib/glib-Datasets.html#GDestroyNotify"><span class="type">GDestroyNotify</span></a> destroy_data</code></em>);</pre>
+<div class="refsect3" lang="en">
+<a name="idm491946987680"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="parameter_name"><p>bus</p></td>
+<td class="parameter_description"><p>an <a href="OwrBus.html" title="OwrBus"><span class="type">OwrBus</span></a></p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+<tr>
+<td class="parameter_name"><p>callback</p></td>
+<td class="parameter_description"><p>(scope notified)</p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+<tr>
+<td class="parameter_name"><p>user_data</p></td>
+<td class="parameter_description"><p> user data for <em class="parameter"><code>callback</code></em>
+. </p></td>
+<td class="parameter_annotations"><span class="annotation">[<acronym title="NULL may be passed as the value in, out, in-out; or as a return value."><span class="acronym">nullable</span></acronym>]</span></td>
+</tr>
+<tr>
+<td class="parameter_name"><p>destroy_data</p></td>
+<td class="parameter_description"><p> a <a href="../glib/glib-Datasets.html#GDestroyNotify"><span class="type">GDestroyNotify</span></a> for <em class="parameter"><code>user_data</code></em>
+. </p></td>
+<td class="parameter_annotations"><span class="annotation">[<acronym title="NULL may be passed as the value in, out, in-out; or as a return value."><span class="acronym">nullable</span></acronym>]</span></td>
+</tr>
+</tbody>
+</table></div>
+</div>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="owr-bus-add-message-origin"></a><h3>owr_bus_add_message_origin ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+owr_bus_add_message_origin (<em class="parameter"><code><a href="OwrBus.html" title="OwrBus"><span class="type">OwrBus</span></a> *bus</code></em>,
+                            <em class="parameter"><code><a href="OwrMessageOrigin.html" title="OwrMessageOrigin"><span class="type">OwrMessageOrigin</span></a> *origin</code></em>);</pre>
+<p>Adds a message origin to the bus, adding an already existing message origin has no effect.</p>
+<div class="refsect3" lang="en">
+<a name="idm491947476096"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="parameter_name"><p>bus</p></td>
+<td class="parameter_description"><p>the bus to which the message origin is added</p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+<tr>
+<td class="parameter_name"><p>origin</p></td>
+<td class="parameter_description"><p> the message origin that is added to the bus. </p></td>
+<td class="parameter_annotations"><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></td>
+</tr>
+</tbody>
+</table></div>
+</div>
+</div>
+<hr>
+<div class="refsect2" lang="en">
+<a name="owr-bus-remove-message-origin"></a><h3>owr_bus_remove_message_origin ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+owr_bus_remove_message_origin (<em class="parameter"><code><a href="OwrBus.html" title="OwrBus"><span class="type">OwrBus</span></a> *bus</code></em>,
+                               <em class="parameter"><code><a href="OwrMessageOrigin.html" title="OwrMessageOrigin"><span class="type">OwrMessageOrigin</span></a> *origin</code></em>);</pre>
+<p>Removes a message origin from the bus if it exists, otherwise nothing is done.</p>
+<div class="refsect3" lang="en">
+<a name="idm491947672864"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="parameter_name"><p>bus</p></td>
+<td class="parameter_description"><p>the bus from which the message origin should be removed</p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+<tr>
+<td class="parameter_name"><p>origin</p></td>
+<td class="parameter_description"><p> the message origin that should be removed from the bus. </p></td>
+<td class="parameter_annotations"><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></td>
+</tr>
+</tbody>
+</table></div>
+</div>
+</div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrBus.other_details"></a><h2>Types and Values</h2>
+<div class="refsect2" lang="en">
+<a name="OwrMessageSubType"></a><h3>enum OwrMessageSubType</h3>
+<p><em class="parameter"><code>OWR_ERROR_TYPE_PROCESSING_ERROR</code></em>
+: a processing error occured, the origin of the error
+will likely not be able to produce or consume anymore data.</p>
+<p><em class="parameter"><code>OWR_STATS_TYPE_SCHEDULE</code></em>
+: information about a call that was scheduled on the main thread</p>
+<div class="itemizedlist"><ul type="disc">
+<li><p><em class="parameter"><code>function_name</code></em>
+: <span class="type">utf8</span> the name of the function that scheduled the call</p></li>
+<li><p><em class="parameter"><code>start_time</code></em>
+: <a href="../glib/glib-Basic-Types.html#gint64"><span class="type">gint64</span></a> monotonic time when the call was scheduled</p></li>
+<li><p><em class="parameter"><code>call_time</code></em>
+: <a href="../glib/glib-Basic-Types.html#gint64"><span class="type">gint64</span></a> monotonic time when the function call started</p></li>
+<li><p><em class="parameter"><code>end_time</code></em>
+: <a href="../glib/glib-Basic-Types.html#gint64"><span class="type">gint64</span></a> monotonic time when the function call completed</p></li>
+</ul></div>
+<p><em class="parameter"><code>OWR_STATS_TYPE_SEND_PIPELINE_ADDED</code></em>
+: a send pipeline was added to a media session</p>
+<div class="itemizedlist"><ul type="disc">
+<li><p><em class="parameter"><code>start_time</code></em>
+: <a href="../glib/glib-Basic-Types.html#gint64"><span class="type">gint64</span></a> monotonic time when the pipeline setup began</p></li>
+<li><p><em class="parameter"><code>end_time</code></em>
+: <a href="../glib/glib-Basic-Types.html#gint64"><span class="type">gint64</span></a> monotonic time when the pipeline setup was completed</p></li>
+</ul></div>
+<p><em class="parameter"><code>OWR_STATS_TYPE_SEND_PIPELINE_REMOVED</code></em>
+: a send pipeline was removed to a media session</p>
+<div class="itemizedlist"><ul type="disc">
+<li><p><em class="parameter"><code>start_time</code></em>
+: <a href="../glib/glib-Basic-Types.html#gint64"><span class="type">gint64</span></a> monotonic time when the pipeline teardown began</p></li>
+<li><p><em class="parameter"><code>end_time</code></em>
+: <a href="../glib/glib-Basic-Types.html#gint64"><span class="type">gint64</span></a> monotonic time when the pipeline teardown was completed</p></li>
+</ul></div>
+<p><em class="parameter"><code>OWR_EVENT_TYPE_RENDERER_STARTED</code></em>
+: a renderer was started</p>
+<p><em class="parameter"><code>OWR_EVENT_TYPE_RENDERER_STOPPED</code></em>
+: a renderer was stopped</p>
+<p><em class="parameter"><code>OWR_EVENT_TYPE_LOCAL_SOURCE_STARTED</code></em>
+: a local media source was started</p>
+<div class="itemizedlist"><ul type="disc">
+<li><p><em class="parameter"><code>start_time</code></em>
+: <a href="../glib/glib-Basic-Types.html#gint64"><span class="type">gint64</span></a> monotonic time when the pipeline setup began</p></li>
+<li><p><em class="parameter"><code>end_time</code></em>
+: <a href="../glib/glib-Basic-Types.html#gint64"><span class="type">gint64</span></a> monotonic time when the pipeline setup was completed</p></li>
+</ul></div>
+<p><em class="parameter"><code>OWR_EVENT_TYPE_LOCAL_SOURCE_STOPPED</code></em>
+: a local media source was stopped</p>
+<div class="itemizedlist"><ul type="disc">
+<li><p><em class="parameter"><code>start_time</code></em>
+: <a href="../glib/glib-Basic-Types.html#gint64"><span class="type">gint64</span></a> monotonic time when the pipeline teardown began</p></li>
+<li><p><em class="parameter"><code>end_time</code></em>
+: <a href="../glib/glib-Basic-Types.html#gint64"><span class="type">gint64</span></a> monotonic time when the pipeline teardown was completed</p></li>
+</ul></div>
+<div class="refsect3" lang="en">
+<a name="idm491947719056"></a><h4>Members</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="enum_member_name"><p><a name="OWR-ERROR-TYPE-TEST:CAPS"></a>OWR_ERROR_TYPE_TEST</p></td>
+<td> </td>
+<td> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="OWR-ERROR-TYPE-PROCESSING-ERROR:CAPS"></a>OWR_ERROR_TYPE_PROCESSING_ERROR</p></td>
+<td> </td>
+<td> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="OWR-STATS-TYPE-TEST:CAPS"></a>OWR_STATS_TYPE_TEST</p></td>
+<td> </td>
+<td> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="OWR-STATS-TYPE-SCHEDULE:CAPS"></a>OWR_STATS_TYPE_SCHEDULE</p></td>
+<td> </td>
+<td> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="OWR-STATS-TYPE-SEND-PIPELINE-ADDED:CAPS"></a>OWR_STATS_TYPE_SEND_PIPELINE_ADDED</p></td>
+<td> </td>
+<td> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="OWR-STATS-TYPE-SEND-PIPELINE-REMOVED:CAPS"></a>OWR_STATS_TYPE_SEND_PIPELINE_REMOVED</p></td>
+<td> </td>
+<td> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="OWR-EVENT-TYPE-TEST:CAPS"></a>OWR_EVENT_TYPE_TEST</p></td>
+<td> </td>
+<td> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="OWR-EVENT-TYPE-RENDERER-STARTED:CAPS"></a>OWR_EVENT_TYPE_RENDERER_STARTED</p></td>
+<td> </td>
+<td> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="OWR-EVENT-TYPE-RENDERER-STOPPED:CAPS"></a>OWR_EVENT_TYPE_RENDERER_STOPPED</p></td>
+<td> </td>
+<td> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="OWR-EVENT-TYPE-LOCAL-SOURCE-STARTED:CAPS"></a>OWR_EVENT_TYPE_LOCAL_SOURCE_STARTED</p></td>
+<td> </td>
+<td> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="OWR-EVENT-TYPE-LOCAL-SOURCE-STOPPED:CAPS"></a>OWR_EVENT_TYPE_LOCAL_SOURCE_STOPPED</p></td>
+<td> </td>
+<td> </td>
+</tr>
+</tbody>
+</table></div>
+</div>
+</div>
+</div>
+<div class="refsect1" lang="en">
+<a name="OwrBus.property-details"></a><h2>Property Details</h2>
+<div class="refsect2" lang="en">
+<a name="OwrBus--message-type-mask"></a><h3>The <code class="literal">“message-type-mask”</code> property</h3>
+<pre class="programlisting">  “message-type-mask”        <span class="type">OwrMessageTypes</span></pre>
+<p>The message types that the bus should forward, other message types will be discarded (default: forward all messages).</p>
+<p>Flags: Read / Write</p>
+<p>Default value: Error | State | Event</p>
+</div>
+</div>
+</div>
+<div class="footer">
+<hr>
+          Generated by GTK-Doc V1.21</div>
+</body>
+</html>
