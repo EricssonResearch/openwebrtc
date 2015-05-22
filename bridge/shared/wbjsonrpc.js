@@ -318,7 +318,7 @@ var JsonRpc = function (msgLink, optionsOrRestricted) {
                 try {
                     for (var i = 0; i < msg.params.length; i++) {
                         var p = msg.params[i];
-                        if (p.__argumentType)
+                        if (p && p.__argumentType)
                             msg.params[i] = decodeArrayBufferArgument(p);
                         else
                             substituteReferencedObject(msg.params, i);
