@@ -1656,6 +1656,16 @@
        checkArguments("createObjectURL", "Blob", 1, arguments);
     };
 
+    Object.defineProperty(HTMLVideoElement.prototype, "srcObject", {
+        "get": function () {
+            return this._srcObject;
+        },
+        "set": function (stream) {
+            this._srcObject = stream;
+            this.src = url.createObjectURL(stream);
+        }
+    }); 
+
     var origDrawImage = CanvasRenderingContext2D.prototype.drawImage;
     CanvasRenderingContext2D.prototype.drawImage = function () {
         var _this = this;
