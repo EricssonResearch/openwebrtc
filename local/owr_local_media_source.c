@@ -89,6 +89,7 @@ struct _OwrLocalMediaSourcePrivate {
 };
 
 static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_source, GstCaps *caps);
+static GstElement *owr_local_media_source_request_source_element(OwrLocalMediaSource *local_media_source);
 
 static void owr_local_media_source_set_property(GObject *object, guint property_id,
     const GValue *value, GParamSpec *pspec);
@@ -122,6 +123,7 @@ static void owr_local_media_source_class_init(OwrLocalMediaSourceClass *klass)
     g_type_class_add_private(klass, sizeof(OwrLocalMediaSourcePrivate));
 
     media_source_class->request_source = (void *(*)(OwrMediaSource *, void *))owr_local_media_source_request_source;
+    klass->request_source_element = (void *(*)(OwrLocalMediaSource *))owr_local_media_source_request_source_element;
 
     g_object_class_install_property(gobject_class, PROP_DEVICE_INDEX,
         g_param_spec_int("device-index", "Device index",
@@ -410,6 +412,121 @@ static void on_caps(GstElement *source, GParamSpec *pspec, OwrMediaSource *media
     }
 }
 
+static GstElement *owr_local_media_source_request_source_element(OwrLocalMediaSource *local_media_source)
+{
+    GstElement *source;
+    OwrLocalMediaSourcePrivate *priv;
+    OwrMediaType media_type = OWR_MEDIA_TYPE_UNKNOWN;
+    OwrSourceType source_type = OWR_SOURCE_TYPE_UNKNOWN;
+#if defined(__linux__) && !defined(__ANDROID__)
+    gchar *tmp;
+#endif
+
+    g_assert(local_media_source);
+    priv = local_media_source->priv;
+
+    g_object_get(local_media_source, "media-type", &media_type, "type", &source_type, NULL);
+
+    switch (media_type) {
+        case OWR_MEDIA_TYPE_AUDIO:
+        {
+            switch (source_type) {
+                case OWR_SOURCE_TYPE_CAPTURE:
+                CREATE_ELEMENT(source, AUDIO_SRC, "audio-source");
+#if !defined(__APPLE__) || !TARGET_IPHONE_SIMULATOR
+/*
+    Default values for buffer-time and latency-time on android are 200ms and 20ms.
+    The minimum latency-time that can be used on Android is 20ms, and using
+    a 40ms buffer-time with a 20ms latency-time causes crackling audio.
+    So let's just stick with the defaults.
+*/
+#if !defined(__ANDROID__)
+                    g_object_set(source, "buffer-time", G_GINT64_CONSTANT(40000),
+                                 "latency-time", G_GINT64_CONSTANT(10000), NULL);
+#endif
+                    if (priv->device_index > -1) {
+#ifdef __APPLE__
+                    g_object_set(source, "device", priv->device_index, NULL);
+#elif defined(__linux__) && !defined(__ANDROID__)
+                        tmp = g_strdup_printf("%d", priv->device_index);
+                        g_object_set(source, "device", tmp, NULL);
+                        g_free(tmp);
+#endif
+                    }
+#endif
+                    break;
+                case OWR_SOURCE_TYPE_TEST:
+                CREATE_ELEMENT(source, "audiotestsrc", "audio-source");
+                    g_object_set(source, "is-live", TRUE, NULL);
+                    break;
+                case OWR_SOURCE_TYPE_UNKNOWN:
+                default:
+                    g_assert_not_reached();
+                    goto done;
+            }
+
+            break;
+        }
+        case OWR_MEDIA_TYPE_VIDEO:
+        {
+            switch (source_type) {
+                case OWR_SOURCE_TYPE_CAPTURE:
+                CREATE_ELEMENT(source, VIDEO_SRC, "video-source");
+                    if (priv->device_index > -1) {
+#if defined(__APPLE__) && !TARGET_IPHONE_SIMULATOR
+                    g_object_set(source, "device-index", priv->device_index, NULL);
+#elif defined(__ANDROID__)
+                    g_object_set(source, "cam-index", priv->device_index, NULL);
+#elif defined(__linux__)
+                        tmp = g_strdup_printf("/dev/video%d", priv->device_index);
+                        g_object_set(source, "device", tmp, NULL);
+                        g_free(tmp);
+#endif
+                    }
+                    break;
+                case OWR_SOURCE_TYPE_TEST: {
+                    GstElement *src, *time;
+                    GstPad *srcpad;
+
+                    source = gst_bin_new("video-source");
+
+                    CREATE_ELEMENT(src, "videotestsrc", "videotestsrc");
+                    g_object_set(src, "is-live", TRUE, NULL);
+                    gst_bin_add(GST_BIN(source), src);
+
+                    time = gst_element_factory_make("timeoverlay", "timeoverlay");
+                    if (time) {
+                        g_object_set(time, "font-desc", "Sans 60", NULL);
+                        gst_bin_add(GST_BIN(source), time);
+                        gst_element_link(src, time);
+                        srcpad = gst_element_get_static_pad(time, "src");
+                    } else
+                        srcpad = gst_element_get_static_pad(src, "src");
+
+                    gst_element_add_pad(source, gst_ghost_pad_new("src", srcpad));
+                    gst_object_unref(srcpad);
+
+                    break;
+                }
+                case OWR_SOURCE_TYPE_UNKNOWN:
+                default:
+                    g_assert_not_reached();
+                    goto done;
+            }
+
+            break;
+        }
+        case OWR_MEDIA_TYPE_UNKNOWN:
+        default:
+            g_assert_not_reached();
+            goto done;
+    }
+    g_assert(source);
+
+done:
+    return source;
+}
+
 /*
  * owr_local_media_source_get_pad
  *
@@ -439,18 +556,13 @@ static void on_caps(GstElement *source, GParamSpec *pspec, OwrMediaSource *media
 static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_source, GstCaps *caps)
 {
     OwrLocalMediaSource *local_source;
-    OwrLocalMediaSourcePrivate *priv;
     GstElement *source_element = NULL;
     GstElement *source_pipeline;
     GHashTable *event_data;
     GValue *value;
-#if defined(__linux__) && !defined(__ANDROID__)
-    gchar *tmp;
-#endif
 
     g_assert(media_source);
     local_source = OWR_LOCAL_MEDIA_SOURCE(media_source);
-    priv = local_source->priv;
 
     /* only create the source bin for this media source once */
     if ((source_pipeline = _owr_media_source_get_source_bin(media_source)))
@@ -511,91 +623,23 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
 
         switch (media_type) {
         case OWR_MEDIA_TYPE_AUDIO:
-            {
-            switch (source_type) {
-            case OWR_SOURCE_TYPE_CAPTURE:
-                CREATE_ELEMENT(source, AUDIO_SRC, "audio-source");
-#if !defined(__APPLE__) || !TARGET_IPHONE_SIMULATOR
-/*
-    Default values for buffer-time and latency-time on android are 200ms and 20ms.
-    The minimum latency-time that can be used on Android is 20ms, and using
-    a 40ms buffer-time with a 20ms latency-time causes crackling audio.
-    So let's just stick with the defaults.
-*/
-#if !defined(__ANDROID__)
-                g_object_set(source, "buffer-time", G_GINT64_CONSTANT(40000),
-                    "latency-time", G_GINT64_CONSTANT(10000), NULL);
-#endif
-                if (priv->device_index > -1) {
-#ifdef __APPLE__
-                    g_object_set(source, "device", priv->device_index, NULL);
-#elif defined(__linux__) && !defined(__ANDROID__)
-                    tmp = g_strdup_printf("%d", priv->device_index);
-                    g_object_set(source, "device", tmp, NULL);
-                    g_free(tmp);
-#endif
-                }
-#endif
-                break;
-            case OWR_SOURCE_TYPE_TEST:
-                CREATE_ELEMENT(source, "audiotestsrc", "audio-source");
-                g_object_set(source, "is-live", TRUE, NULL);
-                break;
-            case OWR_SOURCE_TYPE_UNKNOWN:
-            default:
-                g_assert_not_reached();
+        {
+            source = OWR_LOCAL_MEDIA_SOURCE_GET_CLASS(media_source)->request_source_element(local_source);
+            g_assert(source);
+            if (!source) {
                 goto done;
             }
 
             break;
-            }
+        }
         case OWR_MEDIA_TYPE_VIDEO:
         {
             GstPad *srcpad;
             GstCaps *device_caps;
 
-            switch (source_type) {
-            case OWR_SOURCE_TYPE_CAPTURE:
-                CREATE_ELEMENT(source, VIDEO_SRC, "video-source");
-                if (priv->device_index > -1) {
-#if defined(__APPLE__) && !TARGET_IPHONE_SIMULATOR
-                    g_object_set(source, "device-index", priv->device_index, NULL);
-#elif defined(__ANDROID__)
-                    g_object_set(source, "cam-index", priv->device_index, NULL);
-#elif defined(__linux__)
-                    tmp = g_strdup_printf("/dev/video%d", priv->device_index);
-                    g_object_set(source, "device", tmp, NULL);
-                    g_free(tmp);
-#endif
-                }
-                break;
-            case OWR_SOURCE_TYPE_TEST: {
-                GstElement *src, *time;
-                GstPad *srcpad;
-
-                source = gst_bin_new("video-source");
-
-                CREATE_ELEMENT(src, "videotestsrc", "videotestsrc");
-                g_object_set(src, "is-live", TRUE, NULL);
-                gst_bin_add(GST_BIN(source), src);
-
-                time = gst_element_factory_make("timeoverlay", "timeoverlay");
-                if (time) {
-                    g_object_set(time, "font-desc", "Sans 60", NULL);
-                    gst_bin_add(GST_BIN(source), time);
-                    gst_element_link(src, time);
-                    srcpad = gst_element_get_static_pad(time, "src");
-                } else
-                    srcpad = gst_element_get_static_pad(src, "src");
-
-                gst_element_add_pad(source, gst_ghost_pad_new("src", srcpad));
-                gst_object_unref(srcpad);
-
-                break;
-            }
-            case OWR_SOURCE_TYPE_UNKNOWN:
-            default:
-                g_assert_not_reached();
+            source = OWR_LOCAL_MEDIA_SOURCE_GET_CLASS(media_source)->request_source_element(local_source);
+            g_assert(source);
+            if (!source) {
                 goto done;
             }
 

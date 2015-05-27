@@ -32,6 +32,10 @@ if TARGET_APPLE
 libopenwebrtc_local_la_SOURCES += owr_device_list_avf.m
 endif
 
+if OWR_GST
+libopenwebrtc_local_la_SOURCES += owr_gst_local_media_source.c
+endif
+
 libopenwebrtc_local_la_LIBADD = \
     $(GSTREAMER_LIBS) \
     $(GLIB_LIBS) \
@@ -55,6 +59,10 @@ noinst_HEADERS = \
 
 if TARGET_APPLE
 noinst_HEADERS += owr_device_list_avf_private.h
+endif
+
+if OWR_GST
+include_HEADERS += owr_gst_local_media_source.h
 endif
 
 -include $(top_srcdir)/git.mk
