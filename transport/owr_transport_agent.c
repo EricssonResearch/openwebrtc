@@ -2529,7 +2529,7 @@ static void on_receiving_rtcp(GObject *session, GstBuffer *buffer,
             if (packet_type == GST_RTCP_TYPE_PSFB || packet_type == GST_RTCP_TYPE_RTPFB) {
                 print_rtcp_feedback_type(session, session_id, gst_rtcp_packet_fb_get_type(&rtcp_packet),
                     gst_rtcp_packet_fb_get_media_ssrc(&rtcp_packet), packet_type,
-                    gst_rtcp_packet_fb_get_fci(&rtcp_packet), FALSE);
+                    gst_rtcp_packet_fb_get_fci(&rtcp_packet), TRUE);
                 break;
             }
         }
