@@ -11,23 +11,23 @@
 * More tutorials and documentation
 * ~~New build system: [Cerbero](https://github.com/EricssonResearch/cerbero) ([64-bit support](https://github.com/EricssonResearch/openwebrtc/issues/48) for iOS and more)~~ (done)
 * Compressed video sources
-* Releases
+* ~~Releases~~
 * [Overlay video rendering](https://github.com/EricssonResearch/openwebrtc-examples/issues/38)
 * Mobile-optimized congestion control (based on [IETF contribution SCReAM](https://tools.ietf.org/html/draft-johansson-rmcat-scream-cc-00))
-* [CocoaPods](https://github.com/EricssonResearch/openwebrtc-ios-sdk)
+* [~~CocoaPods~~](https://github.com/EricssonResearch/openwebrtc-ios-sdk)
 * [HEVC/H.265 video](https://github.com/EricssonResearch/openwebrtc/issues/1)
 * [WebRTC Statistics API](https://github.com/EricssonResearch/openwebrtc/issues/5)
-* [Better handling of video rotation](https://github.com/EricssonResearch/openwebrtc/issues/150)
-* [Matrix.org native app integration](https://github.com/matrix-org/matrix-ios-sdk/issues/3)
+* [~~Better handling of video rotation~~](https://github.com/EricssonResearch/openwebrtc/issues/150)
+* [~~Matrix.org native app integration~~](https://github.com/matrix-org/matrix-ios-sdk/issues/3)
 * [Move Bowser to WKWebView](https://github.com/EricssonResearch/bowser/issues/1)
 * Integrate OpenWebRTC in WebKit, starting with the Linux GTK+ port
+* [createOffer compliance](https://github.com/EricssonResearch/openwebrtc/issues/62)
+* [Raspberry Pi support](https://github.com/EricssonResearch/openwebrtc/issues/172)
 
 ## Possible future additions
 
-* [Raspberry Pi support](https://github.com/EricssonResearch/openwebrtc/issues/172)
 * Simulcast (Jitsi support)
 * Better support for constraints in JavaScript
-* [createOffer compliance](https://github.com/EricssonResearch/openwebrtc/issues/62)
 * VP9 video
 * [Windows support](https://github.com/EricssonResearch/openwebrtc/issues/2)
 * ORTC
