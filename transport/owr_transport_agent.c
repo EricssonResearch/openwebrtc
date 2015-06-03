@@ -953,6 +953,9 @@ static gboolean add_session(GHashTable *args)
         g_cclosure_new_object_swap(G_CALLBACK(on_new_remote_candidate), G_OBJECT(transport_agent)));
 
     if (OWR_IS_MEDIA_SESSION(session)) {
+        guint send_ssrc = 0;
+        gchar *cname = NULL;
+
         _owr_media_session_set_on_send_source(OWR_MEDIA_SESSION(session),
             g_cclosure_new_object_swap(G_CALLBACK(on_new_send_source), G_OBJECT(transport_agent)));
 
@@ -962,7 +965,9 @@ static gboolean add_session(GHashTable *args)
         prepare_transport_bin_receive_elements(transport_agent, stream_id, rtcp_mux);
         prepare_transport_bin_send_elements(transport_agent, stream_id, rtcp_mux);
 
-        set_send_ssrc_and_cname(transport_agent, OWR_MEDIA_SESSION(session));
+        g_object_get(session, "send-ssrc", &send_ssrc, "cname", &cname, NULL);
+        if (!send_ssrc || !cname)
+            set_send_ssrc_and_cname(transport_agent, OWR_MEDIA_SESSION(session));
     } else if (OWR_IS_DATA_SESSION(session)) {
         _owr_data_session_set_on_datachannel_added(OWR_DATA_SESSION(session),
             g_cclosure_new_object_swap(G_CALLBACK(on_new_datachannel),
@@ -1562,10 +1567,8 @@ static void set_send_ssrc_and_cname(OwrTransportAgent *transport_agent, OwrMedia
     g_signal_emit_by_name(transport_agent->priv->rtpbin, "get-internal-session", stream_id, &session);
     g_warn_if_fail(session);
     g_object_get(session, "internal-ssrc", &send_ssrc, "sdes", &sdes, NULL);
-    _owr_media_session_set_send_ssrc(media_session, send_ssrc);
-    _owr_media_session_set_cname(media_session, gst_structure_get_string(sdes, "cname"));
-    g_object_notify(G_OBJECT(media_session), "send-ssrc");
-    g_object_notify(G_OBJECT(media_session), "cname");
+    g_object_set(media_session, "send-ssrc", send_ssrc, "cname",
+        gst_structure_get_string(sdes, "cname"), NULL);
     gst_structure_free(sdes);
     g_object_unref(session);
 }
@@ -1794,6 +1797,8 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
         *ghost_src_pad = NULL, *encoder_sink_pad;
     OwrMediaType media_type;
     GstPadLinkReturn link_res;
+    guint send_ssrc = 0;
+    gchar *cname = NULL;
 
     g_return_if_fail(transport_agent);
     g_return_if_fail(media_session);
@@ -1825,6 +1830,24 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
     rtp_capsfilter = gst_element_factory_make("capsfilter", name);
     g_free(name);
     rtp_caps = _owr_payload_create_rtp_caps(payload);
+
+    g_object_get(media_session, "send-ssrc", &send_ssrc, "cname", &cname, NULL);
+    if (cname) {
+        GObject *internal_session = NULL;
+        GstStructure *sdes = NULL;
+
+        g_signal_emit_by_name(rtpbin, "get-internal-session", stream_id, &internal_session);
+        g_warn_if_fail(internal_session);
+
+        g_object_get(internal_session, "sdes", &sdes, NULL);
+        gst_structure_set(sdes, "cname", G_TYPE_STRING, cname, NULL);
+        g_object_set(internal_session, "sdes", sdes, NULL);
+
+        gst_structure_free(sdes);
+        g_object_unref(internal_session);
+    }
+    if (send_ssrc)
+        gst_caps_set_simple(rtp_caps, "ssrc", G_TYPE_UINT, send_ssrc, NULL);
 
     g_object_set(rtp_capsfilter, "caps", rtp_caps, NULL);
     gst_caps_unref(rtp_caps);
