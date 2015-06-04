@@ -40,9 +40,9 @@
 G_BEGIN_DECLS
 
 /*
- * Callback signature is (GList *owrMediaSources, gpointer user_data)
+ * The final callback of the list_closure_merger has signature (GList *owrMediaSources, gpointer user_data)
  */
-void _owr_get_capture_devices(OwrMediaType types, GClosure *callback);
+void _owr_get_capture_devices(OwrMediaType types, GClosure *list_closure_merger);
 
 G_END_DECLS
 

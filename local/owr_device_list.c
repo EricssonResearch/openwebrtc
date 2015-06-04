@@ -94,28 +94,26 @@ static void call_closure_with_list_later(GClosure *callback, GList *list)
 }
 #endif
 
-void _owr_get_capture_devices(OwrMediaType types, GClosure *callback)
+void _owr_get_capture_devices(OwrMediaType types, GClosure *list_closure_merger)
 {
-    GClosure *merger;
+    g_return_if_fail(list_closure_merger);
 
-    g_return_if_fail(callback);
+    if (G_CLOSURE_NEEDS_MARSHAL(list_closure_merger))
+        g_closure_set_marshal(list_closure_merger, g_cclosure_marshal_generic);
 
-    if (G_CLOSURE_NEEDS_MARSHAL(callback))
-        g_closure_set_marshal(callback, g_cclosure_marshal_generic);
-
-    merger = _owr_utils_list_closure_merger_new(callback, (GDestroyNotify) g_object_unref);
+    g_closure_ref(list_closure_merger);
 
     if (types & OWR_MEDIA_TYPE_VIDEO) {
-        g_closure_ref(merger);
-        _owr_schedule_with_user_data((GSourceFunc) enumerate_video_source_devices, merger);
+        g_closure_ref(list_closure_merger);
+        _owr_schedule_with_user_data((GSourceFunc) enumerate_video_source_devices, list_closure_merger);
     }
 
     if (types & OWR_MEDIA_TYPE_AUDIO) {
-        g_closure_ref(merger);
-        _owr_schedule_with_user_data((GSourceFunc) enumerate_audio_source_devices, merger);
+        g_closure_ref(list_closure_merger);
+        _owr_schedule_with_user_data((GSourceFunc) enumerate_audio_source_devices, list_closure_merger);
     }
 
-    g_closure_unref(merger);
+    g_closure_unref(list_closure_merger);
 }
 
 
