@@ -495,6 +495,7 @@
                     "type": trackInfo.kind,
                     "payloads": JSON.parse(JSON.stringify(defaultPayloads[trackInfo.kind])),
                     "rtcp": { "mux": true },
+                    "ice": { "ufrag": randomString(4), "password": randomString(22) },
                     "dtls": { "setup": "actpass" }
                 });
             });
@@ -518,6 +519,7 @@
                     "type": "application",
                     "protocol": "DTLS/SCTP",
                     "fmt": 5000,
+                    "ice": { "ufrag": randomString(4), "password": randomString(22) },
                     "dtls": { "setup": "actpass" },
                     "sctp": {
                         "port": 5000,
@@ -585,6 +587,7 @@
                 if (!lmdesc) {
                     lmdesc = {
                         "type": rmdesc.type,
+                        "ice": { "ufrag": randomString(4), "password": randomString(22) },
                         "dtls": { "setup": rmdesc.dtls.setup == "active" ? "passive" : "active" }
                     };
                     localSessionInfoSnapshot.mediaDescriptions.push(lmdesc);
@@ -1160,10 +1163,11 @@
                 if (!mdesc.ice) {
                     mdesc.ice = {
                         "ufrag": ufrag,
-                        "password": password,
-                        "candidates": []
+                        "password": password
                     };
                 }
+                if (!mdesc.ice.candidates)
+                    mdesc.ice.candidates = [];
                 mdesc.ice.candidates.push(candidate);
 
                 if (candidate.address.indexOf(":") == -1) { // not IPv6
