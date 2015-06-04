@@ -173,6 +173,7 @@ static void on_candidate_gathering_done(NiceAgent *nice_agent, guint stream_id, 
 static void on_component_state_changed(NiceAgent *nice_agent, guint stream_id, guint component_id, OwrIceState state, OwrTransportAgent *transport_agent);
 static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMediaSession *media_session, OwrPayload * payload);
 static void on_new_remote_candidate(OwrTransportAgent *transport_agent, gboolean forced, OwrSession *session);
+static void on_local_candidate_change(OwrTransportAgent *transport_agent, OwrCandidate *candidate, OwrSession *session);
 
 static void on_transport_bin_pad_added(GstElement *transport_bin, GstPad *new_pad, OwrTransportAgent *transport_agent);
 static void on_rtpbin_pad_added(GstElement *rtpbin, GstPad *new_pad, OwrTransportAgent *agent);
@@ -951,6 +952,8 @@ static gboolean add_session(GHashTable *args)
 
     _owr_session_set_on_remote_candidate(session,
         g_cclosure_new_object_swap(G_CALLBACK(on_new_remote_candidate), G_OBJECT(transport_agent)));
+    _owr_session_set_on_local_candidate_change(session,
+        g_cclosure_new_object_swap(G_CALLBACK(on_local_candidate_change), G_OBJECT(transport_agent)));
 
     if (OWR_IS_MEDIA_SESSION(session)) {
         _owr_media_session_set_on_send_source(OWR_MEDIA_SESSION(session),
@@ -1997,6 +2000,24 @@ static void on_new_remote_candidate(OwrTransportAgent *transport_agent, gboolean
         g_slist_free_full(nice_cands_rtcp, (GDestroyNotify)nice_candidate_free);
         g_warn_if_fail(cands_added > 0);
     }
+}
+
+static void on_local_candidate_change(OwrTransportAgent *transport_agent, OwrCandidate *candidate, OwrSession *session)
+{
+    guint stream_id;
+    gchar *ufrag = NULL, *password = NULL;
+
+    g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
+    g_return_if_fail(OWR_IS_CANDIDATE(candidate));
+    g_return_if_fail(OWR_IS_SESSION(session));
+
+    stream_id = get_stream_id(transport_agent, session);
+    g_return_if_fail(stream_id);
+
+    g_object_get(G_OBJECT(candidate), "ufrag", &ufrag, "password", &password, NULL);
+    nice_agent_set_local_credentials(transport_agent->priv->nice_agent, stream_id, ufrag, password);
+    g_free(ufrag);
+    g_free(password);
 }
 
 static gboolean emit_on_incoming_source(GHashTable *args)

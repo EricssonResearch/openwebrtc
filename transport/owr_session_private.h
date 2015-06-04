@@ -40,6 +40,7 @@ GSList * _owr_session_get_remote_candidates(OwrSession *session);
 GSList * _owr_session_get_forced_remote_candidates(OwrSession *session);
 
 void _owr_session_set_on_remote_candidate(OwrSession *session, GClosure *on_remote_candidate);
+void _owr_session_set_on_local_candidate_change(OwrSession *session, GClosure *on_local_candidate_change);
 void _owr_session_clear_closures(OwrSession *session);
 
 void _owr_session_set_dtls_peer_certificate(OwrSession *, const gchar *certificate);
