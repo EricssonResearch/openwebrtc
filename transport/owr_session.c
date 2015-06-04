@@ -76,6 +76,7 @@ struct _OwrSessionPrivate {
     GSList *forced_remote_candidates;
     gboolean gathering_done;
     GClosure *on_remote_candidate;
+    GClosure *on_local_candidate_change;
     OwrIceState ice_state, rtp_ice_state, rtcp_ice_state;
     OwrMessageOriginBusSet *message_origin_bus_set;
 };
@@ -126,6 +127,7 @@ GType owr_ice_state_get_type(void)
 }
 
 static gboolean add_remote_candidate(GHashTable *args);
+static void update_local_credentials(OwrCandidate *candidate, GParamSpec *pspec, OwrSession *session);
 
 
 static void owr_session_set_property(GObject *object, guint property_id, const GValue *value, GParamSpec *pspec)
@@ -210,6 +212,11 @@ static void owr_session_on_new_candidate(OwrSession *session, OwrCandidate *cand
     priv = session->priv;
     g_warn_if_fail(!priv->gathering_done);
     priv->local_candidates = g_slist_append(priv->local_candidates, g_object_ref(candidate));
+
+    g_signal_connect_object(G_OBJECT(candidate), "notify::ufrag",
+        G_CALLBACK(update_local_credentials), session, 0);
+    g_signal_connect_object(G_OBJECT(candidate), "notify::password",
+        G_CALLBACK(update_local_credentials), session, 0);
 }
 
 static void owr_session_on_candidate_gathering_done(OwrSession *session)
@@ -460,6 +467,45 @@ end:
     return FALSE;
 }
 
+static void update_local_credentials(OwrCandidate *candidate, GParamSpec *pspec, OwrSession *session)
+{
+    OwrSessionPrivate *priv;
+    GSList *item;
+    GObject *local_candidate;
+    gchar *ufrag = NULL, *password = NULL;
+    GValue params[2] = { G_VALUE_INIT, G_VALUE_INIT };
+
+    g_return_if_fail(OWR_IS_CANDIDATE(candidate));
+    g_return_if_fail(G_IS_PARAM_SPEC(pspec));
+    g_return_if_fail(OWR_IS_SESSION(session));
+    priv = session->priv;
+
+    g_object_get(G_OBJECT(candidate), "ufrag", &ufrag, "password", &password, NULL);
+
+    for (item = priv->local_candidates; item; item = item->next) {
+        local_candidate = G_OBJECT(item->data);
+        if (local_candidate == G_OBJECT(candidate))
+            continue;
+        g_signal_handlers_block_matched(local_candidate, G_SIGNAL_MATCH_FUNC | G_SIGNAL_MATCH_DATA,
+            0, 0, NULL, G_CALLBACK(update_local_credentials), session);
+        g_object_set(local_candidate, "ufrag", ufrag, "password", password, NULL);
+        g_signal_handlers_unblock_matched(local_candidate, G_SIGNAL_MATCH_FUNC | G_SIGNAL_MATCH_DATA,
+            0, 0, NULL, G_CALLBACK(update_local_credentials), session);
+    }
+
+    g_free(ufrag);
+    g_free(password);
+
+    if (priv->on_local_candidate_change) {
+        g_value_init(&params[0], OWR_TYPE_SESSION);
+        g_value_set_object(&params[0], session);
+        g_value_init(&params[1], OWR_TYPE_CANDIDATE);
+        g_value_set_object(&params[1], candidate);
+        g_closure_invoke(priv->on_local_candidate_change, NULL, 2, (const GValue *)&params, NULL);
+        g_value_unset(&params[0]);
+        g_value_unset(&params[1]);
+    }
+}
 
 void _owr_session_clear_closures(OwrSession *session)
 {
@@ -467,6 +513,11 @@ void _owr_session_clear_closures(OwrSession *session)
         g_closure_invalidate(session->priv->on_remote_candidate);
         g_closure_unref(session->priv->on_remote_candidate);
         session->priv->on_remote_candidate = NULL;
+    }
+    if (session->priv->on_local_candidate_change) {
+        g_closure_invalidate(session->priv->on_local_candidate_change);
+        g_closure_unref(session->priv->on_local_candidate_change);
+        session->priv->on_local_candidate_change = NULL;
     }
 }
 
@@ -518,6 +569,17 @@ void _owr_session_set_on_remote_candidate(OwrSession *session, GClosure *on_remo
         g_closure_unref(session->priv->on_remote_candidate);
     session->priv->on_remote_candidate = on_remote_candidate;
     g_closure_set_marshal(session->priv->on_remote_candidate, g_cclosure_marshal_generic);
+}
+
+void _owr_session_set_on_local_candidate_change(OwrSession *session, GClosure *on_local_candidate_change)
+{
+    g_return_if_fail(OWR_IS_SESSION(session));
+    g_return_if_fail(on_local_candidate_change);
+
+    if (session->priv->on_local_candidate_change)
+        g_closure_unref(session->priv->on_local_candidate_change);
+    session->priv->on_local_candidate_change = on_local_candidate_change;
+    g_closure_set_marshal(session->priv->on_local_candidate_change, g_cclosure_marshal_generic);
 }
 
 void _owr_session_set_dtls_peer_certificate(OwrSession *session,
