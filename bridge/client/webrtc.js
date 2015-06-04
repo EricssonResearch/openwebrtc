@@ -184,7 +184,7 @@
         });
 
         var a = { // attributes
-            "id": mediaStreamPrivateInit.id || randomString(),
+            "id": mediaStreamPrivateInit.id || randomString(36),
             "active": false
         };
         domObject.addReadOnlyAttributes(this, a);
@@ -270,7 +270,7 @@
 
         var a = { // attributes
             "kind": sourceInfo.mediaType,
-            "id": id || randomString(),
+            "id": id || randomString(36),
             "label": sourceInfo.label,
             "muted": false,
             "readyState": "live"
@@ -1462,7 +1462,7 @@
         if (!MediaStreamURL.nextId)
             MediaStreamURL.nextId = 1;
 
-        var url = "mediastream:" + randomString();
+        var url = "mediastream:" + randomString(36);
 
         function ensureImgDiv(video) {
             if (video.className.indexOf("owr-video") != -1)
@@ -1556,7 +1556,7 @@
             img.style.visibility = "hidden";
             img.src = "";
 
-            var tag = randomString();
+            var tag = randomString(36);
             bridge.renderSources(audioSources, videoSources, tag, function (renderInfo) {
                 var count = Math.round(Math.random() * 100000);
                 var roll = navigator.userAgent.indexOf("(iP") < 0 ? 100 : 1000000;

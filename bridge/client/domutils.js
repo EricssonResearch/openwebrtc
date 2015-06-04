@@ -210,10 +210,10 @@ function getDictionaryMember(dict, name, type, defaultValue) {
         return +dict[name];
 }
 
-function randomString() {
-    var randomValues = new Uint8Array(27);
+function randomString(length) {
+    var randomValues = new Uint8Array(Math.ceil(length * 3 / 4));
     crypto.getRandomValues(randomValues);
-    return btoa(String.fromCharCode.apply(null, randomValues));
+    return btoa(String.fromCharCode.apply(null, randomValues)).substr(0, length);
 }
 
 function createError(name, message) {
