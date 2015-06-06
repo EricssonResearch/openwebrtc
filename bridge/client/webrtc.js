@@ -65,7 +65,6 @@
         ]
     };
 
-
     var messageChannel = new function () {
         var _this = this;
         var ws;
@@ -108,6 +107,15 @@
 
     var bridge = new JsonRpc(messageChannel);
     bridge.importFunctions("createPeerHandler", "requestSources", "renderSources");
+
+    function genSsrcs(amount) {
+        var ssrcs = [];
+        for (var i = 0; i < amount; i++)
+            ssrcs.push(Math.trunc(Math.random() * Math.pow(2, 32)));
+        return ssrcs;
+    }
+
+
 
     function getUserMedia(options) {
         checkArguments("getUserMedia", "dictionary", 1, arguments);
@@ -352,7 +360,7 @@
 
         var peerHandler;
         var peerHandlerClient = createPeerHandlerClient();
-        var clientRef = bridge.createObjectRef(peerHandlerClient, "gotSendSSRC",
+        var clientRef = bridge.createObjectRef(peerHandlerClient, 
             "gotDtlsFingerprint", "gotIceCandidate", "candidateGatheringDone", "gotRemoteSource",
             "dataChannelsEnabled", "dataChannelRequested");
         var deferredPeerHandlerCalls = [];
@@ -489,14 +497,27 @@
                 localTrackInfos);
 
             localTrackInfos.forEach(function (trackInfo) {
-                localSessionInfoSnapshot.mediaDescriptions.push({
+                var ssrcs;
+                if (trackInfo.kind == "audio")  // hardcoded for now
+                    ssrcs = genSsrcs(1)
+                else // video
+                    ssrcs = genSsrcs(2);
+                var temporaryMediaDescription = {
                     "mediaStreamId": trackInfo.mediaStreamId,
                     "mediaStreamTrackId": trackInfo.mediaStreamTrackId,
                     "type": trackInfo.kind,
                     "payloads": JSON.parse(JSON.stringify(defaultPayloads[trackInfo.kind])),
                     "rtcp": { "mux": true },
-                    "dtls": { "setup": "actpass" }
-                });
+                    "dtls": { "setup": "actpass" },
+                    "cname": "random16charstring",   // will be randomString(16) once P-E's patch has landed
+                    "ssrcs": ssrcs
+                }
+                if (trackInfo.kind == "video") { // hardcoded for the time being
+                    temporaryMediaDescription.ssrcGroups = ["FID"];
+                    temporaryMediaDescription.ssrcGroupsMembers = [ssrcs];
+
+                }
+                localSessionInfoSnapshot.mediaDescriptions.push(temporaryMediaDescription);
             });
 
             [ "Audio", "Video" ].forEach(function (mediaType) {
@@ -606,6 +627,19 @@
                         lmdesc.rtcp = {};
 
                     lmdesc.rtcp.mux = !!(rmdesc.rtcp && rmdesc.rtcp.mux);
+
+                    var ssrcs;
+                    if (lmdesc.type == "audio")  // hardcoded for now
+                        ssrcs = genSsrcs(1)
+                    else // video
+                        ssrcs = genSsrcs(2);
+                    lmdesc.cname = "random16charstring";   // will be randomString(16) once P-E's patch has landed
+                    lmdesc.ssrc = ssrcs;
+                    if (lmdesc.type == "video") {
+                        lmdesc.ssrcGroups = ["FID"];
+                        lmdesc.ssrcGroupsMembers = [ssrcs];                    
+                    }
+
                 }
 
                 if (lmdesc.dtls.setup == "actpass")
@@ -1129,19 +1163,6 @@
 
         function createPeerHandlerClient() {
             var client = {};
-
-            client.gotSendSSRC = function (mdescIndex, ssrc, cname) {
-                var mdesc = localSessionInfo.mediaDescriptions[mdescIndex];
-                if (!mdesc.ssrcs)
-                    mdesc.ssrcs = [];
-                mdesc.ssrcs.push(ssrc);
-                mdesc.cname = cname;
-
-                if (isLocalSessionInfoComplete() && latestLocalDescriptionCallback) {
-                    completeQueuedOperation(latestLocalDescriptionCallback);
-                    latestLocalDescriptionCallback = null;
-                }
-            };
 
             client.gotDtlsFingerprint = function (mdescIndex, dtlsInfo) {
                 var mdesc = localSessionInfo.mediaDescriptions[mdescIndex];
