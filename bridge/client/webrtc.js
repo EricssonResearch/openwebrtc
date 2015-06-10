@@ -448,6 +448,20 @@
                     mdesc.mediaStreamTrackId = trackInfos[index].mediaStreamTrackId;
                     mdesc.mode = "sendrecv";
                     trackInfos.splice(index, 1);
+
+                    var ssrcs = genSsrcs(mdesc.type == "audio" ? 1 : 2);  // hardcoded for now,
+                                                                                            // later analyze PTs and
+                                                                                            // sampling freqs 
+                    mdesc.cname = "random16charstring";   // will be randomString(16) once P-E's patch has landed
+                    mdesc.ssrcs = ssrcs;
+                    if (mdesc.type == "video") {       // for now hardcoded: only for video, only one group - FID
+                        mdesc.ssrcGroups = [{
+                            "semantics": "FID",
+                            "members": ssrcs
+                        }];
+                    }
+
+
                 } else
                     mdesc.mode = "recvonly";
             });
@@ -497,11 +511,9 @@
                 localTrackInfos);
 
             localTrackInfos.forEach(function (trackInfo) {
-                var ssrcs;
-                if (trackInfo.kind == "audio")  // hardcoded for now
-                    ssrcs = genSsrcs(1)
-                else // video
-                    ssrcs = genSsrcs(2);
+                var ssrcs = genSsrcs(trackInfo.kind == "audio" ? 1 : 2);    // for now hard coded
+                                                                                            // later: analyze PTs
+                                                                                            // and sampl freqs
                 var temporaryMediaDescription = {
                     "mediaStreamId": trackInfo.mediaStreamId,
                     "mediaStreamTrackId": trackInfo.mediaStreamTrackId,
@@ -512,10 +524,11 @@
                     "cname": "random16charstring",   // will be randomString(16) once P-E's patch has landed
                     "ssrcs": ssrcs
                 }
-                if (trackInfo.kind == "video") { // hardcoded for the time being
-                    temporaryMediaDescription.ssrcGroups = ["FID"];
-                    temporaryMediaDescription.ssrcGroupsMembers = [ssrcs];
-
+                if (trackInfo.kind == "video") { // hardcoded to only add ssrcGroup FID and only for video
+                    temporaryMediaDescription.ssrcGroups = [{
+                        "semantics": "FID",
+                        "members": ssrcs
+                    }];
                 }
                 localSessionInfoSnapshot.mediaDescriptions.push(temporaryMediaDescription);
             });
@@ -627,18 +640,6 @@
                         lmdesc.rtcp = {};
 
                     lmdesc.rtcp.mux = !!(rmdesc.rtcp && rmdesc.rtcp.mux);
-
-                    var ssrcs;
-                    if (lmdesc.type == "audio")  // hardcoded for now
-                        ssrcs = genSsrcs(1)
-                    else // video
-                        ssrcs = genSsrcs(2);
-                    lmdesc.cname = "random16charstring";   // will be randomString(16) once P-E's patch has landed
-                    lmdesc.ssrc = ssrcs;
-                    if (lmdesc.type == "video") {
-                        lmdesc.ssrcGroups = ["FID"];
-                        lmdesc.ssrcGroupsMembers = [ssrcs];                    
-                    }
 
                 }
 
