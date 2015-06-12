@@ -59,6 +59,7 @@
 #include "owr_video_payload.h"
 
 #include <agent.h>
+#include <interfaces.h>
 #include <gst/app/gstappsink.h>
 #include <gst/app/gstappsrc.h>
 #include <gst/gst.h>
@@ -131,6 +132,7 @@ struct _OwrTransportAgentPrivate {
     /* session_id -> struct SendBinInfo */
     GHashTable *send_bins;
 
+    gboolean local_address_added;
     guint local_min_port;
     guint local_max_port;
 
@@ -431,6 +433,7 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
     gst_bin_add(GST_BIN(priv->transport_bin), priv->rtpbin);
     gst_bin_add(GST_BIN(priv->pipeline), priv->transport_bin);
 
+    priv->local_address_added = FALSE;
     priv->local_min_port = 0;
     priv->local_max_port = 0;
 
@@ -545,6 +548,8 @@ void owr_transport_agent_add_local_address(OwrTransportAgent *transport_agent, c
         g_warning("Supplied local address is not valid.");
     else if (!nice_agent_add_local_address(transport_agent->priv->nice_agent, &addr))
         g_warning("Failed to add local address.");
+    else
+        transport_agent->priv->local_address_added = TRUE;
 }
 
 void owr_transport_agent_set_local_port_range(OwrTransportAgent *transport_agent, guint min_port, guint max_port)
@@ -981,6 +986,22 @@ static gboolean add_session(GHashTable *args)
             nice_agent_set_port_range(priv->nice_agent, stream_id, NICE_COMPONENT_TYPE_RTCP,
                 priv->local_min_port, priv->local_max_port);
         }
+    }
+
+    if (!priv->local_address_added) {
+        GList *item, *local_ips = nice_interfaces_get_local_ips(FALSE);
+
+        for (item = local_ips; item; item = item->next) {
+            gchar *local_ip = item->data;
+            GInetAddress *inet_address = g_inet_address_new_from_string(local_ip);
+
+            if (inet_address) {
+                if (!g_inet_address_get_is_link_local(inet_address))
+                    owr_transport_agent_add_local_address(transport_agent, local_ip);
+                g_object_unref(inet_address);
+            }
+        }
+        g_list_free_full(local_ips, g_free);
     }
 
     if (!priv->deferred_helper_server_adds)
