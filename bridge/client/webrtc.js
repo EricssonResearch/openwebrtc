@@ -1215,7 +1215,8 @@
                         var sourceInfo = {
                             "mediaType": mdesc.type,
                             "label": "Remote " + mdesc.type + " source",
-                            "source": status.source
+                            "source": status.source,
+                            "type": "remote"
                         };
 
                         if (mdesc.mediaStreamId) {
@@ -1557,7 +1558,10 @@
             img.src = "";
 
             var tag = randomString();
-            bridge.renderSources(audioSources, videoSources, tag, function (renderInfo) {
+            var useVideoOverlay = global.navigator.__owrVideoOverlaySupport
+                && video.className.indexOf("owr-overlay-video") != -1;
+
+            bridge.renderSources(audioSources, videoSources, tag, useVideoOverlay, function (renderInfo) {
                 var count = Math.round(Math.random() * 100000);
                 var roll = navigator.userAgent.indexOf("(iP") < 0 ? 100 : 1000000;
                 var retryTime;
@@ -1623,6 +1627,69 @@
                     return retryTime > 2000 || !imgDiv.parentNode;
                 }
             });
+
+            function checkIsHidden(elem) {
+                if (!elem.parentNode)
+                    return elem != document;
+
+                if (elem.style.display == "none" || elem.style.visibility == "hidden")
+                    return true;
+
+                return checkIsHidden(elem.parentNode);
+            }
+
+            function maybeUpdateVideoOverlay() {
+                var isHidden = checkIsHidden(imgDiv);
+                var hasChanged = isHidden != maybeUpdateVideoOverlay.oldIsHidden;
+                if (isHidden && !hasChanged)
+                    return;
+
+                var videoRect;
+                if (!isHidden) {
+                    var dpr = self.devicePixelRatio;
+                    if (window.innerWidth < window.innerHeight)
+                        dpr *= screen.width / window.innerWidth;
+                    else
+                        dpr *= screen.height / window.innerWidth;
+                    var bcr = imgDiv.getBoundingClientRect();
+                    var scl = document.body.scrollLeft;
+                    var sct = document.body.scrollTop;
+                    videoRect = [
+                        Math.floor((bcr.left + scl) * dpr),
+                        Math.floor((bcr.top + sct) * dpr),
+                        Math.ceil((bcr.right + scl) * dpr),
+                        Math.ceil((bcr.bottom + sct) * dpr)
+                    ];
+                    for (var i = 0; !hasChanged && i < videoRect.length; i++) {
+                        if (videoRect[i] != maybeUpdateVideoOverlay.oldVideoRect[i])
+                            hasChanged = true;
+                    }
+                } else
+                    videoRect = [0, 0, 0, 0];
+
+                if (hasChanged) {
+                    maybeUpdateVideoOverlay.oldIsHidden = isHidden;
+                    maybeUpdateVideoOverlay.oldVideoRect = videoRect;
+                    var trackId = mediaStream.getVideoTracks()[0].id;
+
+                    var rotation = 0;
+                    var transform = getComputedStyle(imgDiv).webkitTransform;
+                    if (!transform.indexOf("matrix(")) {
+                        var a = parseFloat(transform.substr(7).split(",")[0]);
+                        rotation = Math.acos(a) / Math.PI * 180;
+                    }
+
+                    alert("owr-message:video-rect," + (sourceInfoMap[trackId].type == "capture")
+                        + "," + tag
+                        + "," + videoRect[0] + "," + videoRect[1] + ","
+                        + videoRect[2] + "," + videoRect[3] + ","
+                        + rotation);
+                }
+            }
+            maybeUpdateVideoOverlay.oldVideoRect = [-1, -1, -1, -1];
+
+            if (useVideoOverlay && mediaStream.getVideoTracks().length > 0)
+                setInterval(maybeUpdateVideoOverlay, 500);
 
         }
 
