@@ -452,7 +452,7 @@
                     var ssrcs = genSsrcs(mdesc.type == "audio" ? 1 : 2);  // hardcoded for now,
                                                                                             // later analyze PTs and
                                                                                             // sampling freqs 
-                    mdesc.cname = "random16charstring";   // will be randomString(16) once P-E's patch has landed
+                    mdesc.cname = randomString(16);
                     mdesc.ssrcs = ssrcs;
                     if (mdesc.type == "video") {       // for now hardcoded: only for video, only one group - FID
                         mdesc.ssrcGroups = [{
@@ -522,7 +522,7 @@
                     "rtcp": { "mux": true },
                     "ice": { "ufrag": randomString(4), "password": randomString(22) },
                     "dtls": { "setup": "actpass" },
-                    "cname": "random16charstring",   // will be randomString(16) once P-E's patch has landed
+                    "cname": randomString(16),
                     "ssrcs": ssrcs
                 }
                 if (trackInfo.kind == "video") { // hardcoded to only add ssrcGroup FID and only for video
