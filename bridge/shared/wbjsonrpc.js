@@ -327,6 +327,9 @@ var JsonRpc = function (msgLink, optionsOrRestricted) {
                     //var functionScope = !msg.__refId ? thisObj : obj; // FIXME: !!
                     var functionScope = !msg.__refId && obj == scope ? thisObj : obj;
                     response.result = f.apply(functionScope, msg.params);
+                    var resultType = response.__resultType = typeof response.result;
+                    if (resultType == "function" || resultType == "undefined")
+                        response.result = null;
                 }
                 catch (e) {
                     response.error = msg.method + ": " + (e.message || e);
@@ -340,10 +343,14 @@ var JsonRpc = function (msgLink, optionsOrRestricted) {
             if (msg.id != null || response.error)
                 msgLink.postMessage(JSON.stringify(response));
         }
-        else if (msg.result) {
+        else if (msg.hasOwnProperty("result")) {
             var cb = callbacks[msg.id];
             if (cb) {
                 delete callbacks[msg.id];
+                if (msg.__resultType == "undefined")
+                    delete msg.result;
+                else if (msg.__resultType == "function")
+                    msg.result = function () { throw "can't call remote function"; };
                 prepareRefObj(msg.result);
                 cb(msg.result);
             }
