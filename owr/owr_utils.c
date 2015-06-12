@@ -62,6 +62,7 @@ OwrCodecType _owr_caps_to_codec_type(GstCaps *caps)
 typedef struct {
     GClosure *callback;
     GList *list;
+    GCopyFunc item_copy;
     GDestroyNotify item_destroy;
     GMutex mutex;
 } CallbackMergeContext;
@@ -69,7 +70,7 @@ typedef struct {
 /*
  * Call the closure with the list as single argument.
  * @callback: (scope sync) (transfer full): the callback to be called with the list
- * @list: (transfer full): any list
+ * @list: (transfer none): any list
  */
 void _owr_utils_call_closure_with_list(GClosure *callback, GList *list)
 {
@@ -104,19 +105,23 @@ static void callback_merger_on_destroy_data(CallbackMergeContext *context, GClos
 static void callback_merger(GList *list, CallbackMergeContext *context)
 {
     g_mutex_lock(&context->mutex);
-    context->list = g_list_concat(context->list, list);
+    context->list = g_list_concat(context->list,
+        g_list_copy_deep (list, context->item_copy, context));
     g_mutex_unlock(&context->mutex);
 }
 
 /*
  * @final_callback: (transfer full):
+ * @list_item_copy: (allow none): used to copy the list items
  * @list_item_destroy: (allow none): used to free the list items after calling @final_callback
  *
  * Returns a closure which should be called with a single GList argument.
  * When the refcount of the closure reaches 0, final_callback is called
  * with a concatenation of all the lists that were sent to the closure.
  */
-GClosure *_owr_utils_list_closure_merger_new(GClosure *final_callback, GDestroyNotify list_item_destroy)
+GClosure *_owr_utils_list_closure_merger_new(GClosure *final_callback,
+    GCopyFunc list_item_copy,
+    GDestroyNotify list_item_destroy)
 {
     CallbackMergeContext *context;
     GClosure *merger;
@@ -124,6 +129,7 @@ GClosure *_owr_utils_list_closure_merger_new(GClosure *final_callback, GDestroyN
     context = g_new0(CallbackMergeContext, 1);
 
     context->callback = final_callback;
+    context->item_copy = list_item_copy;
     context->item_destroy = list_item_destroy;
     context->list = NULL;
     g_mutex_init(&context->mutex);
