@@ -50,6 +50,7 @@ owr_message_origin_bus_set_free
 owr_message_origin_get_bus_set
 owr_message_origin_get_type
 owr_message_origin_post_message
+owr_message_sub_type_get_type
 owr_message_type_get_type
 owr_payload_get_type
 owr_remote_media_source_get_type

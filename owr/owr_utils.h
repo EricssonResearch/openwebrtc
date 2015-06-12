@@ -42,7 +42,9 @@ G_BEGIN_DECLS
 void *_owr_require_symbols(void);
 OwrCodecType _owr_caps_to_codec_type(GstCaps *caps);
 void _owr_utils_call_closure_with_list(GClosure *callback, GList *list);
-GClosure *_owr_utils_list_closure_merger_new(GClosure *final_callback, GDestroyNotify list_item_destroy);
+GClosure *_owr_utils_list_closure_merger_new(GClosure *final_callback,
+    GCopyFunc list_item_copy,
+    GDestroyNotify list_item_destroy);
 
 /* FIXME: This should be removed when the GStreamer required version
  * is 1.6 and gst_caps_foreach() can be used.

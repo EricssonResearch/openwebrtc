@@ -59,6 +59,7 @@
 #include "owr_video_payload.h"
 
 #include <agent.h>
+#include <interfaces.h>
 #include <gst/app/gstappsink.h>
 #include <gst/app/gstappsrc.h>
 #include <gst/gst.h>
@@ -74,9 +75,6 @@
 GST_DEBUG_CATEGORY_EXTERN(_owrtransportagent_debug);
 GST_DEBUG_CATEGORY_EXTERN(_owrsession_debug);
 #define GST_CAT_DEFAULT _owrtransportagent_debug
-
-/* FIXME - re-enable RTX when issues are fixed in GStreamer */
-#undef RTX_ENABLED
 
 #define DEFAULT_ICE_CONTROLLING_MODE TRUE
 
@@ -134,6 +132,7 @@ struct _OwrTransportAgentPrivate {
     /* session_id -> struct SendBinInfo */
     GHashTable *send_bins;
 
+    gboolean local_address_added;
     guint local_min_port;
     guint local_max_port;
 
@@ -176,6 +175,7 @@ static void on_candidate_gathering_done(NiceAgent *nice_agent, guint stream_id, 
 static void on_component_state_changed(NiceAgent *nice_agent, guint stream_id, guint component_id, OwrIceState state, OwrTransportAgent *transport_agent);
 static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMediaSession *media_session, OwrPayload * payload);
 static void on_new_remote_candidate(OwrTransportAgent *transport_agent, gboolean forced, OwrSession *session);
+static void on_local_candidate_change(OwrTransportAgent *transport_agent, OwrCandidate *candidate, OwrSession *session);
 
 static void on_transport_bin_pad_added(GstElement *transport_bin, GstPad *new_pad, OwrTransportAgent *transport_agent);
 static void on_rtpbin_pad_added(GstElement *rtpbin, GstPad *new_pad, OwrTransportAgent *agent);
@@ -433,6 +433,7 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
     gst_bin_add(GST_BIN(priv->transport_bin), priv->rtpbin);
     gst_bin_add(GST_BIN(priv->pipeline), priv->transport_bin);
 
+    priv->local_address_added = FALSE;
     priv->local_min_port = 0;
     priv->local_max_port = 0;
 
@@ -547,6 +548,8 @@ void owr_transport_agent_add_local_address(OwrTransportAgent *transport_agent, c
         g_warning("Supplied local address is not valid.");
     else if (!nice_agent_add_local_address(transport_agent->priv->nice_agent, &addr))
         g_warning("Failed to add local address.");
+    else
+        transport_agent->priv->local_address_added = TRUE;
 }
 
 void owr_transport_agent_set_local_port_range(OwrTransportAgent *transport_agent, guint min_port, guint max_port)
@@ -954,8 +957,13 @@ static gboolean add_session(GHashTable *args)
 
     _owr_session_set_on_remote_candidate(session,
         g_cclosure_new_object_swap(G_CALLBACK(on_new_remote_candidate), G_OBJECT(transport_agent)));
+    _owr_session_set_on_local_candidate_change(session,
+        g_cclosure_new_object_swap(G_CALLBACK(on_local_candidate_change), G_OBJECT(transport_agent)));
 
     if (OWR_IS_MEDIA_SESSION(session)) {
+        guint send_ssrc = 0;
+        gchar *cname = NULL;
+
         _owr_media_session_set_on_send_source(OWR_MEDIA_SESSION(session),
             g_cclosure_new_object_swap(G_CALLBACK(on_new_send_source), G_OBJECT(transport_agent)));
 
@@ -965,7 +973,9 @@ static gboolean add_session(GHashTable *args)
         prepare_transport_bin_receive_elements(transport_agent, stream_id, rtcp_mux);
         prepare_transport_bin_send_elements(transport_agent, stream_id, rtcp_mux);
 
-        set_send_ssrc_and_cname(transport_agent, OWR_MEDIA_SESSION(session));
+        g_object_get(session, "send-ssrc", &send_ssrc, "cname", &cname, NULL);
+        if (!send_ssrc || !cname)
+            set_send_ssrc_and_cname(transport_agent, OWR_MEDIA_SESSION(session));
     } else if (OWR_IS_DATA_SESSION(session)) {
         _owr_data_session_set_on_datachannel_added(OWR_DATA_SESSION(session),
             g_cclosure_new_object_swap(G_CALLBACK(on_new_datachannel),
@@ -981,6 +991,22 @@ static gboolean add_session(GHashTable *args)
             nice_agent_set_port_range(priv->nice_agent, stream_id, NICE_COMPONENT_TYPE_RTCP,
                 priv->local_min_port, priv->local_max_port);
         }
+    }
+
+    if (!priv->local_address_added) {
+        GList *item, *local_ips = nice_interfaces_get_local_ips(FALSE);
+
+        for (item = local_ips; item; item = item->next) {
+            gchar *local_ip = item->data;
+            GInetAddress *inet_address = g_inet_address_new_from_string(local_ip);
+
+            if (inet_address) {
+                if (!g_inet_address_get_is_link_local(inet_address))
+                    owr_transport_agent_add_local_address(transport_agent, local_ip);
+                g_object_unref(inet_address);
+            }
+        }
+        g_list_free_full(local_ips, g_free);
     }
 
     if (!priv->deferred_helper_server_adds)
@@ -1033,9 +1059,9 @@ static GstElement *add_nice_element(OwrTransportAgent *transport_agent, guint st
         ? NICE_COMPONENT_TYPE_RTCP : NICE_COMPONENT_TYPE_RTP, NULL);
 
     if (is_sink) {
-        g_object_set(nice_element, "enable-last-sample", FALSE, NULL);
+        g_object_set(nice_element, "enable-last-sample", FALSE, "async", FALSE, NULL);
         if (is_rtcp)
-            g_object_set(nice_element, "sync", FALSE, "async", FALSE, NULL);
+            g_object_set(nice_element, "sync", FALSE, NULL);
     }
 
     added_ok = gst_bin_add(GST_BIN(bin), nice_element);
@@ -1565,10 +1591,8 @@ static void set_send_ssrc_and_cname(OwrTransportAgent *transport_agent, OwrMedia
     g_signal_emit_by_name(transport_agent->priv->rtpbin, "get-internal-session", stream_id, &session);
     g_warn_if_fail(session);
     g_object_get(session, "internal-ssrc", &send_ssrc, "sdes", &sdes, NULL);
-    _owr_media_session_set_send_ssrc(media_session, send_ssrc);
-    _owr_media_session_set_cname(media_session, gst_structure_get_string(sdes, "cname"));
-    g_object_notify(G_OBJECT(media_session), "send-ssrc");
-    g_object_notify(G_OBJECT(media_session), "cname");
+    g_object_set(media_session, "send-ssrc", send_ssrc, "cname",
+        gst_structure_get_string(sdes, "cname"), NULL);
     gst_structure_free(sdes);
     g_object_unref(session);
 }
@@ -1797,6 +1821,8 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
         *ghost_src_pad = NULL, *encoder_sink_pad;
     OwrMediaType media_type;
     GstPadLinkReturn link_res;
+    guint send_ssrc = 0;
+    gchar *cname = NULL;
 
     g_return_if_fail(transport_agent);
     g_return_if_fail(media_session);
@@ -1828,6 +1854,24 @@ static void handle_new_send_payload(OwrTransportAgent *transport_agent, OwrMedia
     rtp_capsfilter = gst_element_factory_make("capsfilter", name);
     g_free(name);
     rtp_caps = _owr_payload_create_rtp_caps(payload);
+
+    g_object_get(media_session, "send-ssrc", &send_ssrc, "cname", &cname, NULL);
+    if (cname) {
+        GObject *internal_session = NULL;
+        GstStructure *sdes = NULL;
+
+        g_signal_emit_by_name(rtpbin, "get-internal-session", stream_id, &internal_session);
+        g_warn_if_fail(internal_session);
+
+        g_object_get(internal_session, "sdes", &sdes, NULL);
+        gst_structure_set(sdes, "cname", G_TYPE_STRING, cname, NULL);
+        g_object_set(internal_session, "sdes", sdes, NULL);
+
+        gst_structure_free(sdes);
+        g_object_unref(internal_session);
+    }
+    if (send_ssrc)
+        gst_caps_set_simple(rtp_caps, "ssrc", G_TYPE_UINT, send_ssrc, NULL);
 
     g_object_set(rtp_capsfilter, "caps", rtp_caps, NULL);
     gst_caps_unref(rtp_caps);
@@ -2000,6 +2044,24 @@ static void on_new_remote_candidate(OwrTransportAgent *transport_agent, gboolean
         g_slist_free_full(nice_cands_rtcp, (GDestroyNotify)nice_candidate_free);
         g_warn_if_fail(cands_added > 0);
     }
+}
+
+static void on_local_candidate_change(OwrTransportAgent *transport_agent, OwrCandidate *candidate, OwrSession *session)
+{
+    guint stream_id;
+    gchar *ufrag = NULL, *password = NULL;
+
+    g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
+    g_return_if_fail(OWR_IS_CANDIDATE(candidate));
+    g_return_if_fail(OWR_IS_SESSION(session));
+
+    stream_id = get_stream_id(transport_agent, session);
+    g_return_if_fail(stream_id);
+
+    g_object_get(G_OBJECT(candidate), "ufrag", &ufrag, "password", &password, NULL);
+    nice_agent_set_local_credentials(transport_agent->priv->nice_agent, stream_id, ufrag, password);
+    g_free(ufrag);
+    g_free(password);
 }
 
 static gboolean emit_on_incoming_source(GHashTable *args)
@@ -2266,7 +2328,6 @@ static GstCaps * on_rtpbin_request_pt_map(GstElement *rtpbin, guint session_id, 
     return caps;
 }
 
-#ifdef RTX_ENABLED
 static GstElement * create_aux_bin(gchar *prefix, GstElement *rtx, guint session_id)
 {
     GstElement *bin;
@@ -2297,11 +2358,9 @@ static GstElement * create_aux_bin(gchar *prefix, GstElement *rtx, guint session
 
     return bin;
 }
-#endif
 
 static GstElement * on_rtpbin_request_aux_sender(G_GNUC_UNUSED GstElement *rtpbin, guint session_id, OwrTransportAgent *transport_agent)
 {
-#ifdef RTX_ENABLED
     OwrMediaSession *media_session;
     OwrPayload *payload;
     GstElement *rtxsend;
@@ -2343,17 +2402,11 @@ static GstElement * on_rtpbin_request_aux_sender(G_GNUC_UNUSED GstElement *rtpbi
     return create_aux_bin("rtprtxsend", rtxsend, session_id);
 
 no_retransmission:
-#else
-    OWR_UNUSED(rtpbin);
-    OWR_UNUSED(session_id);
-    OWR_UNUSED(transport_agent);
-#endif
     return NULL;
 }
 
 static GstElement * on_rtpbin_request_aux_receiver(G_GNUC_UNUSED GstElement *rtpbin, G_GNUC_UNUSED guint session_id, OwrTransportAgent *transport_agent)
 {
-#ifdef RTX_ENABLED
     OwrMediaSession *media_session;
     GstElement *rtxrecv;
     GstStructure *pt_map;
@@ -2377,11 +2430,6 @@ static GstElement * on_rtpbin_request_aux_receiver(G_GNUC_UNUSED GstElement *rtp
     return create_aux_bin("rtprtxrecv", rtxrecv, session_id);
 
 no_retransmission:
-#else
-    OWR_UNUSED(rtpbin);
-    OWR_UNUSED(session_id);
-    OWR_UNUSED(transport_agent);
-#endif
     return NULL;
 }
 
@@ -2546,7 +2594,7 @@ static void on_receiving_rtcp(GObject *session, GstBuffer *buffer,
             if (packet_type == GST_RTCP_TYPE_PSFB || packet_type == GST_RTCP_TYPE_RTPFB) {
                 print_rtcp_feedback_type(session, session_id, gst_rtcp_packet_fb_get_type(&rtcp_packet),
                     gst_rtcp_packet_fb_get_media_ssrc(&rtcp_packet), packet_type,
-                    gst_rtcp_packet_fb_get_fci(&rtcp_packet), FALSE);
+                    gst_rtcp_packet_fb_get_fci(&rtcp_packet), TRUE);
                 break;
             }
         }
@@ -2627,10 +2675,8 @@ static void on_new_jitterbuffer(G_GNUC_UNUSED GstElement *rtpbin, GstElement *ji
     media_session = OWR_MEDIA_SESSION(get_session(transport_agent, session_id));
     g_return_if_fail(OWR_IS_MEDIA_SESSION(media_session));
 
-#ifdef RTX_ENABLED
     if (_owr_media_session_want_receive_rtx(media_session))
         g_object_set(jitterbuffer, "do-retransmission", TRUE, NULL);
-#endif
 
     g_object_bind_property(media_session, "jitter-buffer-latency", jitterbuffer,
         "latency", G_BINDING_SYNC_CREATE);

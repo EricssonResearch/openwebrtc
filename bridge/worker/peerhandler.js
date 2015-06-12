@@ -43,7 +43,7 @@ function PeerHandler(configuration, client, jsonRpc) {
         for (i = sessions.length; i < localSessionInfo.mediaDescriptions.length; i++) {
             var lmdesc = localSessionInfo.mediaDescriptions[i];
             var sessionConfig = {
-                "dtlsRole": lmdesc.dtls.mode,
+                "dtlsRole": lmdesc.dtls.setup,
                 "type": lmdesc.type == "application" ? "data" : "media"
             };
 
@@ -105,6 +105,11 @@ function PeerHandler(configuration, client, jsonRpc) {
                 if (cand.type != "host") {
                     cand.relatedAddress = candidate.base_address;
                     cand.relatedPort = candidate.base_port || 9;
+                }
+
+                if (mdesc.ice && mdesc.ice.ufrag && mdesc.ice.password) {
+                    candidate.ufrag = mdesc.ice.ufrag;
+                    candidate.password = mdesc.ice.password;
                 }
 
                 var mdescIndex = localSessionInfo.mediaDescriptions.indexOf(mdesc);
@@ -186,7 +191,7 @@ function PeerHandler(configuration, client, jsonRpc) {
         for (var i = sessions.length; i < remoteSessionInfo.mediaDescriptions.length; i++) {
             var rmdesc = remoteSessionInfo.mediaDescriptions[i];
             var sessionConfig = {
-                "dtlsRole": rmdesc.dtls.mode == "active" ? "passive" : "active",
+                "dtlsRole": rmdesc.dtls.setup == "active" ? "passive" : "active",
                 "type": rmdesc.type == "application" ? "data" : "media"
             };
             sessionConfigs.push(sessionConfig);

@@ -54,7 +54,7 @@
         "video": [
             { "encodingName": "H264", "type": 103, "clockRate": 90000,
                 "ccmfir": true, "nackpli": true, /* "nack": true, */
-                "parameters": { "packetizationMode": 1 } },
+                "parameters": { "levelAsymmetryAllowed": 1, "packetizationMode": 1 } },
 /* FIXME: Enable when Chrome can handle an offer with RTX for H264
             { "encodingName": "RTX", "type": 123, "clockRate": 90000,
                 "parameters": { "apt": 103, "rtxTime": 200 } },*/
@@ -192,7 +192,7 @@
         });
 
         var a = { // attributes
-            "id": mediaStreamPrivateInit.id || randomString(),
+            "id": mediaStreamPrivateInit.id || randomString(36),
             "active": false
         };
         domObject.addReadOnlyAttributes(this, a);
@@ -278,7 +278,7 @@
 
         var a = { // attributes
             "kind": sourceInfo.mediaType,
-            "id": id || randomString(),
+            "id": id || randomString(36),
             "label": sourceInfo.label,
             "muted": false,
             "readyState": "live"
@@ -520,6 +520,7 @@
                     "type": trackInfo.kind,
                     "payloads": JSON.parse(JSON.stringify(defaultPayloads[trackInfo.kind])),
                     "rtcp": { "mux": true },
+                    "ice": { "ufrag": randomString(4), "password": randomString(22) },
                     "dtls": { "setup": "actpass" },
                     "cname": "random16charstring",   // will be randomString(16) once P-E's patch has landed
                     "ssrcs": ssrcs
@@ -552,6 +553,7 @@
                     "type": "application",
                     "protocol": "DTLS/SCTP",
                     "fmt": 5000,
+                    "ice": { "ufrag": randomString(4), "password": randomString(22) },
                     "dtls": { "setup": "actpass" },
                     "sctp": {
                         "port": 5000,
@@ -619,6 +621,7 @@
                 if (!lmdesc) {
                     lmdesc = {
                         "type": rmdesc.type,
+                        "ice": { "ufrag": randomString(4), "password": randomString(22) },
                         "dtls": { "setup": rmdesc.dtls.setup == "active" ? "passive" : "active" }
                     };
                     localSessionInfoSnapshot.mediaDescriptions.push(lmdesc);
@@ -1182,10 +1185,11 @@
                 if (!mdesc.ice) {
                     mdesc.ice = {
                         "ufrag": ufrag,
-                        "password": password,
-                        "candidates": []
+                        "password": password
                     };
                 }
+                if (!mdesc.ice.candidates)
+                    mdesc.ice.candidates = [];
                 mdesc.ice.candidates.push(candidate);
 
                 if (candidate.address.indexOf(":") == -1) { // not IPv6
@@ -1237,7 +1241,8 @@
                         var sourceInfo = {
                             "mediaType": mdesc.type,
                             "label": "Remote " + mdesc.type + " source",
-                            "source": status.source
+                            "source": status.source,
+                            "type": "remote"
                         };
 
                         if (mdesc.mediaStreamId) {
@@ -1484,7 +1489,7 @@
         if (!MediaStreamURL.nextId)
             MediaStreamURL.nextId = 1;
 
-        var url = "mediastream:" + randomString();
+        var url = "mediastream:" + randomString(36);
 
         function ensureImgDiv(video) {
             if (video.className.indexOf("owr-video") != -1)
@@ -1578,8 +1583,11 @@
             img.style.visibility = "hidden";
             img.src = "";
 
-            var tag = randomString();
-            bridge.renderSources(audioSources, videoSources, tag, function (renderInfo) {
+            var tag = randomString(36);
+            var useVideoOverlay = global.navigator.__owrVideoOverlaySupport
+                && video.className.indexOf("owr-overlay-video") != -1;
+
+            bridge.renderSources(audioSources, videoSources, tag, useVideoOverlay, function (renderInfo) {
                 var count = Math.round(Math.random() * 100000);
                 var roll = navigator.userAgent.indexOf("(iP") < 0 ? 100 : 1000000;
                 var retryTime;
@@ -1646,6 +1654,69 @@
                 }
             });
 
+            function checkIsHidden(elem) {
+                if (!elem.parentNode)
+                    return elem != document;
+
+                if (elem.style.display == "none" || elem.style.visibility == "hidden")
+                    return true;
+
+                return checkIsHidden(elem.parentNode);
+            }
+
+            function maybeUpdateVideoOverlay() {
+                var isHidden = checkIsHidden(imgDiv);
+                var hasChanged = isHidden != maybeUpdateVideoOverlay.oldIsHidden;
+                if (isHidden && !hasChanged)
+                    return;
+
+                var videoRect;
+                if (!isHidden) {
+                    var dpr = self.devicePixelRatio;
+                    if (window.innerWidth < window.innerHeight)
+                        dpr *= screen.width / window.innerWidth;
+                    else
+                        dpr *= screen.height / window.innerWidth;
+                    var bcr = imgDiv.getBoundingClientRect();
+                    var scl = document.body.scrollLeft;
+                    var sct = document.body.scrollTop;
+                    videoRect = [
+                        Math.floor((bcr.left + scl) * dpr),
+                        Math.floor((bcr.top + sct) * dpr),
+                        Math.ceil((bcr.right + scl) * dpr),
+                        Math.ceil((bcr.bottom + sct) * dpr)
+                    ];
+                    for (var i = 0; !hasChanged && i < videoRect.length; i++) {
+                        if (videoRect[i] != maybeUpdateVideoOverlay.oldVideoRect[i])
+                            hasChanged = true;
+                    }
+                } else
+                    videoRect = [0, 0, 0, 0];
+
+                if (hasChanged) {
+                    maybeUpdateVideoOverlay.oldIsHidden = isHidden;
+                    maybeUpdateVideoOverlay.oldVideoRect = videoRect;
+                    var trackId = mediaStream.getVideoTracks()[0].id;
+
+                    var rotation = 0;
+                    var transform = getComputedStyle(imgDiv).webkitTransform;
+                    if (!transform.indexOf("matrix(")) {
+                        var a = parseFloat(transform.substr(7).split(",")[0]);
+                        rotation = Math.acos(a) / Math.PI * 180;
+                    }
+
+                    alert("owr-message:video-rect," + (sourceInfoMap[trackId].type == "capture")
+                        + "," + tag
+                        + "," + videoRect[0] + "," + videoRect[1] + ","
+                        + videoRect[2] + "," + videoRect[3] + ","
+                        + rotation);
+                }
+            }
+            maybeUpdateVideoOverlay.oldVideoRect = [-1, -1, -1, -1];
+
+            if (useVideoOverlay && mediaStream.getVideoTracks().length > 0)
+                setInterval(maybeUpdateVideoOverlay, 500);
+
         }
 
         this.toString = function () {
@@ -1686,7 +1757,7 @@
             this._srcObject = stream;
             this.src = url.createObjectURL(stream);
         }
-    }); 
+    });
 
     var origDrawImage = CanvasRenderingContext2D.prototype.drawImage;
     CanvasRenderingContext2D.prototype.drawImage = function () {
