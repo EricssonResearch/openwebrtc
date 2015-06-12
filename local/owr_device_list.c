@@ -76,6 +76,7 @@ typedef struct {
 static gboolean cb_call_closure_with_list_later(CallbackAndList *cal)
 {
     _owr_utils_call_closure_with_list(cal->callback, cal->list);
+    g_list_free_full(cal->list, g_object_unref);
 
     g_slice_free(CallbackAndList, cal);
 
@@ -103,7 +104,9 @@ void _owr_get_capture_devices(OwrMediaType types, GClosure *callback)
     if (G_CLOSURE_NEEDS_MARSHAL(callback))
         g_closure_set_marshal(callback, g_cclosure_marshal_generic);
 
-    merger = _owr_utils_list_closure_merger_new(callback, (GDestroyNotify) g_object_unref);
+    merger = _owr_utils_list_closure_merger_new(callback,
+        (GCopyFunc) g_object_ref,
+        (GDestroyNotify) g_object_unref);
 
     if (types & OWR_MEDIA_TYPE_VIDEO) {
         g_closure_ref(merger);
@@ -124,13 +127,17 @@ void _owr_get_capture_devices(OwrMediaType types, GClosure *callback)
 
 static gboolean enumerate_video_source_devices(GClosure *callback)
 {
-    _owr_utils_call_closure_with_list(callback, _owr_get_avf_video_sources());
+    GList *sources = _owr_get_avf_video_sources();
+    _owr_utils_call_closure_with_list(callback, sources);
+    g_list_free_full(sources, g_object_unref);
     return FALSE;
 }
 
 static gboolean enumerate_audio_source_devices(GClosure *callback)
 {
-    _owr_utils_call_closure_with_list(callback, _owr_get_core_audio_sources());
+    GList *sources = _owr_get_core_audio_sources();
+    _owr_utils_call_closure_with_list(callback, sources);
+    g_list_free_full(sources, g_object_unref);
     return FALSE;
 }
 
@@ -273,10 +280,13 @@ static void source_info_iterator(pa_context *pa_context, const pa_source_info *i
 static gboolean enumerate_audio_source_devices(GClosure *callback)
 {
     OwrLocalMediaSource *source;
+    GList *sources = NULL;
 
     source = _owr_local_media_source_new_cached(-1,
         "Default audio input", OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_CAPTURE);
-    _owr_utils_call_closure_with_list(callback, g_list_prepend(NULL, source));
+    sources = g_list_prepend(sources, source);
+    _owr_utils_call_closure_with_list(callback, sources);
+    g_list_free_full(sources, g_object_unref);
 
     return FALSE;
 }
@@ -381,6 +391,7 @@ static gboolean enumerate_video_source_devices(GClosure *callback)
 
     sources = g_list_reverse(sources);
     _owr_utils_call_closure_with_list(callback, sources);
+    g_list_free_full(sources, g_object_unref);
 
     return FALSE;
 }
@@ -681,6 +692,7 @@ static gboolean enumerate_video_source_devices(GClosure *callback)
     }
 
     _owr_utils_call_closure_with_list(callback, sources);
+    g_list_free_full(sources, g_object_unref);
 
     return FALSE;
 }
