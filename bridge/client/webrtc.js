@@ -54,7 +54,7 @@
         "video": [
             { "encodingName": "H264", "type": 103, "clockRate": 90000,
                 "ccmfir": true, "nackpli": true, /* "nack": true, */
-                "parameters": { "packetizationMode": 1 } },
+                "parameters": { "levelAsymmetryAllowed": 1, "packetizationMode": 1 } },
 /* FIXME: Enable when Chrome can handle an offer with RTX for H264
             { "encodingName": "RTX", "type": 123, "clockRate": 90000,
                 "parameters": { "apt": 103, "rtxTime": 200 } },*/
