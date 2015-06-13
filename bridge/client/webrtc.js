@@ -65,7 +65,6 @@
         ]
     };
 
-
     var messageChannel = new function () {
         var _this = this;
         var ws;
@@ -108,6 +107,15 @@
 
     var bridge = new JsonRpc(messageChannel);
     bridge.importFunctions("createPeerHandler", "requestSources", "renderSources");
+
+    function genSsrcs(amount) {
+        var ssrcs = [];
+        for (var i = 0; i < amount; i++)
+            ssrcs.push(Math.trunc(Math.random() * Math.pow(2, 32)));
+        return ssrcs;
+    }
+
+
 
     function getUserMedia(options) {
         checkArguments("getUserMedia", "dictionary", 1, arguments);
@@ -352,7 +360,7 @@
 
         var peerHandler;
         var peerHandlerClient = createPeerHandlerClient();
-        var clientRef = bridge.createObjectRef(peerHandlerClient, "gotSendSSRC",
+        var clientRef = bridge.createObjectRef(peerHandlerClient, 
             "gotDtlsFingerprint", "gotIceCandidate", "candidateGatheringDone", "gotRemoteSource",
             "dataChannelsEnabled", "dataChannelRequested");
         var deferredPeerHandlerCalls = [];
@@ -440,6 +448,20 @@
                     mdesc.mediaStreamTrackId = trackInfos[index].mediaStreamTrackId;
                     mdesc.mode = "sendrecv";
                     trackInfos.splice(index, 1);
+
+                    var ssrcs = genSsrcs(mdesc.type == "audio" ? 1 : 2);  // hardcoded for now,
+                                                                                            // later analyze PTs and
+                                                                                            // sampling freqs 
+                    mdesc.cname = randomString(16);
+                    mdesc.ssrcs = ssrcs;
+                    if (mdesc.type == "video") {       // for now hardcoded: only for video, only one group - FID
+                        mdesc.ssrcGroups = [{
+                            "semantics": "FID",
+                            "members": ssrcs
+                        }];
+                    }
+
+
                 } else
                     mdesc.mode = "recvonly";
             });
@@ -489,15 +511,27 @@
                 localTrackInfos);
 
             localTrackInfos.forEach(function (trackInfo) {
-                localSessionInfoSnapshot.mediaDescriptions.push({
+                var ssrcs = genSsrcs(trackInfo.kind == "audio" ? 1 : 2);    // for now hard coded
+                                                                                            // later: analyze PTs
+                                                                                            // and sampl freqs
+                var temporaryMediaDescription = {
                     "mediaStreamId": trackInfo.mediaStreamId,
                     "mediaStreamTrackId": trackInfo.mediaStreamTrackId,
                     "type": trackInfo.kind,
                     "payloads": JSON.parse(JSON.stringify(defaultPayloads[trackInfo.kind])),
                     "rtcp": { "mux": true },
                     "ice": { "ufrag": randomString(4), "password": randomString(22) },
-                    "dtls": { "setup": "actpass" }
-                });
+                    "dtls": { "setup": "actpass" },
+                    "cname": randomString(16),
+                    "ssrcs": ssrcs
+                }
+                if (trackInfo.kind == "video") { // hardcoded to only add ssrcGroup FID and only for video
+                    temporaryMediaDescription.ssrcGroups = [{
+                        "semantics": "FID",
+                        "members": ssrcs
+                    }];
+                }
+                localSessionInfoSnapshot.mediaDescriptions.push(temporaryMediaDescription);
             });
 
             [ "Audio", "Video" ].forEach(function (mediaType) {
@@ -609,6 +643,7 @@
                         lmdesc.rtcp = {};
 
                     lmdesc.rtcp.mux = !!(rmdesc.rtcp && rmdesc.rtcp.mux);
+
                 }
 
                 if (lmdesc.dtls.setup == "actpass")
@@ -1132,19 +1167,6 @@
 
         function createPeerHandlerClient() {
             var client = {};
-
-            client.gotSendSSRC = function (mdescIndex, ssrc, cname) {
-                var mdesc = localSessionInfo.mediaDescriptions[mdescIndex];
-                if (!mdesc.ssrcs)
-                    mdesc.ssrcs = [];
-                mdesc.ssrcs.push(ssrc);
-                mdesc.cname = cname;
-
-                if (isLocalSessionInfoComplete() && latestLocalDescriptionCallback) {
-                    completeQueuedOperation(latestLocalDescriptionCallback);
-                    latestLocalDescriptionCallback = null;
-                }
-            };
 
             client.gotDtlsFingerprint = function (mdescIndex, dtlsInfo) {
                 var mdesc = localSessionInfo.mediaDescriptions[mdescIndex];
