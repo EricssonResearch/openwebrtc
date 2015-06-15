@@ -210,6 +210,10 @@ function getDictionaryMember(dict, name, type, defaultValue) {
         return +dict[name];
 }
 
+function randomNumber(bits) {
+    return Math.floor(Math.random() * Math.pow(2, bits));
+}
+
 function randomString(length) {
     var randomValues = new Uint8Array(Math.ceil(length * 3 / 4));
     crypto.getRandomValues(randomValues);

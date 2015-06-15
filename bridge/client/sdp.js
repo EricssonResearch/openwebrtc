@@ -48,7 +48,6 @@ if (typeof(SDP) == "undefined")
         "ccmfir": "^a=rtcp-fb:${type} ccm fir$",
         "rtcp": "^a=rtcp:([\\d]+)( IN (IP[46]) ([\\d\\.a-f\\:]+))?.*$",
         "rtcpmux": "^a=rtcp-mux.*$",
-        "ssrcgroup": "^a=ssrc-group:(FID|FEC-FR) ([\\d ]*)$\\r?\\n",
         "cname": "^a=ssrc:(\\d+) cname:([\\w+/\\-@\\.]+).*$",
         "msid": "^a=(ssrc:\\d+ )?msid:([\\w+/\\-=]+) +([\\w+/\\-=]+).*$",
         "ufrag": "^a=ice-ufrag:([\\w+/]*).*$",
@@ -82,7 +81,6 @@ if (typeof(SDP) == "undefined")
             "${nackLines}" +
             "${nackpliLines}" +
             "${ccmfirLines}" +
-            "${ssrcGroupLines}" +
             "${cnameLines}" +
             "${msidLines}" +
             "${iceCredentialLines}" +
@@ -100,7 +98,6 @@ if (typeof(SDP) == "undefined")
         "nackpli": "a=rtcp-fb:${type} nack pli\r\n",
         "ccmfir": "a=rtcp-fb:${type} ccm fir\r\n",
 
-        "ssrcGroup": "a=ssrc-group:${semantics} ${members}\r\n",
         "cname": "a=ssrc:${ssrc} cname:${cname}\r\n",
         "msid": "a=${[ssrc:]ssrc[ ]}msid:${mediaStreamId} ${mediaStreamTrackId}\r\n",
 
@@ -260,22 +257,6 @@ if (typeof(SDP) == "undefined")
                 if (!mediaDescription.rtcp)
                     mediaDescription.rtcp = {};
                 mediaDescription.rtcp.mux = true;
-            }
-
-            var ssrcGroupLines = match(mblock, regexps.ssrcgroup, "mg");
-            if (ssrcGroupLines) {
-                mediaDescription.ssrcGroups = [];
-                ssrcGroupLines.forEach(function (line) {
-                    var ssrcGroup = match(line, regexps.ssrcgroup, "m");
-                    var members = ssrcGroup[2].trim().split(/ +/).map(function (ssrcString) {
-                        return parseInt(ssrcString);
-                    });
-
-                    mediaDescription.ssrcGroups.push({
-                        "semantics": ssrcGroup[1],
-                        "members": members
-                    });
-                });
             }
 
             var cnameLines = match(mblock, regexps.cname, "mg");
@@ -465,15 +446,12 @@ if (typeof(SDP) == "undefined")
                 rtcpInfo.rtcpMuxLine = templates.rtcpMux;
             mblock = fillTemplate(mblock, rtcpInfo);
 
-           var srcAttributeLines = { "cnameLines": "", "msidLines": "", "ssrcGroupLines": "" };
+           var srcAttributeLines = { "cnameLines": "", "msidLines": "" };
             var srcAttributes = {
                 "cname": mediaDescription.cname,
                 "mediaStreamId": mediaDescription.mediaStreamId,
-                "mediaStreamTrackId": mediaDescription.mediaStreamTrackId,
-                "ssrcGroups": mediaDescription.ssrcGroups
+                "mediaStreamTrackId": mediaDescription.mediaStreamTrackId
             };
-            if (mediaDescription.ssrcs) console.log("ssrcs");
-            if (mediaDescription.cname) console.log("cname");
             if (mediaDescription.cname && mediaDescription.ssrcs) {
                 mediaDescription.ssrcs.forEach(function (ssrc) {
                     srcAttributes.ssrc = ssrc;
@@ -484,18 +462,6 @@ if (typeof(SDP) == "undefined")
             } else if (mediaDescription.mediaStreamId && mediaDescription.mediaStreamTrackId) {
                 srcAttributes.ssrc = null;
                 srcAttributeLines.msidLines += fillTemplate(templates.msid, srcAttributes);
-            }
-            if (mediaDescription.ssrcGroups) {
-                var ssrcGroupLines = "";
-                    console.log("gropu: ");
-
-                mediaDescription.ssrcGroups.forEach(function (group) {
-                    srcAttributeLines.ssrcGroupLines += fillTemplate(templates.ssrcGroup, {
-                        "semantics": group.semantics,
-                        "members": group.members.join(" ")
-                    });
-                });
-                //mblock = fillTemplate(mblock, { "ssrcGroupLines": ssrcGroupLines });
             }
 
             mblock = fillTemplate(mblock, srcAttributeLines);
