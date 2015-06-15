@@ -446,7 +446,7 @@ if (typeof(SDP) == "undefined")
                 rtcpInfo.rtcpMuxLine = templates.rtcpMux;
             mblock = fillTemplate(mblock, rtcpInfo);
 
-           var srcAttributeLines = { "cnameLines": "", "msidLines": "" };
+            var srcAttributeLines = { "cnameLines": "", "msidLines": "" };
             var srcAttributes = {
                 "cname": mediaDescription.cname,
                 "mediaStreamId": mediaDescription.mediaStreamId,
@@ -463,7 +463,6 @@ if (typeof(SDP) == "undefined")
                 srcAttributes.ssrc = null;
                 srcAttributeLines.msidLines += fillTemplate(templates.msid, srcAttributes);
             }
-
             mblock = fillTemplate(mblock, srcAttributeLines);
 
             var iceInfo = {"iceCredentialLines": "", "candidateLines": ""};
