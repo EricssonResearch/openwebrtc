@@ -149,6 +149,11 @@ function PeerHandler(configuration, client, jsonRpc) {
             prepareSession(mediaSession, mdesc);
             mediaSession.rtcp_mux = !isInitiator && !!(mdesc.rtcp && mdesc.rtcp.mux);
 
+            if (mdesc.cname && mdesc.ssrcs && mdesc.ssrcs.length) {
+                mediaSession.cname = mdesc.cname;
+                mediaSession.send_ssrc = mdesc.ssrcs[0];
+            }
+
             mediaSession.signal.connect("notify::send-ssrc", function () {
                 var mdescIndex = localSessionInfo.mediaDescriptions.indexOf(mdesc);
                 client.gotSendSSRC(mdescIndex, mediaSession.send_ssrc, mediaSession.cname);

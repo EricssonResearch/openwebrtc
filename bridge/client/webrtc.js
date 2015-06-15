@@ -382,6 +382,7 @@
                 deferredCreateDataChannelCalls.push(func);
         }
 
+        var cname = randomString(16);
         var negotiationNeededTimerHandle;
         var hasDataChannels = false;
         var localSessionInfo = null;
@@ -495,6 +496,8 @@
                     "type": trackInfo.kind,
                     "payloads": JSON.parse(JSON.stringify(defaultPayloads[trackInfo.kind])),
                     "rtcp": { "mux": true },
+                    "ssrcs": [ randomNumber(32) ],
+                    "cname": cname,
                     "ice": { "ufrag": randomString(4), "password": randomString(22) },
                     "dtls": { "setup": "actpass" }
                 });
@@ -609,6 +612,12 @@
                         lmdesc.rtcp = {};
 
                     lmdesc.rtcp.mux = !!(rmdesc.rtcp && rmdesc.rtcp.mux);
+
+                    do {
+                        lmdesc.ssrcs = [ randomNumber(32) ];
+                    } while (rmdesc.ssrcs && rmdesc.ssrcs.indexOf(lmdesc.ssrcs[0]) != -1);
+
+                    lmdesc.cname = cname;
                 }
 
                 if (lmdesc.dtls.setup == "actpass")
