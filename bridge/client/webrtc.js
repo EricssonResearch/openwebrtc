@@ -65,7 +65,6 @@
         ]
     };
 
-
     var messageChannel = new function () {
         var _this = this;
         var ws;
