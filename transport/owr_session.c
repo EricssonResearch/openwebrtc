@@ -611,17 +611,31 @@ void _owr_session_emit_ice_state_changed(OwrSession *session, guint session_id,
 {
     OwrIceState old_state, new_state;
     gchar *old_state_name, *new_state_name;
+    GParamSpec *pspec;
+    gboolean rtcp_mux = FALSE;
 
-    old_state = owr_session_aggregate_ice_state(session->priv->rtp_ice_state,
-        session->priv->rtcp_ice_state);
+    pspec = g_object_class_find_property(G_OBJECT_GET_CLASS(session), "rtcp-mux");
+    if (pspec && G_PARAM_SPEC_TYPE(pspec) == G_TYPE_BOOLEAN)
+        g_object_get(session, "rtcp-mux", &rtcp_mux, NULL);
+
+    if (rtcp_mux) {
+        old_state = session->priv->rtp_ice_state;
+    } else {
+        old_state = owr_session_aggregate_ice_state(session->priv->rtp_ice_state,
+            session->priv->rtcp_ice_state);
+    }
 
     if (component_type == OWR_COMPONENT_TYPE_RTP)
         session->priv->rtp_ice_state = state;
     else
         session->priv->rtcp_ice_state = state;
 
-    new_state = owr_session_aggregate_ice_state(session->priv->rtp_ice_state,
-        session->priv->rtcp_ice_state);
+    if (rtcp_mux) {
+        new_state = session->priv->rtp_ice_state;
+    } else {
+        new_state = owr_session_aggregate_ice_state(session->priv->rtp_ice_state,
+            session->priv->rtcp_ice_state);
+    }
 
     if (old_state == new_state)
         return;
