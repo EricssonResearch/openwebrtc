@@ -2175,6 +2175,31 @@ static void on_rtpbin_pad_added(GstElement *rtpbin, GstPad *new_pad, OwrTranspor
     g_free(new_pad_name);
 }
 
+typedef struct {
+    OwrSession *session;
+    guint session_id;
+} SessionData;
+
+static void session_data_free(gpointer session_data)
+{
+    g_slice_free(SessionData, session_data);
+}
+
+static GstPadProbeReturn check_for_keyframe(GstPad *pad, GstPadProbeInfo *info,
+    gpointer user_data)
+{
+    SessionData *session_data = (SessionData *)user_data;
+    OWR_UNUSED(pad);
+
+    if (!GST_BUFFER_FLAG_IS_SET(info->data, GST_BUFFER_FLAG_DELTA_UNIT)) {
+        GST_CAT_INFO_OBJECT(_owrsession_debug, session_data->session,
+            "Session %u, Received keyframe for %u\n", session_data->session_id,
+            GPOINTER_TO_UINT(g_object_get_data(G_OBJECT(session_data->session), "ssrc")));
+    }
+
+    return GST_PAD_PROBE_OK;
+}
+
 static void setup_video_receive_elements(GstPad *new_pad, guint32 session_id, OwrPayload *payload, OwrTransportAgent *transport_agent)
 {
     GstPad *depay_sink_pad = NULL, *ghost_pad = NULL;
@@ -2186,6 +2211,7 @@ static void setup_video_receive_elements(GstPad *new_pad, guint32 session_id, Ow
     OwrCodecType codec_type;
     gchar name[100];
     GstPad *pad;
+    SessionData *session_data;
 
     g_object_set_data(G_OBJECT(new_pad), "transport-agent", (gpointer)transport_agent);
     g_object_set_data(G_OBJECT(new_pad), "session-id", GUINT_TO_POINTER(session_id));
@@ -2202,6 +2228,16 @@ static void setup_video_receive_elements(GstPad *new_pad, guint32 session_id, Ow
     rtpdepay = _owr_payload_create_payload_depacketizer(payload);
     g_snprintf(name, OWR_OBJECT_NAME_LENGTH_MAX, "videorepair1_%u", session_id);
     videorepair1 = gst_element_factory_make("videorepair", name);
+
+    pad = gst_element_get_static_pad(videorepair1, "src");
+    session_data = g_slice_new(SessionData);
+    session_data->session = get_session(transport_agent, session_id);
+    session_data->session_id = session_id;
+    gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_BUFFER, check_for_keyframe,
+        session_data, session_data_free);
+    gst_object_unref(pad);
+    pad = NULL;
+
     g_object_get(payload, "codec-type", &codec_type, NULL);
     parser = _owr_payload_create_parser(payload);
     decoder = _owr_payload_create_decoder(payload);
