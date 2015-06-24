@@ -244,6 +244,8 @@ function PeerHandler(configuration, keyCert, client, jsonRpc) {
             if (!mdesc.source || !payload)
                 continue;
 
+            var adapt = payload.ericscream ? owr.AdaptationType.SCREAM :
+                owr.AdaptationType.DISABLED;
             var rtxPayload = findRtxPayload(mdesc.payloads, payload.type);
             var sendPayload = (mdesc.type == "audio") ?
                 new owr.AudioPayload({
@@ -251,7 +253,7 @@ function PeerHandler(configuration, keyCert, client, jsonRpc) {
                     "codec_type": owr.CodecType[payload.encodingName.toUpperCase()],
                     "clock_rate": payload.clockRate,
                     "channels": payload.channels,
-                    "use-adaptation": !!payload.ericscream,
+                    "adaptation": adapt
                 }) :
                 new owr.VideoPayload({
                     "payload_type": payload.type,
@@ -259,7 +261,7 @@ function PeerHandler(configuration, keyCert, client, jsonRpc) {
                     "clock_rate": payload.clockRate,
                     "ccm_fir": !!payload.ccmfir,
                     "nack_pli": !!payload.nackpli,
-                    "use-adaptation": !!payload.ericscream,
+                    "adaptation": adapt,
                     "rtx_payload_type": rtxPayload ? rtxPayload.type : -1,
                     "rtx_time": rtxPayload && rtxPayload.parameters.rtxTime || 0
                 });

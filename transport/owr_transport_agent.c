@@ -4172,10 +4172,12 @@ static GstPadProbeReturn probe_rtp_info(GstPad *srcpad, GstPadProbeInfo *info, S
     if (G_UNLIKELY(scream_rx->rtx_pt == -2)) {
         OwrMediaSession *media_session;
         OwrPayload *send_payload;
+        OwrAdaptationType adapt_type;
         media_session = OWR_MEDIA_SESSION(get_session(transport_agent, session_id));
         send_payload = _owr_media_session_get_send_payload(media_session);
         g_object_get(send_payload, "rtx-payload-type", &scream_rx->rtx_pt,
-            "use-adaptation", &scream_rx->adapt, NULL);
+            "adaptation", &adapt_type, NULL);
+        scream_rx->adapt = (adapt_type == OWR_ADAPTATION_TYPE_SCREAM);
         g_object_unref(media_session);
         g_object_unref(send_payload);
     }
@@ -4314,12 +4316,12 @@ static gboolean on_payload_adaptation_request(GstElement *screamqueue, guint pt,
 {
     OwrPayload *payload;
     guint pt_rtx;
-    gboolean adapt;
+    OwrAdaptationType adapt_type;
 
     OWR_UNUSED(screamqueue);
     payload = _owr_media_session_get_send_payload(media_session);
     g_assert(pt);
-    g_object_get(payload, "rtx-payload-type", &pt_rtx, "use-adaptation", &adapt, NULL);
+    g_object_get(payload, "rtx-payload-type", &pt_rtx, "adaptation", &adapt_type, NULL);
     /* Use adaptation for this payload if not retransmission */
-    return adapt && (pt != pt_rtx);
+    return (adapt_type == OWR_ADAPTATION_TYPE_SCREAM) && (pt != pt_rtx);
 }

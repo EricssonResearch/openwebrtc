@@ -57,6 +57,11 @@ typedef enum _OwrSourceType {
     OWR_SOURCE_TYPE_TEST
 } OwrSourceType;
 
+typedef enum _OwrAdaptationType {
+    OWR_ADAPTATION_TYPE_DISABLED,
+    OWR_ADAPTATION_TYPE_SCREAM
+} OwrAdaptationType;
+
 #define OWR_TYPE_CODEC_TYPE (owr_codec_type_get_type())
 GType owr_codec_type_get_type(void);
 
@@ -65,6 +70,10 @@ GType owr_source_type_get_type(void);
 
 #define OWR_TYPE_MEDIA_TYPE (owr_media_type_get_type())
 GType owr_media_type_get_type(void);
+
+#define OWR_TYPE_ADAPTATION_TYPE (owr_adaptation_type_get_type())
+GType owr_adaptation_type_get_type(void);
+
 
 G_END_DECLS
 
