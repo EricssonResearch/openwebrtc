@@ -109,8 +109,8 @@ server.onaccept = function (event) {
         ws = null;
     };
 
-    rpcScope.createPeerHandler = function (configuration, client) {
-        var peerHandler = new PeerHandler(configuration, client, jsonRpc);
+    rpcScope.createPeerHandler = function (configuration, keyCert, client) {
+        var peerHandler = new PeerHandler(configuration, keyCert, client, jsonRpc);
         peerHandlers.push(peerHandler);
         var exports = [ "prepareToReceive", "prepareToSend", "addRemoteCandidate",
             "createDataChannel" ];

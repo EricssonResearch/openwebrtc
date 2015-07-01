@@ -28,7 +28,7 @@
 
 "use strict";
 
-function PeerHandler(configuration, client, jsonRpc) {
+function PeerHandler(configuration, keyCert, client, jsonRpc) {
     var transportAgent;
     var sessions = [];
     var numberOfReceivePreparedSessions = 0;
@@ -89,6 +89,10 @@ function PeerHandler(configuration, client, jsonRpc) {
                     client.gotDtlsFingerprint(mdescIndex, dtlsInfo);
                 });
             });
+
+            session.dtls_certificate = keyCert.certificate;
+
+            session.dtls_key = keyCert.key;
 
             session.signal.on_new_candidate.connect(function (m, candidate) {
                 var cand = {
