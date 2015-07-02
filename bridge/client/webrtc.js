@@ -130,7 +130,6 @@ Rc3p8yIIO7cpNt1VW1J3hwsZpc61CCQu4dlTIfqKJ8zkJFa0RjVvz28=\n\
     var fingerprint;
 
     crypto.webkitSubtle.digest("sha-256", buf).then(function (digest) {
-        console.log("in 'then'");
         fingerprint = "";
         var bufView = new Uint8Array(digest);
         for (var i = 0; i < bufView.length; i++) {
@@ -138,7 +137,6 @@ Rc3p8yIIO7cpNt1VW1J3hwsZpc61CCQu4dlTIfqKJ8zkJFa0RjVvz28=\n\
                 fingerprint += ":";
             fingerprint += ("0" + bufView[i].toString(16)).substr(-2);
         }
-        console.log("then ready");
     });
 
     var messageChannel = new function () {
