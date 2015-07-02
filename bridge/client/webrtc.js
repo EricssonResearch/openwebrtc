@@ -65,6 +65,81 @@
         ]
     };
 
+    var keyCert = {
+        "key": "-----BEGIN RSA PRIVATE KEY-----\n\
+MIIEpAIBAAKCAQEAx4npCHPrreO5YSUYrZXjN/JTiLaaqbq9h8sSaF5lke64r8JO\n\
+apGWXaLbMcUXfLkFtL4hydo0fyki8iN+oPuMJjEu0c/DX/N1N57wjnHFNY9mXJNx\n\
+hL4Ev64PKxBrjTx/3CKMR6u8ssi0lIcnRjw9/bMKvedWl1S9wEbJeszd1rhLwAwD\n\
+5euqYkzLUtlRthkines86E1zHKVofr0NED22RkL+WgC2q1Y6Ic09wjAqCK+4QVsX\n\
+4XqFmOqYT/I1sb+JPZaIFOaowWWXaBxdKXQ4WbLqm25wA1ilyy1tMUsbnl8Sxouq\n\
+F0dj5MdsKtNBckueV3Ex38fgCyz7EGhyMtqqzQIDAQABAoIBAGXcCcCN5F6FJEnp\n\
+9PoPzMjvhCMDDFregAgE6yWqInFnipH2P695GGg+TWTPttitXrNQZ9Ex+aB8MGGp\n\
+Kugk4PtSGhNy2sptboXxNd2RSFm6FUfm4IkhsyziPs39+NlFbAPFAxVHHvGpMT2s\n\
+7KiW8hJDRpWAtZxU3vR7bjiowgnsbbtJ/ngmJ56wEgVr/t0fjimPdY7rGmX+o/mc\n\
+QbY5+aN29EJiLtVqcQx7DujObHnDCs8Y1WxWChd4Ai3hFpCgfRMGBN7e3rUzZNTf\n\
+GZmIiABOW/SKwS9Kjz9rZJLlYtbCZsl+/XGwpMEBISnnvKK07VZA6DIbrCKlk9Hb\n\
+sIVHRgUCgYEA5nRghJHljO933LooUurF1kwPw6XigcFlwq9mOSk1USseEgEhooeS\n\
+L4V6BuaQ6j3RhRJTb4kr22KqRNRWEB2Mk0eb71s0+ZdGT5hakbSWKQgtm9z0Zuup\n\
+QJk+dle4TRN5zJMWT1o6hKH9GwwlkifHfvJoK0rzY4RsMn5uDt+N24cCgYEA3ag7\n\
+QEI+TF1W55dOZWxCsOHjMZZXMLzfmWGLpcOyq3qPnj9fDtEi+iTcMOXhhYgxB3tO\n\
++I16XNKY/FWTvc2/979dh/AEospk3kHCEQ4NnvrKFw2UD/LL5SczSiXrIQfgAWMA\n\
+n2FHQQbEsu+cgG8eioO9u8o4Mt138Jo+/llS5AsCgYEA1okseP2hJuyfNvqOI3Kv\n\
+remtG0PIc2bpJq5GiZwVKHTtT3GCMF3o9xhZGyd1bLsT27/NsJ2QGHHndJ//Zo07\n\
+mrglMFRGIrxzFhIM7muhBp24Z8rwMwfbzmlavqy2w/oHfyzGriSfKW3rxEwwhblG\n\
+fKWJ2BO0NMbIOtF7/5iZ5O0CgYEAlmQ4n2bSwhlqh4O/q00DCuSYs+Jfki/0PitT\n\
+Bst7BKIJo8M3ieQYKUStKXgvxdwb+AmQEVBcv3IcXsjpjxR0tXHf0gXl/1X3jl1r\n\
+gQrZ7w4V5AJQfWmtMfOg9yQ3HpgrQoWbvIfSQqqG9ylgNDwwqqasKygPbWOap2Lg\n\
+bs7IUPUCgYAof3hkkYeNJg2YpIStWDhun6tMoh3bZaoK/9wM+CGzBAHBOPjY8JvA\n\
+iegtYEMN3IQ5F0i93YpIxLIr0GY8zu4UjamipNs85PLAFKHgcwk5FJuwbJc08qbK\n\
+DoL7VGw0Qie5XKqicpoYMq981k2kcvFBqcG1UNhzflus3687odSQ4A==\n\
+-----END RSA PRIVATE KEY-----\n",
+
+        "certificate": "-----BEGIN CERTIFICATE-----\n\
+MIIDtTCCAp2gAwIBAgIJAPp7zXaiL2IeMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV\n\
+BAYTAkFVMRMwEQYDVQQIEwpTb21lLVN0YXRlMSEwHwYDVQQKExhJbnRlcm5ldCBX\n\
+aWRnaXRzIFB0eSBMdGQwHhcNMTUwNjI2MDU1MjQ4WhcNMTYwNjI1MDU1MjQ4WjBF\n\
+MQswCQYDVQQGEwJBVTETMBEGA1UECBMKU29tZS1TdGF0ZTEhMB8GA1UEChMYSW50\n\
+ZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB\n\
+CgKCAQEAx4npCHPrreO5YSUYrZXjN/JTiLaaqbq9h8sSaF5lke64r8JOapGWXaLb\n\
+McUXfLkFtL4hydo0fyki8iN+oPuMJjEu0c/DX/N1N57wjnHFNY9mXJNxhL4Ev64P\n\
+KxBrjTx/3CKMR6u8ssi0lIcnRjw9/bMKvedWl1S9wEbJeszd1rhLwAwD5euqYkzL\n\
+UtlRthkines86E1zHKVofr0NED22RkL+WgC2q1Y6Ic09wjAqCK+4QVsX4XqFmOqY\n\
+T/I1sb+JPZaIFOaowWWXaBxdKXQ4WbLqm25wA1ilyy1tMUsbnl8SxouqF0dj5Mds\n\
+KtNBckueV3Ex38fgCyz7EGhyMtqqzQIDAQABo4GnMIGkMB0GA1UdDgQWBBSZi+/v\n\
+10ihdTH3w3S5rOpPOaj4MDB1BgNVHSMEbjBsgBSZi+/v10ihdTH3w3S5rOpPOaj4\n\
+MKFJpEcwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgTClNvbWUtU3RhdGUxITAfBgNV\n\
+BAoTGEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZIIJAPp7zXaiL2IeMAwGA1UdEwQF\n\
+MAMBAf8wDQYJKoZIhvcNAQELBQADggEBAD+T4YTxIMOirPMP7pol1hRO6NANX7UF\n\
+Crx3pbGYe3B5oer1HczKgRAWGBWVwgkH+zN4cJGsHWkCToh2n8JKIrUYb3qem7ET\n\
+KBMEFMKaSkKN6VKzAz8pp1zt2gm/cPSN+uJhI7a763sLqR9apWXBuKfkWD4Z4YOi\n\
+3s/8+E/aTrAPwDAt3ipOewqs1zCCIQSXNCZ7D1cCQGuEt6u7nlFotQx/28gkrz+2\n\
+TuDoAwaEuZfpaZKqHHIqNBFExwUDc0KdAFogniq2YaRwcSq9/xUaReCKLG5XoopT\n\
+Rc3p8yIIO7cpNt1VW1J3hwsZpc61CCQu4dlTIfqKJ8zkJFa0RjVvz28=\n\
+-----END CERTIFICATE-----\n"
+
+    };
+
+
+
+    var der = atob(keyCert.certificate.split(/\r?\n/).slice(1, -2).join(""));
+    var buf = new ArrayBuffer(der.length);
+    var bufView = new Uint8Array(buf);
+    for (var i = 0; i < der.length; i++)
+        bufView[i] = der.charCodeAt(i);
+
+    var fingerprint;
+
+    crypto.webkitSubtle.digest("sha-256", buf).then(function (digest) {
+        console.log("in 'then'");
+        fingerprint = "";
+        var bufView = new Uint8Array(digest);
+        for (var i = 0; i < bufView.length; i++) {
+            if (fingerprint)
+                fingerprint += ":";
+            fingerprint += ("0" + bufView[i].toString(16)).substr(-2);
+        }
+        console.log("then ready");
+    });
 
     var messageChannel = new function () {
         var _this = this;
@@ -357,59 +432,7 @@
             "dataChannelsEnabled", "dataChannelRequested");
         var deferredPeerHandlerCalls = [];
 
-        var keyCert = {};
-        keyCert.key = "-----BEGIN RSA PRIVATE KEY-----\n\
-MIIEpAIBAAKCAQEAx4npCHPrreO5YSUYrZXjN/JTiLaaqbq9h8sSaF5lke64r8JO\n\
-apGWXaLbMcUXfLkFtL4hydo0fyki8iN+oPuMJjEu0c/DX/N1N57wjnHFNY9mXJNx\n\
-hL4Ev64PKxBrjTx/3CKMR6u8ssi0lIcnRjw9/bMKvedWl1S9wEbJeszd1rhLwAwD\n\
-5euqYkzLUtlRthkines86E1zHKVofr0NED22RkL+WgC2q1Y6Ic09wjAqCK+4QVsX\n\
-4XqFmOqYT/I1sb+JPZaIFOaowWWXaBxdKXQ4WbLqm25wA1ilyy1tMUsbnl8Sxouq\n\
-F0dj5MdsKtNBckueV3Ex38fgCyz7EGhyMtqqzQIDAQABAoIBAGXcCcCN5F6FJEnp\n\
-9PoPzMjvhCMDDFregAgE6yWqInFnipH2P695GGg+TWTPttitXrNQZ9Ex+aB8MGGp\n\
-Kugk4PtSGhNy2sptboXxNd2RSFm6FUfm4IkhsyziPs39+NlFbAPFAxVHHvGpMT2s\n\
-7KiW8hJDRpWAtZxU3vR7bjiowgnsbbtJ/ngmJ56wEgVr/t0fjimPdY7rGmX+o/mc\n\
-QbY5+aN29EJiLtVqcQx7DujObHnDCs8Y1WxWChd4Ai3hFpCgfRMGBN7e3rUzZNTf\n\
-GZmIiABOW/SKwS9Kjz9rZJLlYtbCZsl+/XGwpMEBISnnvKK07VZA6DIbrCKlk9Hb\n\
-sIVHRgUCgYEA5nRghJHljO933LooUurF1kwPw6XigcFlwq9mOSk1USseEgEhooeS\n\
-L4V6BuaQ6j3RhRJTb4kr22KqRNRWEB2Mk0eb71s0+ZdGT5hakbSWKQgtm9z0Zuup\n\
-QJk+dle4TRN5zJMWT1o6hKH9GwwlkifHfvJoK0rzY4RsMn5uDt+N24cCgYEA3ag7\n\
-QEI+TF1W55dOZWxCsOHjMZZXMLzfmWGLpcOyq3qPnj9fDtEi+iTcMOXhhYgxB3tO\n\
-+I16XNKY/FWTvc2/979dh/AEospk3kHCEQ4NnvrKFw2UD/LL5SczSiXrIQfgAWMA\n\
-n2FHQQbEsu+cgG8eioO9u8o4Mt138Jo+/llS5AsCgYEA1okseP2hJuyfNvqOI3Kv\n\
-remtG0PIc2bpJq5GiZwVKHTtT3GCMF3o9xhZGyd1bLsT27/NsJ2QGHHndJ//Zo07\n\
-mrglMFRGIrxzFhIM7muhBp24Z8rwMwfbzmlavqy2w/oHfyzGriSfKW3rxEwwhblG\n\
-fKWJ2BO0NMbIOtF7/5iZ5O0CgYEAlmQ4n2bSwhlqh4O/q00DCuSYs+Jfki/0PitT\n\
-Bst7BKIJo8M3ieQYKUStKXgvxdwb+AmQEVBcv3IcXsjpjxR0tXHf0gXl/1X3jl1r\n\
-gQrZ7w4V5AJQfWmtMfOg9yQ3HpgrQoWbvIfSQqqG9ylgNDwwqqasKygPbWOap2Lg\n\
-bs7IUPUCgYAof3hkkYeNJg2YpIStWDhun6tMoh3bZaoK/9wM+CGzBAHBOPjY8JvA\n\
-iegtYEMN3IQ5F0i93YpIxLIr0GY8zu4UjamipNs85PLAFKHgcwk5FJuwbJc08qbK\n\
-DoL7VGw0Qie5XKqicpoYMq981k2kcvFBqcG1UNhzflus3687odSQ4A==\n\
------END RSA PRIVATE KEY-----\n";
-
-        keyCert.certificate = "-----BEGIN CERTIFICATE-----\n\
-MIIDtTCCAp2gAwIBAgIJAPp7zXaiL2IeMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV\n\
-BAYTAkFVMRMwEQYDVQQIEwpTb21lLVN0YXRlMSEwHwYDVQQKExhJbnRlcm5ldCBX\n\
-aWRnaXRzIFB0eSBMdGQwHhcNMTUwNjI2MDU1MjQ4WhcNMTYwNjI1MDU1MjQ4WjBF\n\
-MQswCQYDVQQGEwJBVTETMBEGA1UECBMKU29tZS1TdGF0ZTEhMB8GA1UEChMYSW50\n\
-ZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB\n\
-CgKCAQEAx4npCHPrreO5YSUYrZXjN/JTiLaaqbq9h8sSaF5lke64r8JOapGWXaLb\n\
-McUXfLkFtL4hydo0fyki8iN+oPuMJjEu0c/DX/N1N57wjnHFNY9mXJNxhL4Ev64P\n\
-KxBrjTx/3CKMR6u8ssi0lIcnRjw9/bMKvedWl1S9wEbJeszd1rhLwAwD5euqYkzL\n\
-UtlRthkines86E1zHKVofr0NED22RkL+WgC2q1Y6Ic09wjAqCK+4QVsX4XqFmOqY\n\
-T/I1sb+JPZaIFOaowWWXaBxdKXQ4WbLqm25wA1ilyy1tMUsbnl8SxouqF0dj5Mds\n\
-KtNBckueV3Ex38fgCyz7EGhyMtqqzQIDAQABo4GnMIGkMB0GA1UdDgQWBBSZi+/v\n\
-10ihdTH3w3S5rOpPOaj4MDB1BgNVHSMEbjBsgBSZi+/v10ihdTH3w3S5rOpPOaj4\n\
-MKFJpEcwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgTClNvbWUtU3RhdGUxITAfBgNV\n\
-BAoTGEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZIIJAPp7zXaiL2IeMAwGA1UdEwQF\n\
-MAMBAf8wDQYJKoZIhvcNAQELBQADggEBAD+T4YTxIMOirPMP7pol1hRO6NANX7UF\n\
-Crx3pbGYe3B5oer1HczKgRAWGBWVwgkH+zN4cJGsHWkCToh2n8JKIrUYb3qem7ET\n\
-KBMEFMKaSkKN6VKzAz8pp1zt2gm/cPSN+uJhI7a763sLqR9apWXBuKfkWD4Z4YOi\n\
-3s/8+E/aTrAPwDAt3ipOewqs1zCCIQSXNCZ7D1cCQGuEt6u7nlFotQx/28gkrz+2\n\
-TuDoAwaEuZfpaZKqHHIqNBFExwUDc0KdAFogniq2YaRwcSq9/xUaReCKLG5XoopT\n\
-Rc3p8yIIO7cpNt1VW1J3hwsZpc61CCQu4dlTIfqKJ8zkJFa0RjVvz28=\n\
------END CERTIFICATE-----\n";
-
-        bridge.createPeerHandler(configuration, keyCert, clientRef, function (ph) {
+        bridge.createPeerHandler(configuration, {"key": keyCert.key, "certificate": keyCert.certificate}, clientRef, function (ph) {
             peerHandler = ph;
 
             var func;
@@ -433,26 +456,6 @@ Rc3p8yIIO7cpNt1VW1J3hwsZpc61CCQu4dlTIfqKJ8zkJFa0RjVvz28=\n\
             else
                 deferredCreateDataChannelCalls.push(func);
         }
-
-
-
-        var der = atob(keyCert.certificate.split(/\r?\n/).slice(1, -2).join(""));
-        var buf = new ArrayBuffer(der.length);
-        var bufView = new Uint8Array(buf);
-        for (var i = 0; i < der.length; i++)
-            bufView[i] = der.charCodeAt(i);
-
-        var fingerprint;
-
-        crypto.webkitSubtle.digest("sha-256", buf).then(function (digest) {
-            fingerprint = "";
-            var bufView = new Uint8Array(digest);
-            for (var i = 0; i < bufView.length; i++) {
-                if (fingerprint)
-                    fingerprint += ":";
-                fingerprint += ("0" + bufView[i].toString(16)).substr(-2);
-            }
-        });
 
         var cname = randomString(16);
         var negotiationNeededTimerHandle;
@@ -1347,6 +1350,8 @@ Rc3p8yIIO7cpNt1VW1J3hwsZpc61CCQu4dlTIfqKJ8zkJFa0RjVvz28=\n\
 
             return client;
         }
+
+
     }
 
     RTCPeerConnection.toString = function () {
