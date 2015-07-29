@@ -65,6 +65,7 @@
 #include <gst/gst.h>
 #include <gst/rtp/gstrtcpbuffer.h>
 #include <gst/rtp/gstrtpbuffer.h>
+#include <gst/rtp/gstrtpdefs.h>
 #include <gst/sctp/sctpreceivemeta.h>
 #include <gst/sctp/sctpsendmeta.h>
 
@@ -1015,7 +1016,7 @@ static gboolean add_session(GHashTable *args)
     if (OWR_IS_MEDIA_SESSION(session)) {
         /* stream_id is used as the rtpbin session id */
         g_signal_emit_by_name(priv->rtpbin, "get-internal-session", stream_id, &rtp_session);
-        g_object_set(rtp_session, "rtcp-min-interval", GST_SECOND, "bandwidth", 0.0, NULL);
+        g_object_set(rtp_session, "rtcp-min-interval", GST_SECOND, "bandwidth", 0.0, "rtp-profile", GST_RTP_PROFILE_SAVPF, NULL);
         g_object_set_data(rtp_session, "session_id", GUINT_TO_POINTER(stream_id));
         g_signal_connect_after(rtp_session, "on-sending-rtcp", G_CALLBACK(on_sending_rtcp), transport_agent);
         g_signal_connect_after(rtp_session, "on-receiving-rtcp", G_CALLBACK(on_receiving_rtcp), NULL);
