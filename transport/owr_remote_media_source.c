@@ -97,7 +97,6 @@ OwrMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
     gchar *name;
     GstElement *transport_pipeline;
     GstElement *source_bin, *tee;
-    GstElement *fakesink, *queue;
     GstPad *srcpad, *sinkpad, *ghostpad;
     gchar *pad_name, *bin_name;
 
@@ -131,15 +130,11 @@ OwrMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
     _owr_media_source_set_source_bin(OWR_MEDIA_SOURCE(source), source_bin);
     tee = gst_element_factory_make("tee", "tee");
     _owr_media_source_set_source_tee(OWR_MEDIA_SOURCE(source), tee);
-    fakesink = gst_element_factory_make("fakesink", "fakesink");
-    g_object_set(fakesink, "async", FALSE, "enable-last-sample", FALSE, NULL);
-    queue = gst_element_factory_make("queue", "queue");
+    g_object_set(tee, "allow-not-linked", TRUE, NULL);
     g_free(bin_name);
 
     transport_pipeline = GST_ELEMENT(gst_element_get_parent(transport_bin));
-    gst_bin_add_many(GST_BIN(source_bin), tee, queue, fakesink, NULL);
-    LINK_ELEMENTS(tee, queue);
-    LINK_ELEMENTS(queue, fakesink);
+    gst_bin_add_many(GST_BIN(source_bin), tee, NULL);
     sinkpad = gst_element_get_static_pad(tee, "sink");
     ghostpad = gst_ghost_pad_new("sink", sinkpad);
     gst_object_unref(sinkpad);
