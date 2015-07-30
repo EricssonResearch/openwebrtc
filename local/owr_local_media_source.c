@@ -487,6 +487,9 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
         g_type_class_unref(source_enum_class);
 
         source_pipeline = gst_pipeline_new(bin_name);
+        gst_pipeline_use_clock(GST_PIPELINE(source_pipeline), gst_system_clock_obtain());
+        gst_element_set_base_time(source_pipeline, 0);
+        gst_element_set_start_time(source_pipeline, GST_CLOCK_TIME_NONE);
         g_free(bin_name);
         bin_name = NULL;
 
@@ -600,7 +603,6 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
 
             /* First try to see if we can just get the format we want directly */
 
-            /* Framerate is handled at intervideosrc */
             source_caps = gst_caps_new_empty();
 #if GST_CHECK_VERSION(1, 5, 0)
             gst_caps_foreach(caps, fix_video_caps_framerate, source_caps);

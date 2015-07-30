@@ -39,6 +39,9 @@
 #include "owr_types.h"
 #include "owr_utils.h"
 
+#include "owr_inter_sink.h"
+#include "owr_inter_src.h"
+
 #include <gst/gst.h>
 #include <stdio.h>
 
@@ -246,20 +249,6 @@ static void owr_media_source_get_property(GObject *object, guint property_id,
     }
 }
 
-static GstPadProbeReturn
-drop_gap_buffers(GstPad *pad, GstPadProbeInfo *info, gpointer user_data)
-{
-    OWR_UNUSED(pad);
-    OWR_UNUSED(user_data);
-
-    /* Drop GAP buffers, they're just duplicated buffers and we don't
-     * care about constant framerate here */
-    if (GST_BUFFER_FLAG_IS_SET (info->data, GST_BUFFER_FLAG_GAP)) {
-        return GST_PAD_PROBE_DROP;
-    }
-    return GST_PAD_PROBE_OK;
-}
-
 /*
  * The following chain is created after the tee for each output from the
  * source:
@@ -279,7 +268,7 @@ static GstElement *owr_media_source_request_source_default(OwrMediaSource *media
     GstPad *bin_pad = NULL, *srcpad, *sinkpad;
     gchar *bin_name;
     guint source_id;
-    gchar *channel_name;
+    gchar *sink_name, *source_name;
 
     g_return_val_if_fail(media_source->priv->source_bin, NULL);
     g_return_val_if_fail(media_source->priv->source_tee, NULL);
@@ -305,9 +294,6 @@ static GstElement *owr_media_source_request_source_default(OwrMediaSource *media
         {
         GstElement *audioresample, *audioconvert;
 
-        CREATE_ELEMENT_WITH_ID(source, "interaudiosrc", "source", source_id);
-        CREATE_ELEMENT_WITH_ID(sink, "interaudiosink", "sink", source_id);
-
         g_object_set(capsfilter, "caps", caps, NULL);
 
         CREATE_ELEMENT_WITH_ID(audioresample, "audioresample", "source-audio-resample", source_id);
@@ -324,14 +310,22 @@ static GstElement *owr_media_source_request_source_default(OwrMediaSource *media
         }
     case OWR_MEDIA_TYPE_VIDEO:
         {
-        GstElement *videoscale, *videoconvert;
+        GstElement *videorate = NULL, *videoscale, *videoconvert;
+        GstStructure *s;
 
-        CREATE_ELEMENT_WITH_ID(source, "intervideosrc", "source", source_id);
-        CREATE_ELEMENT_WITH_ID(sink, "intervideosink", "sink", source_id);
+        s = gst_caps_get_structure(caps, 0);
+        if (gst_structure_has_field(s, "framerate")) {
+            gint fps_n = 0, fps_d = 0;
 
-        srcpad = gst_element_get_static_pad(source, "src");
-        gst_pad_add_probe(srcpad, GST_PAD_PROBE_TYPE_BUFFER, drop_gap_buffers, NULL, NULL);
-        gst_object_unref(srcpad);
+            gst_structure_get_fraction(s, "framerate", &fps_n, &fps_d);
+            g_assert(fps_d != 0);
+
+            CREATE_ELEMENT_WITH_ID(videorate, "videorate", "source-video-rate", source_id);
+            g_object_set(videorate, "drop-only", TRUE, "max-rate", fps_n / fps_d, NULL);
+
+            gst_structure_remove_field(s, "framerate");
+            gst_bin_add(GST_BIN(source_bin), videorate);
+        }
 
         g_object_set(capsfilter, "caps", caps, NULL);
 
@@ -343,7 +337,13 @@ static GstElement *owr_media_source_request_source_default(OwrMediaSource *media
         LINK_ELEMENTS(capsfilter, queue_post);
         LINK_ELEMENTS(videoconvert, capsfilter);
         LINK_ELEMENTS(videoscale, videoconvert);
-        LINK_ELEMENTS(queue_pre, videoscale);
+
+        if (videorate) {
+            LINK_ELEMENTS(videorate, videoscale);
+            LINK_ELEMENTS(queue_pre, videorate);
+        } else {
+            LINK_ELEMENTS(queue_pre, videoscale);
+        }
 
         break;
         }
@@ -353,10 +353,16 @@ static GstElement *owr_media_source_request_source_default(OwrMediaSource *media
         goto done;
     }
 
-    channel_name = g_strdup_printf("source-%u", source_id);
-    g_object_set(source, "channel", channel_name, NULL);
-    g_object_set(sink, "channel", channel_name, NULL);
-    g_free(channel_name);
+    source_name = g_strdup_printf("source-%u", source_id);
+    source = g_object_new(OWR_TYPE_INTER_SRC, "name", source_name, NULL);
+    g_free(source_name);
+
+    sink_name = g_strdup_printf("sink-%u", source_id);
+    sink = g_object_new(OWR_TYPE_INTER_SINK, "name", sink_name, NULL);
+    g_free(sink_name);
+
+    g_weak_ref_set(&OWR_INTER_SRC(source)->sink_sinkpad, OWR_INTER_SINK(sink)->sinkpad);
+    g_weak_ref_set(&OWR_INTER_SINK(sink)->src_srcpad, OWR_INTER_SRC(source)->internal_srcpad);
 
     /* Add and link the inter*sink to the actual source pipeline */
     bin_name = g_strdup_printf("source-sink-bin-%u", source_id);
