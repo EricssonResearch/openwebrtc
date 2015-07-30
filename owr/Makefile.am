@@ -24,7 +24,9 @@ libopenwebrtc_la_SOURCES = \
     owr_media_source.c \
     owr_bus.c \
     owr_message_origin.c \
-    owr_utils.c
+    owr_utils.c \
+    owr_inter_src.c \
+    owr_inter_sink.c
 
 libopenwebrtc_la_LIBADD = \
     $(top_builddir)/local/libopenwebrtc_local.la \
@@ -69,7 +71,9 @@ noinst_HEADERS = \
     owr_bus_private.h \
     owr_media_source_private.h \
     owr_message_origin_private.h \
-    owr_utils.h
+    owr_utils.h \
+    owr_inter_src.h \
+    owr_inter_sink.h
 
 if OWR_STATIC
 noinst_HEADERS += \
