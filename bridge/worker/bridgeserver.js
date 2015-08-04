@@ -119,6 +119,23 @@ server.onaccept = function (event) {
         return jsonRpc.createObjectRef(peerHandler, exports);
     };
 
+    rpcScope.createKeys = function (client) {
+        console.log("in createKeys");
+        var localcertificate, localprivatekey, localfingerprint;
+        localcertificate = "ndfnalk";
+        owr.crypto_get_certificate();
+        /*localprivatekey= owr.crypto_get_privatekey();
+        localfingerprint = owr.crypto_get_fingerprint();*/
+
+        client.gotKeyCert(
+            {
+                "certificate": localcertificate,
+                "fingerprint": localfingerprint,
+                "privatekey": localprivatekey
+            });
+
+    }
+
     rpcScope.requestSources = function (options, client) {
         var mediaTypes = 0;
         if (options.audio)
@@ -210,7 +227,7 @@ server.onaccept = function (event) {
         return { "controller": controllerRef, "port": imageServerPort };
     };
 
-    jsonRpc.exportFunctions(rpcScope.createPeerHandler, rpcScope.requestSources, rpcScope.renderSources);
+    jsonRpc.exportFunctions(rpcScope.createPeerHandler, rpcScope.requestSources, rpcScope.renderSources, rpcScope.createKeys);
 
 };
 

@@ -142,6 +142,8 @@ Owr_@OWR_API_VERSION_UNDERSCORE@_gir_FILES = \
     ../transport/owr_transport_agent.c \
     ../transport/owr_remote_media_source.h \
     ../transport/owr_remote_media_source.c \
+    ../transport/owr_crypto_utils.h \
+    ../transport/owr_crypto_utils.c \
     ../local/owr_local.h \
     ../local/owr_local.c \
     ../local/owr_local_media_source.h \
