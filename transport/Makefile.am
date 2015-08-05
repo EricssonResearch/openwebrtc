@@ -9,6 +9,7 @@ AM_CPPFLAGS = \
     $(GSTREAMER_CFLAGS) \
     $(GSTREAMER_SCTP_CFLAGS) \
     $(LIBOPENWEBRTC_CFLAGS) \
+    $(OPENSSL_CFLAGS) \
     -I$(top_srcdir)/owr
 
 AM_CFLAGS = \
@@ -37,7 +38,8 @@ libopenwebrtc_transport_la_LIBADD = \
     $(NICE_LIBS) \
     $(GSTREAMER_LIBS) \
     $(GSTREAMER_SCTP_LIBS) \
-    $(GLIB_LIBS)
+    $(GLIB_LIBS) \
+    $(OPENSSL_LIBS)
 
 includedir = $(prefix)/include/owr
 include_HEADERS = \

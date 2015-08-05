@@ -65,52 +65,6 @@
         ]
     };
 
-/*var algorithm = {
-    name: "RSA-OAEP",
-    modulusLength: 2048, //1024,2048,4096
-    publicExponent: new Uint8Array  ([0x01, 0x00, 0x01]),
-    hash: {
-        name: "SHA-256" //"SHA-1", "SHA-256", "SHA-384", "SHA-512"
-    }
-};
-
-
-window.crypto.webkitSubtle.generateKey(
-    algorithm,
-    true, // exportable
-    ["encrypt", "decrypt"] // usage
-)
-.then(function (cryptoKey) {
-    return window.crypto.webkitSubtle.exportKey(
-        'jwk', // export format
-        cryptoKey.publicKey
-    );
-})
-
-.then (function (exportedKey) {
-
-    console.log('Exported key:');
-    console.log(JSON.stringify(exportedKey));
-});*/
-
-   /* var der = atob(keyCert.certificate.split(/\r?\n/).slice(1, -2).join(""));
-    var buf = new ArrayBuffer(der.length);
-    var bufView = new Uint8Array(buf);
-    for (var i = 0; i < der.length; i++)
-        bufView[i] = der.charCodeAt(i);
-
-    var fingerprint;
-
-    crypto.webkitSubtle.digest("sha-256", buf).then(function (digest) {
-        fingerprint = "";
-        var bufView = new Uint8Array(digest);
-        for (var i = 0; i < bufView.length; i++) {
-            if (fingerprint)
-                fingerprint += ":";
-            fingerprint += ("0" + bufView[i].toString(16)).substr(-2);
-        }
-    });*/
-
     var messageChannel = new function () {
         var _this = this;
         var ws;
@@ -155,18 +109,18 @@ window.crypto.webkitSubtle.generateKey(
     bridge.importFunctions("createPeerHandler", "requestSources", "renderSources", "createKeys");
 
     var keyGenClient = {};
+    var keyCertFingerprint;
     keyGenClient.gotKeyCert = function (keyCert) {
-        console.log("got keyCert: " + keyCert);
-
-        console.log("cert: " + keyCert.certificate);
-        console.log("privkey: " + keyCert.privatekey);
-        console.log("fp: " + keyCert.fingerprint);
+        keyCertFingerprint = keyCert;
 
         bridge.removeObjectRef(keyGenClient);
     }
-    console.log("bridge.createObjectRef(keyGenClient");
-    console.log("bridge.createKeys(key");
-    bridge.createKeys(bridge.createObjectRef(keyGenClient, "gotKeyCert"));
+    
+    keyGenClient.noKeyCert = function (keyCert) {
+        console.log("could not generate key and cert");
+    }
+    
+    bridge.createKeys(bridge.createObjectRef(keyGenClient, "gotKeyCert", "noKeyCert"));
 
 
     function getUserMedia(options) {
@@ -417,7 +371,7 @@ window.crypto.webkitSubtle.generateKey(
             "dataChannelsEnabled", "dataChannelRequested");
         var deferredPeerHandlerCalls = [];
 
-        bridge.createPeerHandler(configuration, {"key": keyCert.key, "certificate": keyCert.certificate}, clientRef, function (ph) {
+        bridge.createPeerHandler(configuration, {"key": keyCertFingerprint.privatekey, "certificate": keyCertFingerprint.certificate}, clientRef, function (ph) {
             peerHandler = ph;
 
             var func;
@@ -560,7 +514,7 @@ window.crypto.webkitSubtle.generateKey(
                     "cname": cname,
                     "ice": { "ufrag": randomString(4), "password": randomString(22) },
                     "dtls": { "setup": "actpass", "fingerprintHashFunction": "sha-256",
-                        "fingerprint": fingerprint.toUpperCase() }
+                        "fingerprint": keyCertFingerprint.fingerprint.toUpperCase() }
                 });
             });
 
@@ -655,7 +609,7 @@ window.crypto.webkitSubtle.generateKey(
                         "type": rmdesc.type,
                         "ice": { "ufrag": randomString(4), "password": randomString(22) },
                         "dtls": { "setup": rmdesc.dtls.setup == "active" ? "passive" : "active",
-                            "fingerprintHashFunction": "sha-256", "fingerprint": fingerprint.toUpperCase() }
+                            "fingerprintHashFunction": "sha-256", "fingerprint": keyCertFingerprint.fingerprint.toUpperCase() }
                     };
                     localSessionInfoSnapshot.mediaDescriptions.push(lmdesc);
                 }

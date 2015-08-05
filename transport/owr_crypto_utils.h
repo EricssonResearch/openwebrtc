@@ -30,14 +30,17 @@
 
 #include <glib.h>
 
+#include <openssl/ssl.h>
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
 #ifndef __GTK_DOC_IGNORE__
 
 G_BEGIN_DECLS
 
-void owr_crypto_get_certificate(void);
-gchar * owr_crypto_get_privatekey(void);
-gchar * owr_crypto_get_fingerprint(void);
+typedef void (*OwrCryptoDataCallback) (gchar *privatekey, gchar *certificate, gchar *fingerprint);
 
+void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback);
 
 G_END_DECLS
 

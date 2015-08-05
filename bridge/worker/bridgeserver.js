@@ -120,19 +120,21 @@ server.onaccept = function (event) {
     };
 
     rpcScope.createKeys = function (client) {
-        console.log("in createKeys");
         var localcertificate, localprivatekey, localfingerprint;
-        localcertificate = "ndfnalk";
-        owr.crypto_get_certificate();
-        /*localprivatekey= owr.crypto_get_privatekey();
-        localfingerprint = owr.crypto_get_fingerprint();*/
+        owr.crypto_create_crypto_data(function (privatekey, certificate, fingerprint) {
+            if ((privatekey && certificate && fingerprint)) {
+                client.gotKeyCert(
+                {
+                    "certificate": certificate,
+                    "privatekey": privatekey,
+                    "fingerprint": fingerprint
+                });
+            } else {
+                console.log("got callback without crypto data");
 
-        client.gotKeyCert(
-            {
-                "certificate": localcertificate,
-                "fingerprint": localfingerprint,
-                "privatekey": localprivatekey
-            });
+                client.noKeyCert();
+            }
+        });
 
     }
 

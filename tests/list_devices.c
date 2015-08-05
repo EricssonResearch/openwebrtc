@@ -32,7 +32,15 @@
 #include "owr.h"
 #include "owr_local.h"
 #include "owr_media_source.h"
+#include "owr_crypto_utils.h"
 
+static void got_crypto_data(gchar *privatekey, gchar *certificate)
+{
+    g_print("got got_crypto_data \n");
+    g_print("privatekey %s \n", privatekey);
+    g_print("certificate %s \n", certificate);
+
+}
 static void got_sources(GList *sources, gpointer user_data)
 {
     OwrMediaSource *source = NULL;
@@ -61,7 +69,7 @@ int main() {
     owr_init(NULL);
 
     owr_get_capture_sources(OWR_MEDIA_TYPE_AUDIO|OWR_MEDIA_TYPE_VIDEO, got_sources, NULL);
-
+    owr_crypto_create_crypto_data(got_crypto_data);
     owr_run();
 
     return 0;
