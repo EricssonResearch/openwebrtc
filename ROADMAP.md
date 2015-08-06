@@ -2,7 +2,7 @@
 
 ## Ongoing activities
 
-* [~~H.264 HW video support on iOS~~](http://www.openwebrtc.io/blog/2015/1/14/hardware-h264-video-on-ios) (done)
+* [~~H.264 HW video support on iOS~~](http://www.openwebrtc.org/blog/2015/1/14/hardware-h264-video-on-ios) (done)
 * ~~H.264 HW video in Bowser~~ (done)
 * ~~Promises in JavaScript~~ (done)
 * [~~WebRTC DataChannel~~](https://github.com/EricssonResearch/openwebrtc/issues/3) (done)
