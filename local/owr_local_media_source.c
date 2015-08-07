@@ -292,7 +292,7 @@ static gboolean shutdown_media_source(GHashTable *args)
         return FALSE;
     }
 
-    if (source_tee->numsrcpads != 1) {
+    if (source_tee->numsrcpads != 0) {
         gst_object_unref(source_pipeline);
         gst_object_unref(source_tee);
         g_object_unref(media_source);
@@ -323,8 +323,8 @@ static void tee_pad_removed_cb(GstElement *tee, GstPad *old_pad, gpointer user_d
 
     OWR_UNUSED(old_pad);
 
-    /* Only the fakesink is left, shutdown */
-    if (tee->numsrcpads == 1) {
+    /* No sink is left, shutdown */
+    if (tee->numsrcpads == 0) {
         GHashTable *args;
 
         args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(media_source));
@@ -415,7 +415,7 @@ static void on_caps(GstElement *source, GParamSpec *pspec, OwrMediaSource *media
  *
  * The beginning of a media source chain in the pipeline looks like this:
  *                                                             +------------+
- *                                                         /---+ fakesink   |
+ *                                                         /---+ inter*sink |
  * +--------+    +--------+   +------------+   +-----+    /    +------------+
  * | source +----+ scale? +---+ capsfilter +---+ tee +---/
  * +--------+    +--------+   +------------+   +-----+   \
@@ -459,7 +459,6 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
         OwrMediaType media_type = OWR_MEDIA_TYPE_UNKNOWN;
         OwrSourceType source_type = OWR_SOURCE_TYPE_UNKNOWN;
         GstElement *source, *source_process = NULL, *capsfilter = NULL, *tee;
-        GstElement *queue, *fakesink;
         GstPad *sinkpad, *source_pad;
         GEnumClass *media_enum_class, *source_enum_class;
         GEnumValue *media_enum_value, *source_enum_value;
@@ -488,6 +487,9 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
         g_type_class_unref(source_enum_class);
 
         source_pipeline = gst_pipeline_new(bin_name);
+        gst_pipeline_use_clock(GST_PIPELINE(source_pipeline), gst_system_clock_obtain());
+        gst_element_set_base_time(source_pipeline, 0);
+        gst_element_set_start_time(source_pipeline, GST_CLOCK_TIME_NONE);
         g_free(bin_name);
         bin_name = NULL;
 
@@ -601,7 +603,6 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
 
             /* First try to see if we can just get the format we want directly */
 
-            /* Framerate is handled at intervideosrc */
             source_caps = gst_caps_new_empty();
 #if GST_CHECK_VERSION(1, 5, 0)
             gst_caps_foreach(caps, fix_video_caps_framerate, source_caps);
@@ -663,18 +664,9 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
         gst_object_unref(source_pad);
 
         CREATE_ELEMENT(tee, "tee", "source-tee");
+        g_object_set(tee, "allow-not-linked", TRUE, NULL);
 
-        CREATE_ELEMENT(queue, "queue", "source-tee-fakesink-queue");
-
-        CREATE_ELEMENT(fakesink, "fakesink", "source-tee-fakesink");
-        g_object_set(fakesink, "async", FALSE, "enable-last-sample", FALSE, NULL);
-
-        gst_bin_add_many(GST_BIN(source_pipeline), source, tee, queue, fakesink, NULL);
-
-        gst_element_sync_state_with_parent(queue);
-        gst_element_sync_state_with_parent(fakesink);
-        LINK_ELEMENTS(tee, queue);
-        LINK_ELEMENTS(queue, fakesink);
+        gst_bin_add_many(GST_BIN(source_pipeline), source, tee, NULL);
 
         /* Many sources don't like reconfiguration and it's pointless
          * here anyway right now. No need to reconfigure whenever something

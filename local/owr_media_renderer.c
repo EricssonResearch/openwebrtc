@@ -225,6 +225,9 @@ static void owr_media_renderer_init(OwrMediaRenderer *renderer)
 
     bin_name = g_strdup_printf("media-renderer-%u", g_atomic_int_add(&unique_bin_id, 1));
     priv->pipeline = gst_pipeline_new(bin_name);
+    gst_pipeline_use_clock(GST_PIPELINE(priv->pipeline), gst_system_clock_obtain());
+    gst_element_set_base_time(priv->pipeline, 0);
+    gst_element_set_start_time(priv->pipeline, GST_CLOCK_TIME_NONE);
     g_free(bin_name);
 
 #ifdef OWR_DEBUG
