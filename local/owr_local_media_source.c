@@ -292,7 +292,7 @@ static gboolean shutdown_media_source(GHashTable *args)
         return FALSE;
     }
 
-    if (source_tee->numsrcpads != 0) {
+    if (source_tee->numsrcpads) {
         gst_object_unref(source_pipeline);
         gst_object_unref(source_tee);
         g_object_unref(media_source);
@@ -324,7 +324,7 @@ static void tee_pad_removed_cb(GstElement *tee, GstPad *old_pad, gpointer user_d
     OWR_UNUSED(old_pad);
 
     /* No sink is left, shutdown */
-    if (tee->numsrcpads == 0) {
+    if (!tee->numsrcpads) {
         GHashTable *args;
 
         args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(media_source));

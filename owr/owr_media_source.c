@@ -34,13 +34,12 @@
 #endif
 #include "owr_media_source.h"
 
+#include "owr_inter_sink.h"
+#include "owr_inter_src.h"
 #include "owr_media_source_private.h"
 #include "owr_private.h"
 #include "owr_types.h"
 #include "owr_utils.h"
-
-#include "owr_inter_sink.h"
-#include "owr_inter_src.h"
 
 #include <gst/gst.h>
 #include <stdio.h>
@@ -318,7 +317,7 @@ static GstElement *owr_media_source_request_source_default(OwrMediaSource *media
             gint fps_n = 0, fps_d = 0;
 
             gst_structure_get_fraction(s, "framerate", &fps_n, &fps_d);
-            g_assert(fps_d != 0);
+            g_assert(fps_d);
 
             CREATE_ELEMENT_WITH_ID(videorate, "videorate", "source-video-rate", source_id);
             g_object_set(videorate, "drop-only", TRUE, "max-rate", fps_n / fps_d, NULL);
@@ -341,9 +340,8 @@ static GstElement *owr_media_source_request_source_default(OwrMediaSource *media
         if (videorate) {
             LINK_ELEMENTS(videorate, videoscale);
             LINK_ELEMENTS(queue_pre, videorate);
-        } else {
+        } else
             LINK_ELEMENTS(queue_pre, videoscale);
-        }
 
         break;
         }
