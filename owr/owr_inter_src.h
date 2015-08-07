@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2015 Centricular Ltd.
  *     Author: Sebastian Dröge <sebastian@centricular.com>
+ *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
  *
@@ -31,29 +32,29 @@
 G_BEGIN_DECLS
 
 #define OWR_TYPE_INTER_SRC            (owr_inter_src_get_type())
-#define OWR_INTER_SRC(obj)            (G_TYPE_CHECK_INSTANCE_CAST((obj),OWR_TYPE_INTER_SRC,OwrInterSrc))
-#define OWR_IS_INTER_SRC(obj)         (G_TYPE_CHECK_INSTANCE_TYPE((obj),OWR_TYPE_INTER_SRC))
-#define OWR_INTER_SRC_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST((klass) ,OWR_TYPE_INTER_SRC,OwrInterSrcClass))
-#define OWR_IS_INTER_SRC_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass) ,OWR_TYPE_INTER_SRC))
-#define OWR_INTER_SRC_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS((obj) ,OWR_TYPE_INTER_SRC,OwrInterSrcClass))
+#define OWR_INTER_SRC(obj)            (G_TYPE_CHECK_INSTANCE_CAST((obj), OWR_TYPE_INTER_SRC, OwrInterSrc))
+#define OWR_IS_INTER_SRC(obj)         (G_TYPE_CHECK_INSTANCE_TYPE((obj), OWR_TYPE_INTER_SRC))
+#define OWR_INTER_SRC_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST((klass) , OWR_TYPE_INTER_SRC, OwrInterSrcClass))
+#define OWR_IS_INTER_SRC_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass) , OWR_TYPE_INTER_SRC))
+#define OWR_INTER_SRC_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS((obj) , OWR_TYPE_INTER_SRC, OwrInterSrcClass))
 
 typedef struct _OwrInterSrc      OwrInterSrc;
 typedef struct _OwrInterSrcClass OwrInterSrcClass;
 
 struct _OwrInterSrc {
-  GstBin parent;
+    GstBin parent;
 
-  GstElement *queue;
-  GstPad *internal_srcpad, *dummy_sinkpad;
-  GstPad *srcpad;
-  GWeakRef sink_sinkpad;
+    GstElement *queue;
+    GstPad *internal_srcpad, *dummy_sinkpad;
+    GstPad *srcpad;
+    GWeakRef sink_sinkpad;
 };
 
 struct _OwrInterSrcClass {
-  GstBinClass parent_class;
+    GstBinClass parent_class;
 };
 
-GType owr_inter_src_get_type (void);
+GType owr_inter_src_get_type(void);
 
 G_END_DECLS
 
