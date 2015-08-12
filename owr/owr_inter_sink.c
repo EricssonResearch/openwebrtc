@@ -38,6 +38,9 @@ static GstStaticPadTemplate sink_template = GST_STATIC_PAD_TEMPLATE("sink",
     GST_STATIC_CAPS_ANY
     );
 
+/* Part of a workaround to avoid exposing the get_type symbol */
+#define owr_inter_sink_get_type _owr_inter_sink_get_type
+
 #define parent_class owr_inter_sink_parent_class
 G_DEFINE_TYPE(OwrInterSink, owr_inter_sink, GST_TYPE_ELEMENT);
 

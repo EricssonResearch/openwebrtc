@@ -33,7 +33,7 @@
 
 G_BEGIN_DECLS
 
-#define OWR_TYPE_INTER_SRC            (owr_inter_src_get_type())
+#define OWR_TYPE_INTER_SRC            (_owr_inter_src_get_type())
 #define OWR_INTER_SRC(obj)            (G_TYPE_CHECK_INSTANCE_CAST((obj), OWR_TYPE_INTER_SRC, OwrInterSrc))
 #define OWR_IS_INTER_SRC(obj)         (G_TYPE_CHECK_INSTANCE_TYPE((obj), OWR_TYPE_INTER_SRC))
 #define OWR_INTER_SRC_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST((klass) , OWR_TYPE_INTER_SRC, OwrInterSrcClass))
@@ -56,7 +56,7 @@ struct _OwrInterSrcClass {
     GstBinClass parent_class;
 };
 
-GType owr_inter_src_get_type(void);
+GType _owr_inter_src_get_type(void);
 
 G_END_DECLS
 

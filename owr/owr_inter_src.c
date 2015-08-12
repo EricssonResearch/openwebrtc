@@ -37,6 +37,9 @@ static GstStaticPadTemplate src_template = GST_STATIC_PAD_TEMPLATE("src",
     GST_STATIC_CAPS_ANY
     );
 
+/* Part of a workaround to avoid exposing the get_type symbol */
+#define owr_inter_src_get_type _owr_inter_src_get_type
+
 #define parent_class owr_inter_src_parent_class
 G_DEFINE_TYPE(OwrInterSrc, owr_inter_src, GST_TYPE_BIN);
 

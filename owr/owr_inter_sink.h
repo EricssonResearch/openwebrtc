@@ -33,7 +33,7 @@
 
 G_BEGIN_DECLS
 
-#define OWR_TYPE_INTER_SINK            (owr_inter_sink_get_type())
+#define OWR_TYPE_INTER_SINK            (_owr_inter_sink_get_type())
 #define OWR_INTER_SINK(obj)            (G_TYPE_CHECK_INSTANCE_CAST((obj), OWR_TYPE_INTER_SINK, OwrInterSink))
 #define OWR_IS_INTER_SINK(obj)         (G_TYPE_CHECK_INSTANCE_TYPE((obj), OWR_TYPE_INTER_SINK))
 #define OWR_INTER_SINK_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST((klass) , OWR_TYPE_INTER_SINK, OwrInterSinkClass))
@@ -55,7 +55,7 @@ struct _OwrInterSinkClass {
     GstElementClass parent_class;
 };
 
-GType owr_inter_sink_get_type(void);
+GType _owr_inter_sink_get_type(void);
 
 G_END_DECLS
 
