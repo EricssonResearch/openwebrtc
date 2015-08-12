@@ -29,6 +29,8 @@
 
 #include <gst/gst.h>
 
+#ifndef __GTK_DOC_IGNORE__
+
 G_BEGIN_DECLS
 
 #define OWR_TYPE_INTER_SRC            (owr_inter_src_get_type())
@@ -57,5 +59,7 @@ struct _OwrInterSrcClass {
 GType owr_inter_src_get_type(void);
 
 G_END_DECLS
+
+#endif /* __GTK_DOC_IGNORE__ */
 
 #endif /* __OWR_INTER_SRC_H__ */

@@ -29,6 +29,8 @@
 
 #include <gst/gst.h>
 
+#ifndef __GTK_DOC_IGNORE__
+
 G_BEGIN_DECLS
 
 #define OWR_TYPE_INTER_SINK            (owr_inter_sink_get_type())
@@ -56,5 +58,7 @@ struct _OwrInterSinkClass {
 GType owr_inter_sink_get_type(void);
 
 G_END_DECLS
+
+#endif /* __GTK_DOC_IGNORE__ */
 
 #endif /* __OWR_INTER_SINK_H__ */
