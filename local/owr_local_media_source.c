@@ -488,7 +488,7 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
 
         source_pipeline = gst_pipeline_new(bin_name);
         gst_pipeline_use_clock(GST_PIPELINE(source_pipeline), gst_system_clock_obtain());
-        gst_element_set_base_time(source_pipeline, 0);
+        gst_element_set_base_time(source_pipeline, _owr_get_base_time());
         gst_element_set_start_time(source_pipeline, GST_CLOCK_TIME_NONE);
         g_free(bin_name);
         bin_name = NULL;

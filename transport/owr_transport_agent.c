@@ -407,7 +407,7 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
     pipeline_name = g_strdup_printf("transport-agent-%u", priv->agent_id);
     priv->pipeline = gst_pipeline_new(pipeline_name);
     gst_pipeline_use_clock(GST_PIPELINE(priv->pipeline), gst_system_clock_obtain());
-    gst_element_set_base_time(priv->pipeline, 0);
+    gst_element_set_base_time(priv->pipeline, _owr_get_base_time());
     gst_element_set_start_time(priv->pipeline, GST_CLOCK_TIME_NONE);
     g_free(pipeline_name);
 

@@ -43,6 +43,7 @@ G_BEGIN_DECLS
 /*< private >*/
 gboolean _owr_is_initialized(void);
 GMainContext * _owr_get_main_context(void);
+GstClockTime _owr_get_base_time(void);
 void _owr_schedule_with_user_data(GSourceFunc func, gpointer user_data);
 void _owr_schedule_with_hash_table(GSourceFunc func, GHashTable *hash_table);
 GHashTable *_owr_create_schedule_table_func(OwrMessageOrigin *origin, const gchar *function_name);
