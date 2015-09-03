@@ -123,7 +123,7 @@ server.onaccept = function (event) {
         var localcertificate, localprivatekey, localfingerprint;
         owr.crypto_create_crypto_data(function (privatekey, certificate, fingerprint) {
             if ((privatekey && certificate && fingerprint)) {
-                client.gotKeyCert(
+                client.dtlsInfoGenerationDone(
                 {
                     "certificate": certificate,
                     "privatekey": privatekey,
@@ -132,7 +132,7 @@ server.onaccept = function (event) {
             } else {
                 console.log("got callback without crypto data");
 
-                client.noKeyCert();
+                client.dtlsInfoGenerationDone();
             }
         });
 

@@ -108,21 +108,25 @@
     var bridge = new JsonRpc(messageChannel);
     bridge.importFunctions("createPeerHandler", "requestSources", "renderSources", "createKeys");
 
-    var keyGenClient = {};
-    var keyCertFingerprint;
-    keyGenClient.gotKeyCert = function (keyCert) {
-        keyCertFingerprint = keyCert;
+    var dtlsInfo;
+    var deferredCreatePeerHandler;
 
-        bridge.removeObjectRef(keyGenClient);
-    }
+    (function () {
+        var client = {}; 
+        client.dtlsInfoGenerationDone = function (generatedDtlsInfo) {
+            dtlsInfo = generatedDtlsInfo;
+            if (!dtlsInfo) 
+                console.log("createKeys returned without any dtlsInfo - anything involving use of PeerConnection won't work");
+            else
+                if (deferredCreatePeerHandler)
+                    deferredCreatePeerHandler();
+            bridge.removeObjectRef(client);
+        }
     
-    keyGenClient.noKeyCert = function (keyCert) {
-        console.log("could not generate key and cert");
-    }
     
-    bridge.createKeys(bridge.createObjectRef(keyGenClient, "gotKeyCert", "noKeyCert"));
-
-
+        bridge.createKeys(bridge.createObjectRef(client, "dtlsInfoGenerationDone"));
+    })();
+    
     function getUserMedia(options) {
         checkArguments("getUserMedia", "dictionary", 1, arguments);
 
@@ -371,13 +375,21 @@
             "dataChannelsEnabled", "dataChannelRequested");
         var deferredPeerHandlerCalls = [];
 
-        bridge.createPeerHandler(configuration, {"key": keyCertFingerprint.privatekey, "certificate": keyCertFingerprint.certificate}, clientRef, function (ph) {
-            peerHandler = ph;
+        function createPeerHandler() {
+            bridge.createPeerHandler(configuration, {"key": dtlsInfo.privatekey, "certificate": dtlsInfo.certificate}, clientRef, function (ph) {
+                peerHandler = ph;
 
-            var func;
-            while ((func = deferredPeerHandlerCalls.shift()))
-                func();
-        });
+                var func;
+                while ((func = deferredPeerHandlerCalls.shift()))
+                    func();
+            });
+        }
+
+        if (dtlsInfo)
+            createPeerHandler()
+        else
+            deferredCreatePeerHandler = createPeerHandler;
+
 
         function whenPeerHandler(func) {
             if (peerHandler)
@@ -514,7 +526,7 @@
                     "cname": cname,
                     "ice": { "ufrag": randomString(4), "password": randomString(22) },
                     "dtls": { "setup": "actpass", "fingerprintHashFunction": "sha-256",
-                        "fingerprint": keyCertFingerprint.fingerprint.toUpperCase() }
+                        "fingerprint": dtlsInfo.fingerprint.toUpperCase() }
                 });
             });
 
@@ -609,7 +621,7 @@
                         "type": rmdesc.type,
                         "ice": { "ufrag": randomString(4), "password": randomString(22) },
                         "dtls": { "setup": rmdesc.dtls.setup == "active" ? "passive" : "active",
-                            "fingerprintHashFunction": "sha-256", "fingerprint": keyCertFingerprint.fingerprint.toUpperCase() }
+                            "fingerprintHashFunction": "sha-256", "fingerprint": dtlsInfo.fingerprint.toUpperCase() }
                     };
                     localSessionInfoSnapshot.mediaDescriptions.push(lmdesc);
                 }
