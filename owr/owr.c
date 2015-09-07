@@ -61,7 +61,9 @@
 static gboolean owr_initialized = FALSE;
 static GMainContext *owr_main_context = NULL;
 static GMainLoop *owr_main_loop = NULL;
-static GstClockTime owr_base_time = 0;
+
+G_LOCK_DEFINE_STATIC(base_time);
+static GstClockTime owr_base_time = GST_CLOCK_TIME_NONE;
 
 GST_DEBUG_CATEGORY(_owraudiopayload_debug);
 GST_DEBUG_CATEGORY(_owraudiorenderer_debug);
@@ -397,12 +399,14 @@ GMainContext * _owr_get_main_context()
 
 GstClockTime _owr_get_base_time()
 {
-    if (g_once_init_enter(&owr_base_time)) {
+    G_LOCK(base_time);
+    if (!GST_CLOCK_TIME_IS_VALID(owr_base_time)) {
         GstClock *clock = gst_system_clock_obtain();
-        GstClockTime base_time = gst_clock_get_time(clock);
+
+        owr_base_time = gst_clock_get_time(clock);
         gst_object_unref(clock);
-        g_once_init_leave(&owr_base_time, base_time);
     }
+    G_UNLOCK(base_time);
 
     return owr_base_time;
 }
