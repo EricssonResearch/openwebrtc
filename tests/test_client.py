@@ -51,7 +51,13 @@ def candidate_from_description(candidate_description):
 
 
 def handle_offer(message):
-    print("Handling sdp")
+    print("Handling sdp offer")
+    data = json.loads(message)
+    media_descriptions = data["sessionDescription"]["mediaDescriptions"]
+    for description in media_descriptions:
+        session = Owr.MediaSession.new(True)
+        session.props.media_type = description["media-type"]
+        session.props.rtcp_mux = bool(description["rtcp"]["mux"])
 
 
 def handle_remote_candidate(message):
