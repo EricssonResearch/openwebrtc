@@ -12,9 +12,36 @@ from gi.repository import Soup
 
 SERVER_URL = "http://demo.openwebrtc.org:38080"
 
+ALL_SESSIONS = []
+LOCAL_SOURCES = []
+TRANSPORT_AGENT = None
+
+
+def got_remote_source(session, source):
+    print("Got remote source")
+
+
+def got_candidate(session, candidate):
+    print("Got candidate")
+
+
+def candidate_gathering_done(session):
+    print("Candidate gathering done")
+
+
+def got_dtls_certificate(session, pspec):
+    print("Got DTLS Certificate")
+
 
 def reset():
+    global LOCAL_SOURCES, TRANSPORT_AGENT, ALL_SESSIONS
     print("Reset")
+    for session, session_data in ALL_SESSIONS:
+        session.set_send_source(None)
+    ALL_SESSIONS = []
+    TRANSPORT_AGENT = None
+    LOCAL_SOURCES = []
+    Owr.get_capture_sources(Owr.MediaType.VIDEO, got_local_sources)
 
 
 def candidate_from_description(candidate_description):
@@ -56,8 +83,80 @@ def handle_offer(message):
     media_descriptions = data["sessionDescription"]["mediaDescriptions"]
     for description in media_descriptions:
         session = Owr.MediaSession.new(True)
-        session.props.media_type = description["media-type"]
+        media_type = description["type"]
+        session_data = {}
+        session_data['media-type'] = media_type
         session.props.rtcp_mux = bool(description["rtcp"]["mux"])
+        payloads = description["payloads"]
+        codec_type = Owr.CodecType.NONE
+        for payload in payloads:
+            encoding_name = payload["encodingName"]
+            payload_type = int(payload["type"])
+            clock_rate = int(payload["clockRate"])
+            send_payload = None
+            receive_payload = None
+            if media_type == 'audio':
+                media_type = Owr.MediaType.AUDIO
+                if encoding_name == 'PCMA':
+                    codec_type = Owr.CodecType.PCMA
+                elif encoding_name == 'PCMU':
+                    codec_type = Owr.CodecType.PCMU
+                elif encoding_name == 'OPUS':
+                    codec_type = Owr.CodecType.OPUS
+                else:
+                    continue
+                channels = int(payload["channels"])
+                send_payload = Owr.AudioPayload.new(codec_type, payload_type, clock_rate, channels)
+                receive_payload = Owr.AudioPayload.new(codec_type, payload_type, clock_rate, channels)
+            elif media_type == 'video':
+                media_type = Owr.MediaType.VIDEO
+                if encoding_name == 'H264':
+                    codec_type = Owr.CodecType.H264
+                elif encoding_name == 'VP8':
+                    codec_type = Owr.CodecType.VP8
+                else:
+                    continue
+                ccm_fir = bool(payload["ccmfir"])
+                nack_pli = bool(payload["nackpli"])
+                send_payload = Owr.VideoPayload.new(codec_type, payload_type, clock_rate, ccm_fir, nack_pli)
+                receive_payload = Owr.VideoPayload.new(codec_type, payload_type, clock_rate, ccm_fir, nack_pli)
+            else:
+                print("Media type: %s not supported" % (media_type,))
+                continue
+
+            if send_payload and receive_payload:
+                session_data['encoding-name'] = encoding_name
+                session_data['payload-type'] = payload_type
+                session_data['clock-rate'] = clock_rate
+                if media_type == Owr.MediaType.AUDIO:
+                    session_data['channels'] = channels
+                elif media_type == Owr.MediaType.VIDEO:
+                    session_data['ccm-fir'] = ccm_fir
+                    session_data['nack-pli'] = nack_pli
+                session.add_receive_payload(receive_payload)
+                session.set_send_payload(send_payload)
+                break
+
+        ice_ufrag = description["ice"]["ufrag"]
+        session_data['remote-ice-ufrag'] = ice_ufrag
+        ice_password = description["ice"]["password"]
+        session_data['remote-ice-password'] = ice_password
+        for candidate in description["ice"].get("candidates", []):
+            remote_candidate = candidate_from_description(candidate)
+            remote_candidate.props.ufrag = ice_ufrag
+            component_type = remote_candidate.props.component_type
+            if not rtcp_mux or component_type != Owr.ComponentType.RTCP:
+                session.add_remote_candidate(remote_candidate)
+        session.connect("on-incoming-source", got_remote_source)
+        session.connect("on-new-candidate", got_candidate)
+        session.connect("on-candidate-gathering-done", candidate_gathering_done)
+        session.connect("notify::dtls-certificate", got_dtls_certificate)
+
+        for source in LOCAL_SOURCES:
+            if media_type == source.props.media_type:
+                session.set_send_source(source)
+        ALL_SESSIONS.append((session, session_data))
+        TRANSPORT_AGENT.add_session(session)
 
 
 def handle_remote_candidate(message):
@@ -115,9 +214,13 @@ def send_eventsource_request(url):
 
 
 def got_local_sources(sources):
+    global LOCAL_SOURCES
+    global TRANSPORT_AGENT
+    LOCAL_SOURCES = sources
     print(sources)
     ta = Owr.TransportAgent.new(False)
     ta.add_helper_server(Owr.HelperServerType.STUN, "stun.services.mozilla.com", 3478, None, None)
+    TRANSPORT_AGENT = ta
     url = SERVER_URL + '/stoc/%s/%d' % (sys.argv[1], random.randint(0, pow(2, 32)-1))
     send_eventsource_request(url)
     print("got here: 3")
