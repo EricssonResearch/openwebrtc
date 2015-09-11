@@ -1,7 +1,10 @@
 """
 Use environment variable: OWR_USE_TEST_SOURCES=1
 """
+import base64
+import hashlib
 import json
+import re
 import sys
 import random
 import time
@@ -15,22 +18,148 @@ SERVER_URL = "http://demo.openwebrtc.org:38080"
 ALL_SESSIONS = []
 LOCAL_SOURCES = []
 TRANSPORT_AGENT = None
+CLIENT_ID = 0
+PEER_ID = ""
+CANDIDATE_TYPES = {
+    Owr.CandidateTypes.HOST: "host",
+    Owr.CandidateTypes.SRFLX: "srflx",
+    Owr.CandidateTypes.PRFLX: "prflx",
+    Owr.CandidateTypes.RELAY: "relay"}
+TCP_TYPES = {
+    Owr.TransportTypes.TCP_ACTIVE: "active",
+    Owr.TransportTypes.TCP_PASSIVE: "passive",
+    Owr.TransportTypes.TCP_SO: "so"}
+
+
+def answer_sent(session, result):
+    input_stream = session.send_finish(result)
+    if not input_stream:
+        print("Failed to send answer to server")
+    print("Answer Sent")
+
+
+def can_send_answer():
+    for _, session_data in ALL_SESSIONS:
+        if not session_data.get('gathering-done', False) or not session_data.get('fingerprint', None):
+            print session_data
+            return False
+    return True
+
+def send_answer():
+    print("Sending answer")
+    answer = {}
+    answer["type"] = "answer"
+    sd = answer["sessionDescription"] = {}
+    md = sd["mediaDescriptions"] = []
+    for session, session_data in ALL_SESSIONS:
+        media_description = { 
+            "type": session_data["media-type"],
+            "rtcp": { "mux": session.props.rtcp_mux }}
+        payload = {
+            "encodingName": session_data["encoding-name"],
+            "type": session_data["payload-type"],
+            "clockRate": session_data["clock-rate"] }
+        if session_data["media-type"] == 'audio':
+            payload["channels"] = session_data["channels"]
+        elif session_data["media-type"] == "video":
+            payload["ccmfir"] = session_data["ccm-fir"]
+            payload["nackpli"] = session_data["nack-pli"]
+        media_description["payloads"] = [payload]
+        candidates = session_data["local-candidates"]
+        media_description["ice"] = {
+            "ufrag": candidates[0].props.ufrag,
+            "password": candidates[0].props.password}
+        candidates_array = []
+        for candidate in candidates:
+            candidate_dict = {
+                "foundation": candidate.props.foundation,
+                "componentId": int(candidate.props.component_type),
+                "transport": "UDP" if candidate.props.transport_type == Owr.TransportTypes.UDP else "TCP",
+                "priority": candidate.props.priority,
+                "address": candidate.props.address,
+                "port": candidate.props.port,
+                "type": CANDIDATE_TYPES[candidate.props.type]
+                }
+            if candidate.props.type != Owr.CandidateTypes.HOST:
+                candidate_dict["relatedAddress"] = candidate.props.base_address
+                candidate_dict["relatedPort"] = candidate.props.base_port
+            if candidate.props.transport_type != Owr.TransportTypes.UDP:
+                candidate_dict["tcpType"] = TCP_TYPES[candidate.props.transport_type]
+            candidates_array.append(candidate_dict)
+        media_description["ice"]["candidates"] = candidates_array
+        media_description["dtls"] = {
+            "fingerprintHashFunction": "sha-256",
+            "fingerprint": session_data["fingerprint"],
+            "setup": "active"
+        }
+        md.append(media_description)
+    url = "%s/ctos/%s/%u/%s" % (SERVER_URL, sys.argv[1], CLIENT_ID, PEER_ID)
+    message_data = json.dumps(answer)
+    print("Answer: %s to url: %s" % (message_data, url))
+    soup_session = Soup.Session.new()
+    soup_message = Soup.Message.new("POST", url)
+    soup_message.set_request("application/json", Soup.MemoryUse.COPY, message_data)
+    soup_session.send_async(soup_message, None, answer_sent)
+
+
+def find_session_data(session):
+    for session_obj, session_data in ALL_SESSIONS:
+        if session == session_obj:
+            return session_data
+    return None
 
 
 def got_remote_source(session, source):
-    print("Got remote source")
+    print("Got remote source %s" % (source.props.name))
+    media_type = source.props.media_type
+    if media_type == Owr.MediaType.AUDIO:
+        renderer = Owr.AudioRenderer.new()
+    elif media_type == Owr.MediaType.VIDEO:
+        renderer = Owr.ImageRenderer.new()
+    renderer.set_source(source)
 
 
 def got_candidate(session, candidate):
     print("Got candidate")
+    session_data = find_session_data(session)
+    local_candidates = session_data.get("local-candidates", [])
+    local_candidates.append(candidate)
+    session_data["local-candidates"] = local_candidates
 
 
 def candidate_gathering_done(session):
     print("Candidate gathering done")
+    session_data = find_session_data(session)
+    session_data['gathering-done'] = True
+    if can_send_answer():
+        send_answer()
+    else:
+        print("Not ready to send answer")
 
 
 def got_dtls_certificate(session, pspec):
     print("Got DTLS Certificate")
+    pem = session.props.dtls_certificate
+    pem_b64 = ''
+    lines = pem.split('\n')
+    for line in lines:
+        if not line.startswith('-----'):
+            pem_b64 += line
+        elif "END CERTIFICATE" in line:
+            break
+    pem_binary = base64.decodestring(pem_b64)
+    checksum = hashlib.sha256(pem_binary)
+    digest = checksum.hexdigest()
+    fingerprint = ':'.join(re.findall('..',digest))
+    session_data = find_session_data(session)
+    if session_data:
+        session_data['fingerprint'] = fingerprint
+        if can_send_answer():
+            send_answer()
+        else:
+            print("Not ready to send answer")
+    else:
+        print("ERROR: CANNOT FIND SESSION")
 
 
 def reset():
@@ -145,7 +274,7 @@ def handle_offer(message):
             remote_candidate = candidate_from_description(candidate)
             remote_candidate.props.ufrag = ice_ufrag
             component_type = remote_candidate.props.component_type
-            if not rtcp_mux or component_type != Owr.ComponentType.RTCP:
+            if not session.props.rtcp_mux or component_type != Owr.ComponentType.RTCP:
                 session.add_remote_candidate(remote_candidate)
         session.connect("on-incoming-source", got_remote_source)
         session.connect("on-new-candidate", got_candidate)
@@ -170,16 +299,17 @@ def handle_remote_candidate(message):
 
 
 def eventstream_line_read(input_stream, result, peer_joined):
+    global PEER_ID
     line = input_stream.read_line_finish_utf8(result)
     print("Got line of length: %d (%s)" % (line[1], line[0]))
     if line[0]:
         if peer_joined and line[0].startswith('data:'):
             peer_joined = False
-            peer_id = line[0][5:]
-            print("Peer joined: " + peer_id)
+            PEER_ID = line[0][5:]
+            print("Peer joined: " + PEER_ID)
         elif line[0].startswith('event:leave'):
             print("Peer left")
-            peer_id = ''
+            PEER_ID = ''
             reset()
         elif line[0].startswith('event:join'):
             peer_joined = True
@@ -216,12 +346,14 @@ def send_eventsource_request(url):
 def got_local_sources(sources):
     global LOCAL_SOURCES
     global TRANSPORT_AGENT
+    global CLIENT_ID
     LOCAL_SOURCES = sources
     print(sources)
     ta = Owr.TransportAgent.new(False)
     ta.add_helper_server(Owr.HelperServerType.STUN, "stun.services.mozilla.com", 3478, None, None)
     TRANSPORT_AGENT = ta
-    url = SERVER_URL + '/stoc/%s/%d' % (sys.argv[1], random.randint(0, pow(2, 32)-1))
+    CLIENT_ID = random.randint(0, pow(2, 32)-1)
+    url = SERVER_URL + '/stoc/%s/%d' % (sys.argv[1], CLIENT_ID)
     send_eventsource_request(url)
     print("got here: 3")
 
