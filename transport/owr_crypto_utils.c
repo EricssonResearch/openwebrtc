@@ -105,6 +105,8 @@ void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback)
   gint len_key;
   gchar *pem_key = NULL;
 
+  gboolean errorDetected = FALSE;
+
   bio_cert = BIO_new (BIO_s_mem ());
   bio_key = BIO_new (BIO_s_mem ());
 
@@ -117,7 +119,6 @@ void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback)
 
   guint fprint_size;
 
- 
   cert = X509_new ();
 
   key_pair = EVP_PKEY_new ();
@@ -144,7 +145,7 @@ void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback)
 
   if (!X509_digest(cert, fprint_type, fprint, &fprint_size)) {
     g_print("Error creating the certificate fingerprint.\n");
-    goto beach;
+    errorDetected = TRUE;
   }
 
   string_fprint = g_string_new (NULL);
@@ -155,52 +156,74 @@ void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback)
 
   char_fprint = g_string_free(string_fprint, FALSE);
 
-  g_print("char_fprint: %s", char_fprint);
-
-
   if (!PEM_write_bio_X509 (bio_cert, (X509 *) cert)) {
     g_print("could not write certificate bio \n");
-    goto beach;
+    errorDetected = TRUE;
   }
+
 
   if (!PEM_write_bio_PrivateKey (bio_key, (EVP_PKEY *) key_pair, NULL, NULL, 0, 0, NULL)) {
     g_print("could not write PrivateKey bio \n");
-    goto beach;
+    errorDetected = TRUE;
   }
 
   len_cert = BIO_read (bio_cert, buffer_cert, GST_DTLS_BIO_BUFFER_SIZE);
   if (!len_cert) {
-    goto beach;
+    g_print("no cert length \n");
+    errorDetected = TRUE;
   }
 
   len_key = BIO_read (bio_key, buffer_key, GST_DTLS_BIO_BUFFER_SIZE);
   if (!len_key) {
-    goto beach;
+    g_print("no key length \n");
+    errorDetected = TRUE;
   }
 
   pem_cert = g_strndup (buffer_cert, len_cert);
   pem_key = g_strndup (buffer_key, len_key);
 
-beach:
-  BIO_free (bio_cert);
-  BIO_free (bio_key);
+
+    GValue params[3] = { G_VALUE_INIT, G_VALUE_INIT, G_VALUE_INIT };
+
+    g_value_init(&params[0], G_TYPE_STRING);
+    g_value_init(&params[1], G_TYPE_STRING);
+    g_value_set_string(&params[1], pem_cert);
+    g_value_init(&params[2], G_TYPE_STRING);
+    g_value_set_string(&params[2], char_fprint);
+
+  if (errorDetected) {
+    g_print("error detected \n");
+    g_value_set_string(&params[0], "Failure");
+    g_value_set_string(&params[1], "Failure");
+    g_value_set_string(&params[2], "Failure");
+
+    g_closure_invoke(closure, NULL, 3, (const GValue *)&params, NULL);
+  }
+  else {
+    g_value_set_string(&params[0], pem_key);
+    g_value_set_string(&params[1], pem_cert);
+    g_value_set_string(&params[2], char_fprint);
+
+    g_closure_invoke(closure, NULL, 3, (const GValue *)&params, NULL);
 
 
-  GValue params[3] = { G_VALUE_INIT, G_VALUE_INIT, G_VALUE_INIT };
+  }
 
-  g_value_init(&params[0], G_TYPE_STRING);
-  g_value_set_string(&params[0], pem_key);
-  g_value_init(&params[1], G_TYPE_STRING);
-  g_value_set_string(&params[1], pem_cert);
-  g_value_init(&params[2], G_TYPE_STRING);
-  g_value_set_string(&params[2], char_fprint);
-
-  g_closure_invoke(closure, NULL, 3, (const GValue *)&params, NULL);
-  g_closure_unref(closure);
+// some cleanup
 
   g_value_unset(&params[0]);
   g_value_unset(&params[1]);
   g_value_unset(&params[2]);
+
+  //RSA_free(rsa);  -- gives segmentation fault about every second time
+
+  X509_free(cert);
+  g_closure_unref(closure);
+  BIO_free (bio_cert);
+  BIO_free (bio_key);
+  EVP_PKEY_free(key_pair);
+  g_free(char_fprint);
+
 }
 
 

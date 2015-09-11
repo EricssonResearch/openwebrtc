@@ -123,16 +123,18 @@ server.onaccept = function (event) {
         var localcertificate, localprivatekey, localfingerprint;
         owr.crypto_create_crypto_data(function (privatekey, certificate, fingerprint) {
             if ((privatekey && certificate && fingerprint)) {
-                client.dtlsInfoGenerationDone(
-                {
-                    "certificate": certificate,
-                    "privatekey": privatekey,
-                    "fingerprint": fingerprint
-                });
-            } else {
-                console.log("got callback without crypto data");
-
-                client.dtlsInfoGenerationDone();
+                if (fingerprint == "Failure") {
+                    console.log("generation of crypto data has failed");
+                    client.dtlsInfoGenerationDone();
+                }
+                else {
+                    client.dtlsInfoGenerationDone(
+                        {
+                            "certificate": certificate,
+                            "privatekey": privatekey,
+                            "fingerprint": fingerprint
+                    });
+                }
             }
         });
 
