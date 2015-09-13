@@ -1,4 +1,4 @@
-# Copyright (c) 2014, Ericsson AB. All rights reserved.
+# Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without modification,
 # are permitted provided that the following conditions are met:
@@ -26,7 +26,7 @@ import xml.etree.ElementTree as ET
 import itertools
 from standard_types import VoidType, IntType, LongPtrType, GParamSpecType, JObjectWrapperType
 from standard_types import ClassCallbackMetaType, GObjectMetaType, CallbackMetaType
-from standard_types import EnumMetaType, BitfieldMetaType, GWeakRefType
+from standard_types import EnumMetaType, BitfieldMetaType, GWeakRefType, JDestroyType
 from copy import copy
 
 NS = '{http://www.gtk.org/introspection/core/1.0}'
@@ -55,6 +55,8 @@ TAG_METHOD = NS + 'method'
 TAG_BITFIELD = NS + 'bitfield'
 TAG_FUNCTION = NS + 'function'
 TAG_SIGNAL = GLIB_NS + 'signal'
+TAG_INTERFACE = NS + 'interface'
+TAG_IMPLEMENTS = NS + 'implements'
 
 ATTR_NAME = 'name'
 ATTR_WHEN = 'when'
@@ -63,6 +65,7 @@ ATTR_SCOPE = 'scope'
 ATTR_LENGTH = 'length'
 ATTR_PARENT = 'parent'
 ATTR_CLOSURE = 'closure'
+ATTR_DESTORY = 'destroy'
 ATTR_READABLE = 'readable'
 ATTR_WRITABLE = 'writable'
 ATTR_ALLOW_NONE = 'allow-none'
@@ -130,6 +133,8 @@ def parse_tag_value(type_registry, tag, name=None):
     type_tag = tag.find(TAG_TYPE)
     if type_tag is None:
         type_tag = tag.find(TAG_ARRAY)
+
+    scope = tag.get(ATTR_SCOPE)
     allow_none = tag.get(ATTR_ALLOW_NONE) == '1'
     inner_type_tags = type_tag.findall(TAG_TYPE)
 
@@ -151,7 +156,10 @@ def parse_tag_value(type_registry, tag, name=None):
             c_array_type = type_tag.get(ATTR_C_TYPE)
             value = typ(name, transfer == 'full', allow_none, c_array_type)
         else:
-            value = typ(name, transfer == 'full', allow_none)
+            if scope is not None:
+                value = typ(name, transfer == 'full', allow_none, scope)
+            else:
+                value = typ(name, transfer == 'full', allow_none)
     value.doc = parse_doc(tag)
     return value
 
@@ -201,11 +209,15 @@ class Parameters(object):
             return cls(return_value, None)
 
         closure_refs = {}
+        destroy_refs = {}
         array_refs = {}
         for tag_index, tag in enumerate(params_tag.findall(TAG_PARAMETER)):
             closure = tag.get(ATTR_CLOSURE)
             if closure is not None:
                 closure_refs[int(closure)] = tag_index
+            destroy = tag.get(ATTR_DESTORY)
+            if destroy is not None:
+                destroy_refs[int(destroy)] = tag_index
             array_tag = tag.find(TAG_ARRAY)
             if array_tag is not None:
                 length = array_tag.get(ATTR_LENGTH)
@@ -224,9 +236,18 @@ class Parameters(object):
                 if closure_refs.get(real_tag_index) is not None:
                     name = tag.get(ATTR_NAME)
                     closure_index = closure_refs.get(real_tag_index)
-                    assert closure_index == real_tag_index - 1 or closure_index == real_tag_index
-                    closure = params[-1]
+                    closure = None
+                    if closure_index == real_tag_index - 1:
+                        closure = params[-1]
+                    else:
+                        assert closure_index == real_tag_index
                     params.append(JObjectWrapperType(name, closure, transfer_ownership=True))
+                elif destroy_refs.get(real_tag_index) is not None:
+                    name = tag.get(ATTR_NAME)
+                    destroy_index = destroy_refs.get(real_tag_index)
+                    assert destroy_index == real_tag_index - 2
+                    params[-2].scope == 'notified'
+                    params.append(JDestroyType(name))
                 elif array_refs.get(real_tag_index) is not None:
                     array_index = array_refs.get(real_tag_index)
                     assert array_index == real_tag_index - 1
@@ -408,7 +429,7 @@ class Class(object):
         self.__dict__.update(**kwargs)
 
     @classmethod
-    def from_tag(cls, type_registry, tag):
+    def from_tag(cls, type_registry, tag, interfaces=None):
         parent = tag.get(ATTR_PARENT)
         if parent == 'GObject.Object':
             parent = None
@@ -430,6 +451,7 @@ class Class(object):
             methods=[Method.from_tag(type_registry, t) for t in tag.findall(TAG_METHOD) if t.get(ATTR_INTROSPECTABLE) != '0'],
             functions=[Function.from_tag(type_registry, t) for t in tag.findall(TAG_FUNCTION) if t.get(ATTR_INTROSPECTABLE) != '0'],
             signals=[Signal.from_tag(type_registry, value, t) for t in tag.findall(TAG_SIGNAL) if t.get(ATTR_INTROSPECTABLE) != '0'],
+            interfaces=[interfaces[t.get(ATTR_NAME)] for t in tag.findall(TAG_IMPLEMENTS)],
         )
 
 
@@ -517,13 +539,17 @@ class Namespace(object):
 
             return map(glib_from_c, c_enums)
 
+        interfaces = [Class.from_tag(type_registry, t) for t in tag.findall(TAG_INTERFACE)]
+        interface_map = {interface.name: interface for interface in interfaces}
+
         self.name = tag.get(ATTR_NAME)
         self.symbol_prefix = tag.get(ATTR_C_SYMBOL_PREFIXES)
         self.identifier_prefix = tag.get(ATTR_C_IDENTIFIER_PREFIXES)
         self.shared_library = tag.get(ATTR_SHARED_LIBRARY)
+        self.interfaces = interfaces
         self.enums = [Enum.from_tag(type_registry, *tags) for tags in find_enum_pairs()]
         self.callbacks = [Callback.from_tag(type_registry, t) for t in tag.findall(TAG_CALLBACK)]
-        self.classes = [Class.from_tag(type_registry, t) for t in tag.findall(TAG_CLASS)]
+        self.classes = [Class.from_tag(type_registry, t, interface_map) for t in tag.findall(TAG_CLASS)]
         self.functions = [Function.from_tag(type_registry, t) for t in tag.findall(TAG_FUNCTION)]
 
 
@@ -538,6 +564,7 @@ class GirParser(object):
             prefix = namespace.get(ATTR_C_SYMBOL_PREFIXES)
             tag_types = {
                 TAG_CLASS: GObjectMetaType,
+                TAG_INTERFACE: GObjectMetaType,
                 TAG_CALLBACK: CallbackMetaType,
                 TAG_ENUMERATION: EnumMetaType,
                 TAG_BITFIELD: BitfieldMetaType,
@@ -548,8 +575,9 @@ class GirParser(object):
                 c_type = tag.get(ATTR_C_TYPE)
                 MetaType = tag_types[tag.tag]
 
-                if MetaType == EnumMetaType and tag.get(ATTR_GLIB_TYPE_NAME) is not None:
-                    continue
+                if MetaType == EnumMetaType or MetaType == BitfieldMetaType:
+                    if tag.get(ATTR_GLIB_TYPE_NAME) is not None:
+                        continue
 
                 types.append(MetaType(
                     gir_type=gir_type,
@@ -562,7 +590,8 @@ class GirParser(object):
     def parse_enum_aliases(self):
         aliases = {}
         for namespace in self.xml_root.findall(TAG_NAMESPACE):
-            for tag in namespace.findall(TAG_ENUMERATION):
+            enum_tags = namespace.findall(TAG_ENUMERATION) + namespace.findall(TAG_BITFIELD)
+            for tag in enum_tags:
                 if tag.get(ATTR_GLIB_TYPE_NAME) is not None:
                     alias = tag.get(ATTR_NAME)
                     name = alias[:-1]

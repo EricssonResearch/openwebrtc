@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
  * Copyright (c) 2014, Centricular Ltd
  *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
@@ -38,6 +38,7 @@
 
 #include "owr_media_source.h"
 #include "owr_media_source_private.h"
+#include "owr_message_origin_private.h"
 #include "owr_private.h"
 #include "owr_types.h"
 #include "owr_utils.h"
@@ -45,6 +46,9 @@
 #include <gst/gst.h>
 
 #include <stdio.h>
+
+GST_DEBUG_CATEGORY_EXTERN(_owrmediarenderer_debug);
+#define GST_CAT_DEFAULT _owrmediarenderer_debug
 
 #define DEFAULT_MEDIA_TYPE OWR_MEDIA_TYPE_UNKNOWN
 #define DEFAULT_SOURCE NULL
@@ -62,7 +66,10 @@ static GParamSpec *obj_properties[N_PROPERTIES] = {NULL, };
 
 #define OWR_MEDIA_RENDERER_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_MEDIA_RENDERER, OwrMediaRendererPrivate))
 
-G_DEFINE_TYPE(OwrMediaRenderer, owr_media_renderer, G_TYPE_OBJECT)
+static void owr_message_origin_interface_init(OwrMessageOriginInterface *interface);
+
+G_DEFINE_TYPE_WITH_CODE(OwrMediaRenderer, owr_media_renderer, G_TYPE_OBJECT,
+    G_IMPLEMENT_INTERFACE(OWR_TYPE_MESSAGE_ORIGIN, owr_message_origin_interface_init))
 
 struct _OwrMediaRendererPrivate {
     GMutex media_renderer_lock;
@@ -72,6 +79,7 @@ struct _OwrMediaRendererPrivate {
 
     GstElement *pipeline;
     GstElement *src, *sink;
+    OwrMessageOriginBusSet *message_origin_bus_set;
 };
 
 static void owr_media_renderer_set_property(GObject *object, guint property_id,
@@ -83,6 +91,9 @@ static void owr_media_renderer_finalize(GObject *object)
 {
     OwrMediaRenderer *renderer = OWR_MEDIA_RENDERER(object);
     OwrMediaRendererPrivate *priv = renderer->priv;
+
+    owr_message_origin_bus_set_free(priv->message_origin_bus_set);
+    priv->message_origin_bus_set = NULL;
 
     if (priv->pipeline) {
         gst_element_set_state(priv->pipeline, GST_STATE_NULL);
@@ -124,6 +135,16 @@ static void owr_media_renderer_class_init(OwrMediaRendererClass *klass)
 
     gobject_class->finalize = owr_media_renderer_finalize;
     g_object_class_install_properties(gobject_class, N_PROPERTIES, obj_properties);
+}
+
+static gpointer owr_media_renderer_get_bus_set(OwrMessageOrigin *origin)
+{
+    return OWR_MEDIA_RENDERER(origin)->priv->message_origin_bus_set;
+}
+
+static void owr_message_origin_interface_init(OwrMessageOriginInterface *interface)
+{
+    interface->get_bus_set = owr_media_renderer_get_bus_set;
 }
 
 /* FIXME: Copy from owr/orw.c without any error handling whatsoever */
@@ -200,8 +221,13 @@ static void owr_media_renderer_init(OwrMediaRenderer *renderer)
     priv->source = DEFAULT_SOURCE;
     priv->disabled = DEFAULT_DISABLED;
 
+    priv->message_origin_bus_set = owr_message_origin_bus_set_new();
+
     bin_name = g_strdup_printf("media-renderer-%u", g_atomic_int_add(&unique_bin_id, 1));
     priv->pipeline = gst_pipeline_new(bin_name);
+    gst_pipeline_use_clock(GST_PIPELINE(priv->pipeline), gst_system_clock_obtain());
+    gst_element_set_base_time(priv->pipeline, _owr_get_base_time());
+    gst_element_set_start_time(priv->pipeline, GST_CLOCK_TIME_NONE);
     g_free(bin_name);
 
 #ifdef OWR_DEBUG
@@ -266,6 +292,22 @@ static void owr_media_renderer_get_property(GObject *object, guint property_id,
     }
 }
 
+static void on_caps(GstElement *sink, GParamSpec *pspec, OwrMediaRenderer *media_renderer)
+{
+    GstCaps *caps;
+
+    OWR_UNUSED(pspec);
+
+    g_object_get(sink, "caps", &caps, NULL);
+
+    if (GST_IS_CAPS(caps)) {
+        GST_INFO_OBJECT(media_renderer, "%s renderer - configured with caps: %" GST_PTR_FORMAT,
+            media_renderer->priv->media_type == OWR_MEDIA_TYPE_AUDIO ? "Audio" :
+            media_renderer->priv->media_type == OWR_MEDIA_TYPE_VIDEO ? "Video" :
+            "Unknown", caps);
+    }
+}
+
 static void maybe_start_renderer(OwrMediaRenderer *renderer)
 {
     OwrMediaRendererPrivate *priv;
@@ -281,6 +323,9 @@ static void maybe_start_renderer(OwrMediaRenderer *renderer)
 
     sinkpad = gst_element_get_static_pad(priv->sink, "sink");
     g_assert(sinkpad);
+
+    g_signal_connect(sinkpad, "notify::caps", G_CALLBACK(on_caps), renderer);
+
     caps = OWR_MEDIA_RENDERER_GET_CLASS(renderer)->get_caps(renderer);
     src = _owr_media_source_request_source(priv->source, caps);
     gst_caps_unref(caps);
@@ -299,21 +344,22 @@ static void maybe_start_renderer(OwrMediaRenderer *renderer)
         return;
     }
     gst_element_set_state(priv->pipeline, GST_STATE_PLAYING);
+    OWR_POST_EVENT(renderer, RENDERER_STARTED, NULL);
 }
 
-/**
- * owr_media_renderer_set_source:
- * @renderer:
- * @source: (transfer none) (allow-none):
- *
- * Returns:
- */
-void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *source)
+static gboolean set_source(GHashTable *args)
 {
+    OwrMediaRenderer *renderer;
+    OwrMediaSource *source;
     OwrMediaRendererPrivate *priv;
 
-    g_return_if_fail(renderer);
-    g_return_if_fail(!source || OWR_IS_MEDIA_SOURCE(source));
+    g_return_val_if_fail(args, G_SOURCE_REMOVE);
+
+    renderer = g_hash_table_lookup(args, "renderer");
+    source = g_hash_table_lookup(args, "source");
+
+    g_return_val_if_fail(OWR_IS_MEDIA_RENDERER(renderer), G_SOURCE_REMOVE);
+    g_return_val_if_fail(!source || OWR_IS_MEDIA_SOURCE(source), G_SOURCE_REMOVE);
 
     priv = renderer->priv;
 
@@ -321,7 +367,7 @@ void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *s
 
     if (source == priv->source) {
         g_mutex_unlock(&priv->media_renderer_lock);
-        return;
+        goto end;
     }
 
     if (priv->source) {
@@ -336,8 +382,9 @@ void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *s
     if (!source) {
         /* Shut down the pipeline if we have no source */
         gst_element_set_state(priv->pipeline, GST_STATE_NULL);
+        OWR_POST_EVENT(renderer, RENDERER_STOPPED, NULL);
         g_mutex_unlock(&priv->media_renderer_lock);
-        return;
+        goto end;
     }
 
     priv->source = g_object_ref(source);
@@ -345,6 +392,38 @@ void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *s
     maybe_start_renderer(renderer);
 
     g_mutex_unlock(&priv->media_renderer_lock);
+
+end:
+    g_object_unref(renderer);
+    if (source)
+        g_object_unref(source);
+    g_hash_table_unref(args);
+    return G_SOURCE_REMOVE;
+}
+
+/**
+ * owr_media_renderer_set_source:
+ * @renderer:
+ * @source: (transfer none) (allow-none):
+ *
+ * Returns:
+ */
+void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *source)
+{
+    GHashTable *args;
+
+    g_return_if_fail(OWR_IS_MEDIA_RENDERER(renderer));
+    g_return_if_fail(!source || OWR_IS_MEDIA_SOURCE(source));
+
+    args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(renderer));
+    g_hash_table_insert(args, "renderer", renderer);
+    g_hash_table_insert(args, "source", source);
+
+    g_object_ref(renderer);
+    if (source)
+        g_object_ref(source);
+
+    _owr_schedule_with_hash_table((GSourceFunc)set_source, args);
 }
 
 /**

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
  * Copyright (c) 2014, Centricular Ltd
  *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
@@ -62,6 +62,32 @@ static gboolean owr_initialized = FALSE;
 static GMainContext *owr_main_context = NULL;
 static GMainLoop *owr_main_loop = NULL;
 
+G_LOCK_DEFINE_STATIC(base_time);
+static GstClockTime owr_base_time = GST_CLOCK_TIME_NONE;
+
+GST_DEBUG_CATEGORY(_owraudiopayload_debug);
+GST_DEBUG_CATEGORY(_owraudiorenderer_debug);
+GST_DEBUG_CATEGORY(_owrbridge_debug);
+GST_DEBUG_CATEGORY(_owrbus_debug);
+GST_DEBUG_CATEGORY(_owrcandidate_debug);
+GST_DEBUG_CATEGORY(_owrdatachannel_debug);
+GST_DEBUG_CATEGORY(_owrdatasession_debug);
+GST_DEBUG_CATEGORY(_owrdevicelist_debug);
+GST_DEBUG_CATEGORY(_owrimagerenderer_debug);
+GST_DEBUG_CATEGORY(_owrimageserver_debug);
+GST_DEBUG_CATEGORY(_owrlocal_debug);
+GST_DEBUG_CATEGORY(_owrlocalmediasource_debug);
+GST_DEBUG_CATEGORY(_owrmediarenderer_debug);
+GST_DEBUG_CATEGORY(_owrmediasession_debug);
+GST_DEBUG_CATEGORY(_owrmediasource_debug);
+GST_DEBUG_CATEGORY(_owrpayload_debug);
+GST_DEBUG_CATEGORY(_owrremotemediasource_debug);
+GST_DEBUG_CATEGORY(_owrsession_debug);
+GST_DEBUG_CATEGORY(_owrtransportagent_debug);
+GST_DEBUG_CATEGORY(_owrvideopayload_debug);
+GST_DEBUG_CATEGORY(_owrvideorenderer_debug);
+GST_DEBUG_CATEGORY(_owrwindowregistry_debug);
+
 #ifdef OWR_STATIC
 GST_PLUGIN_STATIC_DECLARE(alaw);
 GST_PLUGIN_STATIC_DECLARE(app);
@@ -70,7 +96,6 @@ GST_PLUGIN_STATIC_DECLARE(audioresample);
 GST_PLUGIN_STATIC_DECLARE(audiotestsrc);
 GST_PLUGIN_STATIC_DECLARE(coreelements);
 GST_PLUGIN_STATIC_DECLARE(dtls);
-GST_PLUGIN_STATIC_DECLARE(inter);
 GST_PLUGIN_STATIC_DECLARE(mulaw);
 GST_PLUGIN_STATIC_DECLARE(nice);
 GST_PLUGIN_STATIC_DECLARE(opengl);
@@ -104,7 +129,7 @@ GST_PLUGIN_STATIC_DECLARE(pulseaudio);
 GST_PLUGIN_STATIC_DECLARE(video4linux2);
 #endif
 
-#if defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR && !defined(__arm64__))
+#if defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR
 GST_PLUGIN_STATIC_DECLARE(ercolorspace);
 #endif
 #endif
@@ -189,6 +214,51 @@ void owr_init(GMainContext *main_context)
     gst_init(NULL, NULL);
     owr_initialized = TRUE;
 
+    GST_DEBUG_CATEGORY_INIT(_owraudiopayload_debug, "owraudiopayload", 0,
+        "OpenWebRTC Audio Payload");
+    GST_DEBUG_CATEGORY_INIT(_owraudiorenderer_debug, "owraudiorenderer", 0,
+        "OpenWebRTC Audio Renderer");
+    GST_DEBUG_CATEGORY_INIT(_owrbridge_debug, "owrbridge", 0,
+        "OpenWebRTC Bridge");
+    GST_DEBUG_CATEGORY_INIT(_owrbus_debug, "owrbus", 0,
+        "OpenWebRTC Bus");
+    GST_DEBUG_CATEGORY_INIT(_owrcandidate_debug, "owrcandidate", 0,
+        "OpenWebRTC Candidate");
+    GST_DEBUG_CATEGORY_INIT(_owrdatachannel_debug, "owrdatachannel", 0,
+        "OpenWebRTC Data Channel");
+    GST_DEBUG_CATEGORY_INIT(_owrdatasession_debug, "owrdatasession", 0,
+        "OpenWebRTC Data Session");
+    GST_DEBUG_CATEGORY_INIT(_owrdevicelist_debug, "owrdevicelist", 0,
+        "OpenWebRTC Device List");
+    GST_DEBUG_CATEGORY_INIT(_owrimagerenderer_debug, "owrimagerenderer", 0,
+        "OpenWebRTC Image Renderer");
+    GST_DEBUG_CATEGORY_INIT(_owrimageserver_debug, "owrimageserver", 0,
+        "OpenWebRTC Image Server");
+    GST_DEBUG_CATEGORY_INIT(_owrlocal_debug, "owrlocal", 0,
+        "OpenWebRTC Local");
+    GST_DEBUG_CATEGORY_INIT(_owrlocalmediasource_debug, "owrlocalmediasource", 0,
+        "OpenWebRTC Local Media Source");
+    GST_DEBUG_CATEGORY_INIT(_owrmediarenderer_debug, "owrmediarenderer", 0,
+        "OpenWebRTC Media Renderer");
+    GST_DEBUG_CATEGORY_INIT(_owrmediasession_debug, "owrmediasession", 0,
+        "OpenWebRTC Media Session");
+    GST_DEBUG_CATEGORY_INIT(_owrmediasource_debug, "owrmediasource", 0,
+        "OpenWebRTC Media Source");
+    GST_DEBUG_CATEGORY_INIT(_owrpayload_debug, "owrpayload", 0,
+        "OpenWebRTC Payload");
+    GST_DEBUG_CATEGORY_INIT(_owrremotemediasource_debug, "owrremotemediasource", 0,
+        "OpenWebRTC Remote Media Source");
+    GST_DEBUG_CATEGORY_INIT(_owrsession_debug, "owrsession", 0,
+        "OpenWebRTC Session");
+    GST_DEBUG_CATEGORY_INIT(_owrtransportagent_debug, "owrtransportagent", 0,
+        "OpenWebRTC Transport Agent");
+    GST_DEBUG_CATEGORY_INIT(_owrvideopayload_debug, "owrvideopayload", 0,
+        "OpenWebRTC Video Payload");
+    GST_DEBUG_CATEGORY_INIT(_owrvideorenderer_debug, "owrvideorenderer", 0,
+        "OpenWebRTC Video Renderer");
+    GST_DEBUG_CATEGORY_INIT(_owrwindowregistry_debug, "owrwindowregistry", 0,
+        "OpenWebRTC Window Registry");
+
 #ifdef OWR_STATIC
     GST_PLUGIN_STATIC_REGISTER(alaw);
     GST_PLUGIN_STATIC_REGISTER(app);
@@ -197,7 +267,6 @@ void owr_init(GMainContext *main_context)
     GST_PLUGIN_STATIC_REGISTER(audiotestsrc);
     GST_PLUGIN_STATIC_REGISTER(coreelements);
     GST_PLUGIN_STATIC_REGISTER(dtls);
-    GST_PLUGIN_STATIC_REGISTER(inter);
     GST_PLUGIN_STATIC_REGISTER(mulaw);
     GST_PLUGIN_STATIC_REGISTER(nice);
     GST_PLUGIN_STATIC_REGISTER(opengl);
@@ -230,7 +299,7 @@ void owr_init(GMainContext *main_context)
     GST_PLUGIN_STATIC_REGISTER(pulseaudio);
     GST_PLUGIN_STATIC_REGISTER(video4linux2);
 #endif
-#if defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR && !defined(__arm64__))
+#if defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR
     GST_PLUGIN_STATIC_REGISTER(ercolorspace);
 #endif
 
@@ -328,6 +397,20 @@ GMainContext * _owr_get_main_context()
     return owr_main_context;
 }
 
+GstClockTime _owr_get_base_time()
+{
+    G_LOCK(base_time);
+    if (!GST_CLOCK_TIME_IS_VALID(owr_base_time)) {
+        GstClock *clock = gst_system_clock_obtain();
+
+        owr_base_time = gst_clock_get_time(clock);
+        gst_object_unref(clock);
+    }
+    G_UNLOCK(base_time);
+
+    return owr_base_time;
+}
+
 void _owr_schedule_with_user_data(GSourceFunc func, gpointer user_data)
 {
     GSource *source = g_idle_source_new();
@@ -335,6 +418,35 @@ void _owr_schedule_with_user_data(GSourceFunc func, gpointer user_data)
     g_source_set_callback(source, func, user_data, NULL);
     g_source_set_priority(source, G_PRIORITY_DEFAULT);
     g_source_attach(source, owr_main_context);
+}
+
+static gboolean time_schedule_func(gpointer user_data)
+{
+    GHashTable *table, *data;
+    GValue *value;
+    OwrMessageOrigin *origin;
+    GSourceFunc func;
+    gboolean result;
+
+    table = user_data;
+
+    func = g_hash_table_lookup(table, "__func");
+    origin = g_hash_table_lookup(table, "__origin");
+    data = g_hash_table_lookup(table, "__data");
+
+    value = _owr_value_table_add(data, "call_time", G_TYPE_INT64);
+    g_value_set_int64(value, g_get_monotonic_time());
+
+    result = func(table);
+
+    g_return_val_if_fail(OWR_IS_MESSAGE_ORIGIN(origin), result);
+
+    value = _owr_value_table_add(data, "end_time", G_TYPE_INT64);
+    g_value_set_int64(value, g_get_monotonic_time());
+
+    OWR_POST_STATS(origin, SCHEDULE, data);
+
+    return result;
 }
 
 /**
@@ -345,6 +457,29 @@ void _owr_schedule_with_user_data(GSourceFunc func, gpointer user_data)
  */
 void _owr_schedule_with_hash_table(GSourceFunc func, GHashTable *hash_table)
 {
-    _owr_schedule_with_user_data(func, hash_table);
+    if (g_hash_table_lookup(hash_table, "__data")) {
+        g_hash_table_insert(hash_table, "__func", func);
+        _owr_schedule_with_user_data(time_schedule_func, hash_table);
+    } else
+        _owr_schedule_with_user_data(func, hash_table);
 }
 
+GHashTable *_owr_create_schedule_table_func(OwrMessageOrigin *origin, const gchar *function_name)
+{
+    GHashTable *args, *stats_table;
+    GValue *value;
+
+    stats_table = _owr_value_table_new();
+
+    value = _owr_value_table_add(stats_table, "start_time", G_TYPE_INT64);
+    g_value_set_int64(value, g_get_monotonic_time());
+
+    value = _owr_value_table_add(stats_table, "function_name", G_TYPE_STRING);
+    g_value_set_static_string(value, function_name);
+
+    args = g_hash_table_new(g_str_hash, g_str_equal);
+    g_hash_table_insert(args, "__data", stats_table);
+    g_hash_table_insert(args, "__origin", g_object_ref(origin));
+
+    return args;
+}

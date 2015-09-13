@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
  * Copyright (c) 2014, Centricular Ltd
  *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
@@ -39,6 +39,9 @@
 
 #include <gio/gio.h>
 #include <string.h>
+
+GST_DEBUG_CATEGORY_EXTERN(_owrimageserver_debug);
+#define GST_CAT_DEFAULT _owrimageserver_debug
 
 #define DEFAULT_PORT 3325
 #define DEFAULT_ALLOW_ORIGIN "null"

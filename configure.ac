@@ -1,10 +1,15 @@
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT(openwebrtc, 0.1)
+AC_INIT(openwebrtc, 0.3.0)
 
 AC_CONFIG_HEADERS([config.h])
 
 AC_CONFIG_MACRO_DIR(m4)
+
+OWR_API_VERSION=0.3
+AC_SUBST(OWR_API_VERSION)
+OWR_API_VERSION_UNDERSCORE=0_3
+AC_SUBST(OWR_API_VERSION_UNDERSCORE)
 
 AM_INIT_AUTOMAKE([1.11 -Wno-portability foreign])
 
@@ -113,6 +118,27 @@ if test "x$enable_owr_static" = xyes; then
 fi
 AC_SUBST(GST_STATIC_PLUGINS_DIR)
 AM_CONDITIONAL(OWR_STATIC, test x$enable_owr_static = xyes)
+
+dnl build GStreamer library or not
+AC_MSG_CHECKING([whether to build owr-gst or not])
+AC_ARG_ENABLE(owr-gst,
+AC_HELP_STRING(
+  [--enable-owr-gst],
+  [Enable owr-gst @<:@default=no@:>@]),
+[case "${enableval}" in
+  yes) enable_owr_gst=yes ;;
+  no)  enable_owr_gst=no ;;
+  *) AC_MSG_ERROR(bad value ${enableval} for --enable-owr-gst) ;;
+esac],[enable_owr_gst=no])
+AC_MSG_RESULT([$enable_owr_gst])
+if test "x$enable_owr_gst" = xyes; then
+  if test x$enable_owr_static = xyes; then
+    AC_MSG_ERROR(owr-gst is not supported with owr-static)
+  fi
+  AC_DEFINE(OWR_GST, 1,
+  [Define if building owr-gst])
+fi
+AM_CONDITIONAL(OWR_GST, test x$enable_owr_gst = xyes)
 
 dnl pick dependencies and build flags based on OS
 case "$host_os" in
@@ -276,13 +302,15 @@ AC_SUBST(OWR_DEVICE_LIST_EXT_LIBS)
 AC_OUTPUT([
 Makefile
 bridge/Makefile
-bridge/openwebrtc-bridge-0.1.pc
+bridge/openwebrtc-bridge-$OWR_API_VERSION.pc
 bridge/client/Makefile
 bridge/seed/Makefile
 bridge/shared/Makefile
 bridge/worker/Makefile
+gst/Makefile
+gst/openwebrtc-gst-$OWR_API_VERSION.pc
 owr/Makefile
-owr/openwebrtc-0.1.pc
+owr/openwebrtc-$OWR_API_VERSION.pc
 transport/Makefile
 local/Makefile
 tests/Makefile

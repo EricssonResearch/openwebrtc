@@ -1,4 +1,4 @@
-# Copyright (c) 2014, Ericsson AB. All rights reserved.
+# Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without modification,
 # are permitted provided that the following conditions are met:
@@ -83,6 +83,37 @@ C.Helper.add_helper('jobject_wrapper_destroy',
     )
 )
 
+C.Helper.add_helper('jobject_callback_wrapper_create',
+    C.Function('jobject_callback_wrapper_create',
+        return_type='JObjectCallbackWrapper*',
+        params=['jobject jobj', 'gboolean should_destroy'],
+        body=[
+            C.Decl('JObjectCallbackWrapper*', 'callback_wrapper'),
+            '',
+            C.Assign('callback_wrapper', C.Call('g_slice_new0', 'JObjectCallbackWrapper')),
+            C.Assert('callback_wrapper'),
+            C.Assign('callback_wrapper->wrapper', C.Helper('jobject_wrapper_create', 'jobj', 'FALSE')),
+            C.Assign('callback_wrapper->should_destroy', 'should_destroy'),
+            '',
+            C.Return('callback_wrapper'),
+        ]
+    )
+)
+
+C.Helper.add_helper('jobject_callback_wrapper_destroy',
+    C.Function('jobject_callback_wrapper_destroy',
+        return_type='void',
+        params=['gpointer user_data'],
+        body=[
+            C.Decl('JObjectCallbackWrapper*', 'callback_wrapper'),
+            '',
+            C.Assign('callback_wrapper', 'user_data', cast='JObjectCallbackWrapper*'),
+            C.Helper('jobject_wrapper_destroy', 'callback_wrapper->wrapper', 'FALSE'),
+            C.Call('g_slice_free', 'JObjectCallbackWrapper', 'callback_wrapper'),
+        ]
+    )
+)
+
 C.Helper.add_helper('jobject_wrapper_closure_notify',
     C.Function('jobject_wrapper_closure_notify',
         return_type='void',
@@ -97,7 +128,7 @@ C.Helper.add_helper('jobject_wrapper_closure_notify',
 C.Helper.add_helper('gobject_to_jobject',
     C.Function('gobject_to_jobject',
         return_type='jobject',
-        params=['JNIEnv* env', 'gpointer data_pointer', 'jclass clazz', 'gboolean take_ref'],
+        params=['JNIEnv* env', 'gpointer data_pointer', 'gboolean take_ref'],
         body=[
             C.Decl('GObject*', 'gobj'),
             C.Decl('JObjectWrapper*', 'wrapper'),
@@ -114,8 +145,15 @@ C.Helper.add_helper('gobject_to_jobject',
                     C.Return('wrapper->obj'),
                 ], [
                     C.Decl('jobject', 'jobj'),
+                    C.Decl('jclass', 'clazz'),
                     C.Decl('jobject', 'native_pointer'),
                     C.Decl('GWeakRef*', 'ref'),
+                    '',
+                    C.Assign('clazz', C.Call('g_hash_table_lookup', 'gobject_to_java_class_map', C.Call('G_OBJECT_TYPE', 'gobj'))),
+                    C.If('!clazz', [
+                        C.Log.error('Java class not found for GObject type: %s', C.Call('G_OBJECT_TYPE_NAME', 'gobj')),
+                        C.Return('NULL'),
+                    ]),
                     '',
                     C.If('take_ref', C.Call('g_object_ref', 'gobj')),
                     '',
@@ -408,21 +446,39 @@ class JObjectWrapperType(ObjectMetaType(
         if closure is None:
             closure = self
         self.closure = closure
+        self.scope = getattr(closure, 'scope', None)
 
     def transform_to_c(self):
+        create = None
+        if self.scope is None:
+            create = C.Helper('jobject_wrapper_create', self.closure.jni_name, 'FALSE')
+        else:
+            create = C.Helper('jobject_callback_wrapper_create', self.closure.jni_name,
+                'TRUE' if self.scope == 'async' else 'FALSE')
+
         return TypeTransform([
             C.Decl(self.c_type, self.c_name),
         ],[
-            C.Assign(self.c_name, C.Helper('jobject_wrapper_create', self.closure.jni_name, 'FALSE')),
+            C.Assign(self.c_name, create),
+        ], self.scope == 'call' and [
+            C.Helper('jobject_callback_wrapper_destroy', self.c_name),
         ])
 
     def transform_to_jni(self):
+        get = None
+        if self.transfer_ownership:
+            get = '((JObjectCallbackWrapper*) %s)->wrapper->obj;' % self.c_name
+        else:
+            get = '((JObjectWrapper*) %s)->obj;' % self.c_name
+
         return TypeTransform([
             C.Decl(self.jni_type, self.jni_name),
         ],[
-            C.Assign(self.jni_name, '((JObjectWrapper*) ' + self.c_name + ')->obj;'),
+            C.Assign(self.jni_name, get),
         ], self.transfer_ownership and [
-            C.Helper('jobject_wrapper_destroy', self.c_name, 'FALSE'),
+            C.If('((JObjectCallbackWrapper *) %s)->should_destroy' % self.c_name,
+                C.Helper('jobject_callback_wrapper_destroy', self.c_name),
+            ),
         ])
 
 
@@ -453,7 +509,29 @@ class EnumMetaType(ObjectMetaType):
         ])
 
 
+class JDestroyType(ObjectMetaType(
+        gir_type=None,
+        java_type=None,
+        c_type='GDestroyNotify',
+        package=None,
+    )):
+    jni_type=None
+
+    def transform_to_c(self):
+        C.Helper('jobject_callback_wrapper_destroy')
+        return TypeTransform([
+            C.Decl(self.c_type, self.c_name),
+        ],[
+            C.Assign(self.c_name, 'jobject_callback_wrapper_destroy'),
+        ])
+
+
 class CallbackMetaType(ObjectMetaType):
+    def __init__(self, name, transfer_ownership=False, allow_none=False, scope=None):
+        super(CallbackMetaType, self).__init__(name, transfer_ownership, allow_none)
+        assert scope in [None, 'call', 'async', 'notified']
+        self.scope = scope
+
     def __new__(cls, gir_type, c_type, prefix):
         return super(CallbackMetaType, cls).__new__(cls,
             gir_type=gir_type,
@@ -509,7 +587,7 @@ class GObjectMetaType(ObjectMetaType):
             C.Decl(self.jni_type, self.jni_name),
         ],[
             C.Assign(self.jni_name, C.Helper('gobject_to_jobject',
-                'env', self.c_name, C.Cache.default_class(self), 'TRUE' if not self.transfer_ownership else 'FALSE'))
+                'env', self.c_name, 'TRUE' if not self.transfer_ownership else 'FALSE'))
         ])
 
 
@@ -714,19 +792,24 @@ class GHashTableType(ContainerMetaType(
             C.Decl(self.inner_value.c_type, self.inner_value.c_name),
             inner_transforms.declarations,
         ], [
-            C.Assign(self.jni_name, C.Env.new('HashMap')),
-            C.ExceptionCheck.default(self),
-            C.Call('g_hash_table_iter_init', '&' + it, self.c_name),
-            C.While(C.Call('g_hash_table_iter_next', '&' + it, '(void **) &' + self.inner_key.c_name, '(void **) &' + self.inner_value.c_name),
-                inner_transforms.conversion,
-                C.Env.method(self.jni_name, ('HashMap', 'put'), self.inner_key.jni_name, self.inner_value.jni_name),
+            C.Assign(self.jni_name, 'NULL'),
+            C.If(self.c_name, [
+                C.Assign(self.jni_name, C.Env.new('HashMap')),
                 C.ExceptionCheck.default(self),
-                C.Env('DeleteLocalRef', self.inner_key.jni_name) if self.inner_value.has_local_ref else [],
-                C.Env('DeleteLocalRef', self.inner_value.jni_name) if self.inner_value.has_local_ref else [],
-                inner_transforms.cleanup,
-            )
+                C.Call('g_hash_table_iter_init', '&' + it, self.c_name),
+                C.While(C.Call('g_hash_table_iter_next', '&' + it, '(void **) &' + self.inner_key.c_name, '(void **) &' + self.inner_value.c_name),
+                    inner_transforms.conversion,
+                    C.Env.method(self.jni_name, ('HashMap', 'put'), self.inner_key.jni_name, self.inner_value.jni_name),
+                    C.ExceptionCheck.default(self),
+                    C.Env('DeleteLocalRef', self.inner_key.jni_name) if self.inner_value.has_local_ref else [],
+                    C.Env('DeleteLocalRef', self.inner_value.jni_name) if self.inner_value.has_local_ref else [],
+                    inner_transforms.cleanup,
+                ),
+            ]),
         ], self.transfer_ownership and [
-            C.Call('g_hash_table_unref', self.c_name),
+            C.If(self.c_name, [
+                C.Call('g_hash_table_unref', self.c_name),
+            ]),
         ])
 
 

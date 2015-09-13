@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
  * Copyright (c) 2014, Centricular Ltd
  *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
@@ -41,6 +41,9 @@
 #include "owr_media_source_private.h"
 #include "owr_private.h"
 #include "owr_utils.h"
+
+GST_DEBUG_CATEGORY_EXTERN(_owrlocal_debug);
+#define GST_CAT_DEFAULT _owrlocal_debug
 
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
@@ -118,13 +121,19 @@ void owr_get_capture_sources(OwrMediaType types, OwrCaptureSourcesCallback callb
     g_closure_set_marshal(closure, g_cclosure_marshal_generic);
 
     if (g_getenv("OWR_USE_TEST_SOURCES")) {
-        merger = _owr_utils_list_closure_merger_new(closure, (GDestroyNotify) g_object_unref);
+        GList *sources;
+
+        merger = _owr_utils_list_closure_merger_new(closure,
+            (GCopyFunc) g_object_ref,
+            (GDestroyNotify) g_object_unref);
 
         g_closure_ref(merger);
         _owr_get_capture_devices(types, merger);
 
         g_closure_ref(merger);
-        _owr_utils_call_closure_with_list(merger, get_test_sources(types));
+        sources = get_test_sources(types);
+        _owr_utils_call_closure_with_list(merger, sources);
+        g_list_free_full(sources, g_object_unref);
 
         g_closure_unref(merger);
     } else

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2014, Ericsson AB. All rights reserved.
+# Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without modification,
 # are permitted provided that the following conditions are met:
@@ -95,6 +95,7 @@ HEADERS = [
     'owr.h',
     'owr_audio_payload.h',
     'owr_audio_renderer.h',
+    'owr_bus.h',
     'owr_candidate.h',
     'owr_data_channel.h',
     'owr_data_session.h',
@@ -105,6 +106,7 @@ HEADERS = [
     'owr_media_renderer.h',
     'owr_media_session.h',
     'owr_media_source.h',
+    'owr_message_origin.h',
     'owr_payload.h',
     'owr_remote_media_source.h',
     'owr_session.h',

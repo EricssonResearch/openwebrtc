@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
  * Copyright (c) 2014, Centricular Ltd
  *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
@@ -45,6 +45,9 @@
 #ifdef __APPLE__
 #include <TargetConditionals.h>
 #endif
+
+GST_DEBUG_CATEGORY_EXTERN(_owrimagerenderer_debug);
+#define GST_CAT_DEFAULT _owrimagerenderer_debug
 
 #define DEFAULT_WIDTH 0
 #define DEFAULT_HEIGHT 0
@@ -215,7 +218,7 @@ static GstElement *owr_image_renderer_get_element(OwrMediaRenderer *renderer)
     g_assert(sink);
     priv->appsink = sink;
 
-    g_object_set(sink, "max-buffers", 1, "drop", TRUE, "qos", TRUE, NULL);
+    g_object_set(sink, "max-buffers", 1, "drop", TRUE, "qos", TRUE, "enable-last-sample", FALSE, NULL);
 
     gst_bin_add_many(GST_BIN(renderer_bin), sink, NULL);
 

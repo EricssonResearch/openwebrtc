@@ -15,6 +15,7 @@ AM_CFLAGS = \
     -Wall \
     -Wextra \
     -Werror \
+    -Wno-parentheses-equality \
     $(DEBUG_CFLAGS)
 
 noinst_LTLIBRARIES = libopenwebrtc_transport.la

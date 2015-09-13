@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
  * Copyright (c) 2014, Centricular Ltd
  *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
@@ -44,7 +44,11 @@
 
 #include "owr_candidate_private.h"
 
+#include <gst/gst.h>
 #include <string.h>
+
+GST_DEBUG_CATEGORY_EXTERN(_owrcandidate_debug);
+#define GST_CAT_DEFAULT _owrcandidate_debug
 
 #define OWR_CANDIDATE_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_CANDIDATE, OwrCandidatePrivate))
 

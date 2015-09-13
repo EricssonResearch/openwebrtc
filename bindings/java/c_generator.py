@@ -1,4 +1,4 @@
-# Copyright (c) 2014, Ericsson AB. All rights reserved.
+# Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without modification,
 # are permitted provided that the following conditions are met:
@@ -479,6 +479,9 @@ def gen_class(package, clazz):
         body += [C.Comment(attr) if getattr(clazz, attr) else None]
         body += map(make_function_gen(package, clazz.name), getattr(clazz, attr))
 
+    for interface in clazz.interfaces:
+        body += map(make_function_gen(package, clazz.name), interface.methods)
+
     body += [C.Comment('signals') if clazz.signals else None]
     body += map(make_callback_gen(package, clazz.name), clazz.signals)
     body += map(gen_signal_accessors, clazz.signals)
@@ -589,6 +592,15 @@ def gen_source(namespaces, include_headers):
         _end = '} JObjectWrapper;',
     )
 
+    jobject_callback_wrapper_struct = C.Block(
+        _start = 'typedef struct {',
+        body = [
+            C.Decl('JObjectWrapper', '*wrapper'),
+            C.Decl('gboolean', 'should_destroy'),
+        ],
+        _end = '} JObjectCallbackWrapper;',
+    )
+
     native_destructor = [C.JniExport(
         package=package,
         clazz='NativeInstance',
@@ -621,6 +633,10 @@ def gen_source(namespaces, include_headers):
 
     helper_functions = Helper.enumerate_used_helpers()
 
+    gobject_class_cache = [
+        C.Call('g_hash_table_insert', 'gobject_to_java_class_map', C.Call(clazz.glib_get_type), Cache.default_class(clazz.value))
+    for clazz in namespace.classes for namespace in namespaces];
+
     # cached classes need to be enumerated last
     cache_declarations, jni_onload_cache = C.Cache.enumerate_cached_classes()
 
@@ -637,6 +653,10 @@ def gen_source(namespaces, include_headers):
             '',
             jni_onload_cache,
             '',
+            C.Assign('gobject_to_java_class_map', C.Call('g_hash_table_new', 'g_direct_hash', 'g_direct_equal')),
+            '',
+            gobject_class_cache,
+            '',
             C.Return('JNI_VERSION_1_6'),
         ]
     )
@@ -648,9 +668,11 @@ def gen_source(namespaces, include_headers):
         includes,
         HEADER,
         cache_declarations,
+        C.Decl('static GHashTable*', 'gobject_to_java_class_map'),
         GET_JNI_ENV,
         jni_onload,
         jobject_wrapper_struct,
+        jobject_callback_wrapper_struct,
     ] + helper_functions + [native_destructor] + body
 
     body = intersperse(prune_empty(body), '')

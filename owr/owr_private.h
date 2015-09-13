@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
  * Copyright (c) 2014, Centricular Ltd
  *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
@@ -28,6 +28,8 @@
 #ifndef __OWR_PRIVATE_H__
 #define __OWR_PRIVATE_H__
 
+#include "owr_message_origin_private.h"
+
 #include <glib.h>
 
 #include <gst/gst.h>
@@ -41,8 +43,12 @@ G_BEGIN_DECLS
 /*< private >*/
 gboolean _owr_is_initialized(void);
 GMainContext * _owr_get_main_context(void);
+GstClockTime _owr_get_base_time(void);
 void _owr_schedule_with_user_data(GSourceFunc func, gpointer user_data);
 void _owr_schedule_with_hash_table(GSourceFunc func, GHashTable *hash_table);
+GHashTable *_owr_create_schedule_table_func(OwrMessageOrigin *origin, const gchar *function_name);
+
+#define _owr_create_schedule_table(origin) _owr_create_schedule_table_func(origin, __FUNCTION__)
 
 G_END_DECLS
 

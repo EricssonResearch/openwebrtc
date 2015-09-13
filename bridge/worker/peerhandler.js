@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Ericsson AB. All rights reserved.
+ * Copyright (C) 2014-2015 Ericsson AB. All rights reserved.
  * Copyright (C) 2015 Collabora Ltd.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -43,7 +43,7 @@ function PeerHandler(configuration, client, jsonRpc) {
         for (i = sessions.length; i < localSessionInfo.mediaDescriptions.length; i++) {
             var lmdesc = localSessionInfo.mediaDescriptions[i];
             var sessionConfig = {
-                "dtlsRole": lmdesc.dtls.mode,
+                "dtlsRole": lmdesc.dtls.setup,
                 "type": lmdesc.type == "application" ? "data" : "media"
             };
 
@@ -107,6 +107,11 @@ function PeerHandler(configuration, client, jsonRpc) {
                     cand.relatedPort = candidate.base_port || 9;
                 }
 
+                if (mdesc.ice && mdesc.ice.ufrag && mdesc.ice.password) {
+                    candidate.ufrag = mdesc.ice.ufrag;
+                    candidate.password = mdesc.ice.password;
+                }
+
                 var mdescIndex = localSessionInfo.mediaDescriptions.indexOf(mdesc);
                 client.gotIceCandidate(mdescIndex, cand, candidate.ufrag, candidate.password);
             });
@@ -143,6 +148,11 @@ function PeerHandler(configuration, client, jsonRpc) {
         function prepareMediaSession(mediaSession, mdesc) {
             prepareSession(mediaSession, mdesc);
             mediaSession.rtcp_mux = !isInitiator && !!(mdesc.rtcp && mdesc.rtcp.mux);
+
+            if (mdesc.cname && mdesc.ssrcs && mdesc.ssrcs.length) {
+                mediaSession.cname = mdesc.cname;
+                mediaSession.send_ssrc = mdesc.ssrcs[0];
+            }
 
             mediaSession.signal.connect("notify::send-ssrc", function () {
                 var mdescIndex = localSessionInfo.mediaDescriptions.indexOf(mdesc);
@@ -186,7 +196,7 @@ function PeerHandler(configuration, client, jsonRpc) {
         for (var i = sessions.length; i < remoteSessionInfo.mediaDescriptions.length; i++) {
             var rmdesc = remoteSessionInfo.mediaDescriptions[i];
             var sessionConfig = {
-                "dtlsRole": rmdesc.dtls.mode == "active" ? "passive" : "active",
+                "dtlsRole": rmdesc.dtls.setup == "active" ? "passive" : "active",
                 "type": rmdesc.type == "application" ? "data" : "media"
             };
             sessionConfigs.push(sessionConfig);
@@ -380,7 +390,7 @@ function PeerHandler(configuration, client, jsonRpc) {
 }
 
 function createInternalDataChannelRef(internalDataChannel, jsonRpc) {
-    var exports = [ "send", "close" ];
+    var exports = [ "send", "sendBinary", "close" ];
     exports.forEach(function (name) {
         jsonRpc.exportFunctions(internalDataChannel[name]);
     });
@@ -412,6 +422,12 @@ function InternalDataChannel(settings, dataSession, client) {
 
     this.send = function (data) {
         channel.send(data);
+        client.setBufferedAmount(channel.buffered_amount);
+    };
+
+    this.sendBinary = function (data) {
+        var buf = Array.prototype.slice.call(new Uint8Array(data));
+        channel.send_binary(buf, buf.length);
         client.setBufferedAmount(channel.buffered_amount);
     };
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
  * Copyright (c) 2014, Centricular Ltd
  *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
@@ -50,9 +50,6 @@ void _owr_media_session_set_on_send_source(OwrMediaSession *media_session, GClos
 void _owr_media_session_clear_closures(OwrMediaSession *media_session);
 
 GstBuffer * _owr_media_session_get_srtp_key_buffer(OwrMediaSession *media_session, const gchar *keyname);
-
-void _owr_media_session_set_send_ssrc(OwrMediaSession *media_session, guint send_ssrc);
-void _owr_media_session_set_cname(OwrMediaSession *media_session, const gchar *cname);
 
 G_END_DECLS
 

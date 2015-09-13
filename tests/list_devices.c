@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
  * Copyright (c) 2014, Centricular Ltd
  *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
@@ -33,8 +33,6 @@
 #include "owr_local.h"
 #include "owr_media_source.h"
 
-static GMainLoop *loop;
-
 static void got_sources(GList *sources, gpointer user_data)
 {
     OwrMediaSource *source = NULL;
@@ -56,7 +54,7 @@ static void got_sources(GList *sources, gpointer user_data)
         sources = sources->next;
     }
 
-    g_main_loop_quit(loop);
+    owr_quit();
 }
 
 int main() {

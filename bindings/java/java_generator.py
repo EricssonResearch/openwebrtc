@@ -1,4 +1,4 @@
-# Copyright (c) 2014, Ericsson AB. All rights reserved.
+# Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without modification,
 # are permitted provided that the following conditions are met:
@@ -236,7 +236,7 @@ def gen_signal(signal):
 
 
 @add_to(J)
-def gen_class(clazz):
+def gen_class(clazz, interfaces):
     # public constructors
     body = [(
         Method(
@@ -272,6 +272,9 @@ def gen_class(clazz):
     body += map(Method.default, clazz.methods)
     body += map(partial(Method.default, static=True), clazz.functions)
 
+    # interface methods
+    body += [['@Override', Method.default(method)] for method in flatten(interface.methods for interface in clazz.interfaces)];
+
     # properties
     body += sum(sum([[
         [Method.default(prop.setter)] if prop.writable else [],
@@ -284,10 +287,22 @@ def gen_class(clazz):
 
     return J.Class(clazz.name,
         extends=clazz.parent or 'NativeInstance',
+        implements=[interface.name for interface in clazz.interfaces],
         imports=[
             config.PACKAGE_ROOT + '.NativeInstance',
             config.PACKAGE_ROOT + '.NativePointer',
         ],
+        body=intersperse(prune_empty(body), ''),
+    )
+
+
+@add_to(J)
+def gen_interface(interface):
+    body = [Method.default(method, native=False) for method in interface.methods]
+
+    return J.Class(interface.name,
+        extends=interface.parent,
+        variation='interface',
         body=intersperse(prune_empty(body), ''),
     )
 
@@ -339,7 +354,8 @@ def gen_enum(enum):
 
 @add_to(J)
 def gen_namespace(namespace):
-    classes = map(gen_class, namespace.classes)
+    classes = map(gen_class, namespace.classes, namespace.interfaces)
+    interfaces = map(gen_interface, namespace.interfaces)
     enums = map(gen_enum, namespace.enums)
     callbacks = map(partial(J.Class.create_callback, static=False), namespace.callbacks)
 
@@ -356,7 +372,7 @@ def gen_namespace(namespace):
         ] + intersperse(map(partial(Method.default, static=True), namespace.functions), '')
     )
 
-    all_classes = classes + enums + callbacks + [main_class]
+    all_classes = classes + interfaces + enums + callbacks + [main_class]
 
     for clazz in all_classes:
         clazz.package = config.PACKAGE_ROOT + '.' + namespace.symbol_prefix

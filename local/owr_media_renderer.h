@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
  * Copyright (c) 2014, Centricular Ltd
  *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
@@ -62,6 +62,7 @@ struct _OwrMediaRendererClass {
 
     /*< private >*/
     void *(*get_caps)(OwrMediaRenderer *renderer);
+    void *(*get_sink)(OwrMediaRenderer *renderer);
 };
 
 GType owr_media_renderer_get_type(void) G_GNUC_CONST;

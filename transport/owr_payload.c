@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
  * Copyright (c) 2014, Centricular Ltd
  *     Author: Sebastian Dröge <sebastian@centricular.com>
  *     Author: Arun Raghavan <arun@centricular.com>
@@ -42,6 +42,13 @@
 #include "owr_video_payload.h"
 
 #include <string.h>
+
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
+
+GST_DEBUG_CATEGORY_EXTERN(_owrpayload_debug);
+#define GST_CAT_DEFAULT _owrpayload_debug
 
 #define DEFAULT_MTU 1200
 #define DEFAULT_BITRATE 0
@@ -360,6 +367,7 @@ GstElement * _owr_payload_create_encoder(OwrPayload *payload)
     gchar *element_name = NULL;
     GstElementFactory *factory;
     const gchar *factory_name;
+    gint cpu_used;
 
     g_return_val_if_fail(payload, NULL);
 
@@ -374,16 +382,26 @@ GstElement * _owr_payload_create_encoder(OwrPayload *payload)
         if (!strcmp(factory_name, "openh264enc")) {
             g_object_set(encoder, "gop-size", 0, NULL);
             gst_util_set_object_arg(G_OBJECT(encoder), "rate-control", "bitrate");
+            gst_util_set_object_arg(G_OBJECT(encoder), "complexity", "low");
             g_object_bind_property(payload, "bitrate", encoder, "bitrate", G_BINDING_SYNC_CREATE);
         } else if (!strcmp(factory_name, "x264enc")) {
             g_object_bind_property_full(payload, "bitrate", encoder, "bitrate", G_BINDING_SYNC_CREATE,
                 binding_transform_to_kbps, NULL, NULL, NULL);
-            g_object_set(encoder, "tune", 0x04 /* zero-latency */, NULL);
+            gst_util_set_object_arg(G_OBJECT(encoder), "speed-preset", "ultrafast");
+            gst_util_set_object_arg(G_OBJECT(encoder), "tune", "fastdecode+zerolatency");
         } else if (!strcmp(factory_name, "vtenc_h264")) {
             g_object_bind_property_full(payload, "bitrate", encoder, "bitrate", G_BINDING_SYNC_CREATE,
                 binding_transform_to_kbps, NULL, NULL, NULL);
-            g_object_set(encoder, "allow-frame-reordering", FALSE, "realtime", TRUE,
-                "quality", 0.5, "max-keyframe-interval", G_MAXINT, NULL);
+            g_object_set(encoder,
+                "allow-frame-reordering", FALSE,
+                "realtime", TRUE,
+#if defined(__APPLE__) && TARGET_OS_IPHONE
+                "quality", 0.0,
+#else
+                "quality", 0.5,
+#endif
+                "max-keyframe-interval", G_MAXINT,
+                NULL);
         } else {
             /* Assume bits/s instead of kbit/s */
             g_object_bind_property(payload, "bitrate", encoder, "bitrate", G_BINDING_SYNC_CREATE);
@@ -394,8 +412,27 @@ GstElement * _owr_payload_create_encoder(OwrPayload *payload)
     case OWR_CODEC_TYPE_VP8:
         encoder = try_codecs(vp8_encoders, "encoder");
         g_return_val_if_fail(encoder, NULL);
-        g_object_set(encoder, "end-usage", 1, "deadline", G_GINT64_CONSTANT(1), "lag-in-frames", 0,
-            "error-resilient", 1, "keyframe-mode", 0, NULL);
+
+#if (defined(__APPLE__) && TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR) || defined(__ANDROID__)
+        cpu_used = -12; /* Mobile */
+#else
+        cpu_used = -6; /* Desktop */
+#endif
+        /* values are inspired by webrtc.org values in vp8_impl.cc */
+        g_object_set(encoder,
+            "end-usage", 1, /* VPX_CBR */
+            "deadline", G_GINT64_CONSTANT(1), /* VPX_DL_REALTIME */
+            "cpu-used", cpu_used,
+            "min-quantizer", 2,
+            "buffer-initial-size", 500,
+            "buffer-optimal-size", 600,
+            "buffer-size", 1000,
+            "lag-in-frames", 0,
+            "timebase", 1, 90000,
+            "error-resilient", 1,
+            "keyframe-mode", 0, /* VPX_KF_DISABLED */
+            NULL);
+
         g_object_bind_property(payload, "bitrate", encoder, "target-bitrate", G_BINDING_SYNC_CREATE);
         g_object_set(payload, "bitrate", evaluate_bitrate_from_payload(payload), NULL);
         break;

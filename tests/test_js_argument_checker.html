@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test JavaScript Argument Checker (domutils.js)</title>
+
+<script type="text/javascript" src="../bridge/client/domutils.js"></script>
+<script type="text/javascript">
+
+var logDiv;
+var errorCount = 0;
+
+function CustomConstructor() {
+}
+
+window.onload = function () {
+    log("Start");
+
+    var basicTestInput = {
+        "object": "{}",
+        "number": "1.0",
+        "string": "\"foo\"",
+        "boolean": "true",
+        "function": "function () {}",
+        "dictionary": "{}"
+    };
+
+    log("Basic tests")
+    for (var typeName in basicTestInput)
+        runBasicTests(typeName, basicTestInput[typeName]);
+
+    log("More checkArguments() tests");
+    shouldNotThrow('checkArguments("test", "object | number", 1, [{}]);');
+    shouldNotThrow('checkArguments("test", "object | number", 1, [1.0]);');
+    shouldThrow('checkArguments("test", "object | number", 1, [function () {}]);');
+
+    shouldThrow('checkArguments("test", "object", 1, ["bad value"]);');
+    shouldThrow('checkArguments("test", "object", 0, ["bad optional value"]);');
+
+    shouldThrow('checkArguments("test", "number", 1, [NaN]);');
+    shouldThrow('checkArguments("test", "number", 1, [Infinity]);');
+    shouldThrow('checkArguments("test", "number", 1, [-Infinity]);');
+
+    shouldNotThrow('checkArguments("test", "CustomConstructor", 1, [new CustomConstructor()]);');
+    shouldThrow('checkArguments("test", "CustomConstructor", 1, [{}]);');
+    shouldThrow('checkArguments("test", "CustomUnknownConstructor", 1, [new CustomConstructor()]);');
+
+    shouldNotThrow('checkArguments("test", "dictionary", 1, [null]);');
+    shouldNotThrow('checkArguments("test", "dictionary", 1, [undefined]);');
+    shouldNotThrow('checkArguments("test", "dictionary", 1, [{}]);');
+
+    log("Test checkDictionary()");
+    shouldNotThrow('checkDictionary("test", {}, { "b": "boolean", "n": "number", "o": "object"});');
+    shouldNotThrow('checkDictionary("test", {"b": true}, { "b": "boolean", "n": "number", "o": "object"});');
+    shouldThrow('checkDictionary("test", {"n": "not a number"}, { "b": "boolean", "n": "number", "o": "object"});');
+    shouldNotThrow('checkDictionary("test", {"b": true, "n": 1.0}, { "b": "boolean", "n": "number", "o": "object"});');
+    shouldNotThrow('checkDictionary("test", {"not-a-member": true}, { "b": "boolean", "n": "number", "o": "object"});');
+    shouldNotThrow('checkDictionary("test", {"o": {}, "not-a-member": true}, { "b": "boolean", "n": "number", "o": "object"});');
+
+    log("Done with " + errorCount + " errors");
+}
+
+function runBasicTests(typeName, strValue) {
+    shouldThrow('checkArguments("test", "' + typeName + '", 1, []);');
+    shouldNotThrow('checkArguments("test", "' + typeName + '", 0, []);');
+    shouldNotThrow('checkArguments("test", "' + typeName + '", 0, [' + strValue + ']);');
+    shouldNotThrow('checkArguments("test", "' + typeName + '", 1, [' + strValue + ']);');
+    shouldNotThrow('checkArguments("test", "' + typeName + '", 1, [' + strValue + ', "extra"]);');
+    shouldNotThrow('checkArguments("test", "' + typeName + ', ' + typeName + '", 2, [' + strValue + ', ' + strValue + ']);');
+    shouldNotThrow('checkArguments("test", "' + typeName + ', ' + typeName + '", 1, [' + strValue + ', ' + strValue + ']);');
+}
+
+function shouldThrow(expression) {
+    try {
+        eval(expression);
+    } catch (e) {
+        log("PASS: '" + expression + "' did throw");
+        return;
+    }
+    reportError("FAIL: '" + expression + "' should have thrown");
+}
+
+function shouldNotThrow(expression) {
+    try {
+        eval(expression);
+    } catch (e) {
+        reportError("FAIL: '" + expression + "' should not have thrown");
+        return;
+    }
+    log("PASS: '" + expression + "' did not throw");
+}
+
+function reportError(message) {
+    log(message);
+    errorCount++;
+}
+
+function log(message) {
+    if (!logDiv)
+        logDiv = document.querySelector("#log_div");
+    logDiv.appendChild(document.createTextNode(message));
+    logDiv.appendChild(document.createElement("br"));
+}
+</script>
+
+</head>
+<body>
+<div id="log_div"></div>
+</body>
+</html>

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Ericsson AB. All rights reserved.
+ * Copyright (C) 2014-2015 Ericsson AB. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -181,6 +181,10 @@ function canConvert(value, expectedTypes) {
             if (!isNaN(asNumber) && asNumber != -Infinity && asNumber != Infinity)
                 return true;
         }
+        if (expectedType == "dictionary") { // object, undefined and null can be converted
+            if (type == "object" || type == "undefined" || type == "null")
+                return true;
+        }
         if (type == "object") {
             if (expectedType == "object")
                 return true;
@@ -206,10 +210,14 @@ function getDictionaryMember(dict, name, type, defaultValue) {
         return +dict[name];
 }
 
-function randomString() {
-    var randomValues = new Uint8Array(27);
+function randomNumber(bits) {
+    return Math.floor(Math.random() * Math.pow(2, bits));
+}
+
+function randomString(length) {
+    var randomValues = new Uint8Array(Math.ceil(length * 3 / 4));
     crypto.getRandomValues(randomValues);
-    return btoa(String.fromCharCode.apply(null, randomValues));
+    return btoa(String.fromCharCode.apply(null, randomValues)).substr(0, length);
 }
 
 function createError(name, message) {

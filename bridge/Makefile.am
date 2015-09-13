@@ -32,6 +32,9 @@ libopenwebrtc_bridge_la_DEPENDENCIES = \
     $(top_builddir)/owr/libopenwebrtc.la
 
 libopenwebrtc_bridge_la_CFLAGS = $(AM_CFLAGS) -ansi
+if OWR_STATIC
+libopenwebrtc_bridge_la_CFLAGS += -DOWR_GIR_FILE="\"Owr-@OWR_API_VERSION@.gir.h\"" -DOWR_GIR_VAR_PREFIX="Owr_@OWR_API_VERSION_UNDERSCORE@"
+endif
 libopenwebrtc_bridge_la_LDFLAGS = -export-dynamic
 
 bin_PROGRAMS = openwebrtc-daemon
@@ -55,9 +58,9 @@ include_HEADERS = \
     owr_bridge.h
 
 pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = openwebrtc-bridge-0.1.pc
+pkgconfig_DATA = openwebrtc-bridge-@OWR_API_VERSION@.pc
 
 EXTRA_DIST = \
-    openwebrtc-bridge-0.1.pc.in
+    openwebrtc-bridge-@OWR_API_VERSION@.pc.in
 
 -include $(top_srcdir)/git.mk

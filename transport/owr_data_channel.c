@@ -35,6 +35,9 @@
 
 #include <string.h>
 
+GST_DEBUG_CATEGORY_EXTERN(_owrdatachannel_debug);
+#define GST_CAT_DEFAULT _owrdatachannel_debug
+
 #define DEFAULT_ORDERED TRUE
 #define DEFAULT_MAX_PACKETS_LIFE_TIME -1
 #define DEFAULT_MAX_RETRANSMITS -1
