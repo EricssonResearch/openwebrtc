@@ -120,7 +120,7 @@ def got_remote_source(session, source):
 
 
 def got_candidate(session, candidate):
-    print("Got candidate")
+    print("Got candidate %s" % (candidate,))
     session_data = find_session_data(session)
     local_candidates = session_data.get("local-candidates", [])
     local_candidates.append(candidate)
@@ -147,6 +147,7 @@ def got_dtls_certificate(session, pspec):
             pem_b64 += line
         elif "END CERTIFICATE" in line:
             break
+    print("Certificate: %s Stripped: %s" % (lines, pem_b64))
     pem_binary = base64.decodestring(pem_b64)
     checksum = hashlib.sha256(pem_binary)
     digest = checksum.hexdigest()
@@ -273,8 +274,10 @@ def handle_offer(message):
         for candidate in description["ice"].get("candidates", []):
             remote_candidate = candidate_from_description(candidate)
             remote_candidate.props.ufrag = ice_ufrag
+            remote_candidate.props.password = ice_password
             component_type = remote_candidate.props.component_type
-            if not session.props.rtcp_mux or component_type != Owr.ComponentType.RTCP:
+            if not session.props.rtcp_mux or component_type != Owr.ComponentTypes.RTCP:
+                print("Adding remote candidate from offer: %s" % (candidate,))
                 session.add_remote_candidate(remote_candidate)
         session.connect("on-incoming-source", got_remote_source)
         session.connect("on-new-candidate", got_candidate)
@@ -295,13 +298,19 @@ def handle_remote_candidate(message):
     candidate_description = data["candidate"]["candidateDescription"]
     remote_candidate = candidate_from_description(candidate_description)
     # stuff related to the media session
-    print("Remote candidate parsed: %s" % (remote_candidate,))
+    media_session, session_data = ALL_SESSIONS[sdp_mline_index]
+    ice_ufrag = session_data["remote-ice-ufrag"]
+    ice_password = session_data["remote-ice-password"]
+    remote_candidate.props.ufrag = ice_ufrag
+    remote_candidate.props.password = ice_password
+    if not media_session.props.rtcp_mux or remote_candidate.props.component_type != Owr.ComponentTypes.RTCP:
+        print("Adding remote candidate: %s" % (candidate_description,))
+        media_session.add_remote_candidate(remote_candidate)
 
 
 def eventstream_line_read(input_stream, result, peer_joined):
     global PEER_ID
     line = input_stream.read_line_finish_utf8(result)
-    print("Got line of length: %d (%s)" % (line[1], line[0]))
     if line[0]:
         if peer_joined and line[0].startswith('data:'):
             peer_joined = False
@@ -338,9 +347,7 @@ def eventsource_request_sent(session, result, _data):
 def send_eventsource_request(url):
     session = Soup.Session.new()
     message = Soup.Message.new("GET", url)
-    print("got here: 1 " + url)
     session.send_async(message, None, eventsource_request_sent, None)
-    print("got here: 2")
 
 
 def got_local_sources(sources):
@@ -355,7 +362,6 @@ def got_local_sources(sources):
     CLIENT_ID = random.randint(0, pow(2, 32)-1)
     url = SERVER_URL + '/stoc/%s/%d' % (sys.argv[1], CLIENT_ID)
     send_eventsource_request(url)
-    print("got here: 3")
 
 
 def main():
