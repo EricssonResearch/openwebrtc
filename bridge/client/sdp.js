@@ -179,7 +179,7 @@ if (typeof(SDP) == "undefined")
         for (var i = 0; i < parts.length; i += 5) {
             var mediaDescription = {
                 "type": parts[i],
-                "port": parts[i + 1],
+                "port": parseInt(parts[i + 1]),
                 "protocol": parts[i + 2],
             };
             var fmt = parts[i + 3].replace(/^[\s\uFEFF\xA0]+/, '')
