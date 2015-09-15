@@ -1208,7 +1208,7 @@ static GstElement *add_mprtp_scheduler_element(OwrTransportAgent *transport_agen
 
     g_return_val_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent), NULL);
 
-    element_name = g_strdup_printf("mprtp_sch_%s", stream_id);
+    element_name = g_strdup_printf("mprtp_sch_%d", stream_id);
 
     mprtp_sch = gst_element_factory_make("mprtpscheduler", element_name);
 
@@ -1363,7 +1363,6 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
     GstElement *mprtp_sch;
     SendBinInfo *send_bin_info;
     gchar *bin_name, *dtls_srtp_pad_name;
-    GstPad *sink_pad;
 
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
 
