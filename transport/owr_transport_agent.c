@@ -1389,7 +1389,7 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
     g_free(dtls_srtp_pad_name);
 
     g_warn_if_fail(linked_ok);
-    linked_ok = gst_element_link(dtls_srtp_bin_rtp, nice_element);
+    //linked_ok = gst_element_link(dtls_srtp_bin_rtp, nice_element);
     g_warn_if_fail(linked_ok);
     synced_ok = gst_element_sync_state_with_parent(nice_element);
     g_warn_if_fail(synced_ok);
