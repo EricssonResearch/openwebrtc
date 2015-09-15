@@ -112,6 +112,7 @@ typedef struct {
 } DataChannel;
 
 typedef struct {
+    GstElement *mprtp_sch;
     GstElement *dtls_srtp_bin_rtp;
     GstElement *dtls_srtp_bin_rtcp;
     GstElement *send_output_bin;
@@ -1198,6 +1199,29 @@ static GstElement *add_dtls_srtp_bin(OwrTransportAgent *transport_agent, guint s
     return dtls_srtp_bin;
 }
 
+static GstElement *add_mprtp_scheduler_element(OwrTransportAgent *transport_agent, guint stream_id,
+    GstElement *bin)
+{
+    GstElement *mprtp_sch = NULL;
+    gchar *element_name;
+    gboolean added_ok;
+
+    g_return_val_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent), NULL);
+
+    element_name = g_strdup_printf("mprtp_sch_%s", stream_id);
+
+    mprtp_sch = gst_element_factory_make("mprtpscheduler", element_name);
+
+    g_object_set(mprtp_sch, "subflow-riports-enabled", FALSE, NULL);
+
+    added_ok = gst_bin_add(GST_BIN(bin), mprtp_sch);
+    g_warn_if_fail(added_ok);
+
+    g_free(element_name);
+
+    return mprtp_sch;
+}
+
 static GstPad *ghost_pad_and_add_to_bin(GstPad *pad, GstElement *bin, const gchar *pad_name)
 {
     GstPad *ghost_pad;
@@ -1233,11 +1257,12 @@ static void on_rtcp_mux_changed(OwrMediaSession *media_session, GParamSpec *pspe
 
 static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, guint stream_id, gboolean rtp, gboolean rtcp)
 {
-    gchar *rtpbin_pad_name, *dtls_srtp_pad_name;
+    gchar *rtpbin_pad_name, *sink_pad_name;
     gchar *output_selector_name;
     gboolean linked_ok;
     GstPad *sink_pad, *src_pad;
     GstElement *output_selector;
+    GstElement* mprtp_sch;
     GstElement *dtls_srtp_bin_rtp;
     GstElement *dtls_srtp_bin_rtcp;
     GstElement *send_output_bin;
@@ -1248,7 +1273,7 @@ static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, g
 
     send_bin_info = g_hash_table_lookup(transport_agent->priv->send_bins, GINT_TO_POINTER(stream_id));
     g_return_if_fail(send_bin_info);
-
+    mprtp_sch = send_bin_info->mprtp_sch;
     dtls_srtp_bin_rtp = send_bin_info->dtls_srtp_bin_rtp;
     dtls_srtp_bin_rtcp = send_bin_info->dtls_srtp_bin_rtcp;
     send_output_bin = send_bin_info->send_output_bin;
@@ -1259,19 +1284,18 @@ static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, g
     /* RTP */
     if (rtp) {
         rtpbin_pad_name = g_strdup_printf("send_rtp_src_%u", stream_id);
-        dtls_srtp_pad_name = g_strdup_printf("rtp_sink_%u", stream_id);
-
-        sink_pad = gst_element_get_request_pad(dtls_srtp_bin_rtp, dtls_srtp_pad_name);
+        sink_pad_name = g_strdup_printf("rtp_sink_%u", stream_id);
+        sink_pad = gst_element_get_static_pad(mprtp_sch, "rtp_sink");
         g_assert(GST_IS_PAD(sink_pad));
-        ghost_pad_and_add_to_bin(sink_pad, send_output_bin, dtls_srtp_pad_name);
+        ghost_pad_and_add_to_bin(sink_pad, send_output_bin, sink_pad_name);
         gst_object_unref(sink_pad);
 
         linked_ok = gst_element_link_pads(transport_agent->priv->rtpbin, rtpbin_pad_name,
-            send_output_bin, dtls_srtp_pad_name);
+            send_output_bin, sink_pad_name);
         g_warn_if_fail(linked_ok);
 
         g_free(rtpbin_pad_name);
-        g_free(dtls_srtp_pad_name);
+        g_free(sink_pad_name);
     }
 
     /* RTCP */
@@ -1284,10 +1308,10 @@ static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, g
         gst_element_sync_state_with_parent(output_selector);
 
         rtpbin_pad_name = g_strdup_printf("send_rtcp_src_%u", stream_id);
-        dtls_srtp_pad_name = g_strdup_printf("rtcp_sink_%u",  stream_id);
+        sink_pad_name = g_strdup_printf("rtcp_sink_%u",  stream_id);
 
         /* RTCP muxing */
-        sink_pad = gst_element_get_request_pad(dtls_srtp_bin_rtp, dtls_srtp_pad_name);
+        sink_pad = gst_element_get_request_pad(dtls_srtp_bin_rtp, sink_pad_name);
         g_assert(GST_IS_PAD(sink_pad));
         src_pad = gst_element_get_request_pad(output_selector, "src_%u");
         g_assert(GST_IS_PAD(src_pad));
@@ -1299,7 +1323,7 @@ static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, g
 
         if (dtls_srtp_bin_rtcp) {
             /* RTCP standalone */
-            sink_pad = gst_element_get_request_pad(dtls_srtp_bin_rtcp, dtls_srtp_pad_name);
+            sink_pad = gst_element_get_request_pad(dtls_srtp_bin_rtcp, sink_pad_name);
             g_assert(GST_IS_PAD(sink_pad));
             src_pad = gst_element_get_request_pad(output_selector, "src_%u");
             g_assert(GST_IS_PAD(src_pad));
@@ -1316,15 +1340,15 @@ static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, g
         }
 
         sink_pad = gst_element_get_static_pad(output_selector, "sink");
-        ghost_pad_and_add_to_bin(sink_pad, send_output_bin, dtls_srtp_pad_name);
+        ghost_pad_and_add_to_bin(sink_pad, send_output_bin, sink_pad_name);
         gst_object_unref(sink_pad);
 
         linked_ok = gst_element_link_pads(transport_agent->priv->rtpbin, rtpbin_pad_name,
-            send_output_bin, dtls_srtp_pad_name);
+            send_output_bin, sink_pad_name);
         g_warn_if_fail(linked_ok);
 
         g_free(rtpbin_pad_name);
-        g_free(dtls_srtp_pad_name);
+        g_free(sink_pad_name);
 
         send_bin_info->linked_rtcp = TRUE;
     }
@@ -1336,8 +1360,10 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
     GstElement *nice_element, *dtls_srtp_bin_rtp, *dtls_srtp_bin_rtcp = NULL;
     gboolean linked_ok, synced_ok;
     GstElement *send_output_bin;
+    GstElement *mprtp_sch;
     SendBinInfo *send_bin_info;
-    gchar *bin_name;
+    gchar *bin_name, *dtls_srtp_pad_name;
+    GstPad *sink_pad;
 
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
 
@@ -1356,6 +1382,14 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
 
     nice_element = add_nice_element(transport_agent, stream_id, TRUE, FALSE, send_output_bin);
     dtls_srtp_bin_rtp = add_dtls_srtp_bin(transport_agent, stream_id, TRUE, FALSE, send_output_bin);
+    mprtp_sch = add_mprtp_scheduler_element(transport_agent, stream_id, send_output_bin);
+    dtls_srtp_pad_name = g_strdup_printf("rtp_sink_%u", stream_id);
+
+    linked_ok = gst_element_link_pads(mprtp_sch, "mprtp_src",
+                                      dtls_srtp_bin_rtp, dtls_srtp_pad_name);
+    g_free(dtls_srtp_pad_name);
+
+    g_warn_if_fail(linked_ok);
     linked_ok = gst_element_link(dtls_srtp_bin_rtp, nice_element);
     g_warn_if_fail(linked_ok);
     synced_ok = gst_element_sync_state_with_parent(nice_element);
@@ -1375,6 +1409,7 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
     }
 
     send_bin_info = g_new(SendBinInfo, 1);
+    send_bin_info->mprtp_sch = mprtp_sch;
     send_bin_info->dtls_srtp_bin_rtp = dtls_srtp_bin_rtp;
     send_bin_info->dtls_srtp_bin_rtcp = dtls_srtp_bin_rtcp;
     send_bin_info->send_output_bin = send_output_bin;
@@ -1458,7 +1493,7 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
         rtcp_src_pad = gst_element_get_static_pad(funnel, "src");
         ghost_pad_and_add_to_bin(rtcp_src_pad, receive_input_bin, "rtcp_src");
         gst_object_unref(rtcp_src_pad);
-
+//mprtpplayouter
         rtpbin_pad_name = g_strdup_printf("recv_rtcp_sink_%u", stream_id);
         linked_ok = gst_element_link_pads(receive_input_bin, "rtcp_src",
             transport_agent->priv->rtpbin, rtpbin_pad_name);
