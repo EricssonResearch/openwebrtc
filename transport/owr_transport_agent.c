@@ -1213,6 +1213,7 @@ static GstElement *add_mprtp_scheduler_element(OwrTransportAgent *transport_agen
     mprtp_sch = gst_element_factory_make("mprtpscheduler", element_name);
 
     g_object_set(mprtp_sch, "subflow-riports-enabled", FALSE, NULL);
+    g_object_set(mprtp_sch, "join-subflow=1", FALSE, NULL);
 
     added_ok = gst_bin_add(GST_BIN(bin), mprtp_sch);
     g_warn_if_fail(added_ok);
