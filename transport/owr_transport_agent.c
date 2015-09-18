@@ -1223,6 +1223,32 @@ static GstElement *add_mprtp_scheduler_element(OwrTransportAgent *transport_agen
     return mprtp_sch;
 }
 
+
+static GstElement *add_mprtp_plaoyouter_element(OwrTransportAgent *transport_agent, guint stream_id,
+    GstElement *bin)
+{
+    GstElement *mprtp_sch = NULL;
+    gchar *element_name;
+    gboolean added_ok;
+
+    g_return_val_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent), NULL);
+
+    element_name = g_strdup_printf("mprtp_ply_%d", stream_id);
+
+    mprtp_sch = gst_element_factory_make("mprtpplayouter", element_name);
+
+    g_object_set(mprtp_sch, "subflow-riports-enabled", FALSE, NULL);
+    g_object_set(mprtp_sch, "join-subflow", 1, NULL);
+
+    added_ok = gst_bin_add(GST_BIN(bin), mprtp_sch);
+    g_warn_if_fail(added_ok);
+
+    g_free(element_name);
+
+    return mprtp_sch;
+}
+
+
 static GstPad *ghost_pad_and_add_to_bin(GstPad *pad, GstElement *bin, const gchar *pad_name)
 {
     GstPad *ghost_pad;
@@ -1423,6 +1449,7 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
     guint stream_id, gboolean rtcp_mux)
 {
     GstElement *nice_element, *dtls_srtp_bin, *funnel;
+    GstElement *mprtp_ply;
     GstPad *rtp_src_pad, *rtcp_src_pad;
     gchar *rtpbin_pad_name;
     gboolean linked_ok, synced_ok;
@@ -1449,8 +1476,11 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
 
     nice_element = add_nice_element(transport_agent, stream_id, FALSE, FALSE, receive_input_bin);
     dtls_srtp_bin = add_dtls_srtp_bin(transport_agent, stream_id, FALSE, FALSE, receive_input_bin);
+    mprtp_ply = add_mprtp_plaoyouter_element(transport_agent, stream_id, receive_input_bin);
 
-    rtp_src_pad = gst_element_get_static_pad(dtls_srtp_bin, "rtp_src");
+    //rtp_src_pad = gst_element_get_static_pad(dtls_srtp_bin, "rtp_src");
+    gst_element_link_pads(dtls_srtp_bin, "rtp_src", mprtp_ply, "mprtp_sink");
+    rtp_src_pad = gst_element_get_static_pad(mprtp_ply, "mprtp_src");
     ghost_pad_and_add_to_bin(rtp_src_pad, receive_input_bin, "rtp_src");
     gst_object_unref(rtp_src_pad);
 
@@ -1525,6 +1555,7 @@ static void prepare_transport_bin_data_receive_elements(OwrTransportAgent *trans
 {
     OwrTransportAgentPrivate *priv;
     GstElement *nice_element, *dtls_srtp_bin, *sctpdec;
+    //GstElement *mprtp_ply;
     GstElement *receive_input_bin;
     gchar *name;
     OwrDataSession *data_session;
@@ -1552,6 +1583,8 @@ static void prepare_transport_bin_data_receive_elements(OwrTransportAgent *trans
 
     nice_element = add_nice_element(transport_agent, stream_id, FALSE, FALSE, receive_input_bin);
     dtls_srtp_bin = add_dtls_srtp_bin(transport_agent, stream_id, FALSE, FALSE, receive_input_bin);
+    //mprtp_ply = add_mprtp_plaoyouter_element(transport_agent, stream_id, receive_input_bin);
+
     sctpdec = _owr_data_session_create_decoder(data_session);
     g_return_if_fail(nice_element && dtls_srtp_bin && sctpdec);
 
