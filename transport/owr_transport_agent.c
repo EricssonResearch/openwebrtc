@@ -112,13 +112,28 @@ typedef struct {
 } DataChannel;
 
 typedef struct {
-    GstElement *mprtp_sch;
     GstElement *dtls_srtp_bin_rtp;
     GstElement *dtls_srtp_bin_rtcp;
     GstElement *send_output_bin;
 
     gboolean linked_rtcp;
 } SendBinInfo;
+
+typedef struct{
+  guint8 id;
+  NiceAgent *sink_agent;
+  NiceAgent *src_agent;
+  GstElement *nicesink;
+  GstElement *nicesrc;
+  GstElement *bin;
+  guint sink_stream;
+  guint src_stream;
+  NiceComponentState src_state;
+  NiceComponentState sink_state;
+  guint component_id;
+
+  OwrTransportAgent *parent;
+}MpRTPSubflow;
 
 struct _OwrTransportAgentPrivate {
     NiceAgent *nice_agent;
@@ -133,6 +148,15 @@ struct _OwrTransportAgentPrivate {
 
     /* session_id -> struct SendBinInfo */
     GHashTable *send_bins;
+
+    GstElement *mprtp_sch;
+    GstElement *mprtp_snd;
+    GstElement *mprtp_rcv;
+    GstElement *mprtp_ply;
+    GHashTable *mprtp_subflows;
+
+    /* session_id -> struct MPRtpElements */
+    //GHashTable *mprtp_elements;
 
     gboolean local_address_added;
     guint local_min_port;
@@ -451,6 +475,7 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
     priv->data_session_established = FALSE;
 
     priv->send_bins = g_hash_table_new_full(NULL, NULL, NULL, g_free);
+    priv->mprtp_subflows = g_hash_table_new_full(NULL, NULL, NULL, g_free);
 
     priv->message_origin_bus_set = owr_message_origin_bus_set_new();
 }
@@ -541,6 +566,156 @@ void owr_transport_agent_add_helper_server(OwrTransportAgent *transport_agent,
     g_main_context_pop_thread_default(_owr_get_main_context());
     g_object_unref(resolver);
 }
+
+
+
+static void
+subflow_cb_candidate_gathering_done (NiceAgent * agent, guint stream_id, gpointer data)
+{
+  GSList *candidates;
+
+  GST_INFO ("Candidates gathered on agent %" GST_PTR_FORMAT ", stream: %d",
+      agent, stream_id);
+
+  candidates = nice_agent_get_local_candidates (agent, stream_id, 1);
+
+  nice_agent_set_remote_candidates (NICE_AGENT (data), stream_id, 1,
+      candidates);
+
+  g_slist_free_full (candidates, (GDestroyNotify) nice_candidate_free);
+}
+
+static void
+credentials_negotiation (NiceAgent * a_agent, NiceAgent * b_agent,
+    guint a_stream, guint b_stream)
+{
+  gchar *user = NULL;
+  gchar *passwd = NULL;
+
+  nice_agent_get_local_credentials (a_agent, a_stream, &user, &passwd);
+  nice_agent_set_remote_credentials (b_agent, b_stream, user, passwd);
+
+  g_free (user);
+  g_free (passwd);
+}
+
+static void
+subflow_cb_component_state_changed (NiceAgent * agent, guint stream_id,
+    guint component_id, guint state, gpointer user_data)
+{
+  MpRTPSubflow *subflow = (MpRTPSubflow *)user_data;
+  NiceComponentState *stateptr;
+
+  g_return_if_fail(subflow);
+  stateptr = (subflow->src_stream == stream_id) ? &subflow->src_state : &subflow->sink_state;
+  *stateptr = state;
+  subflow->component_id = component_id;
+  g_print("unused parameters at "
+      "subflow_cb_component_state_changed: %p\n", agent);
+}
+
+void owr_transport_agent_join_subflow(OwrTransportAgent *transport_agent,
+                                      guint8 subflow_id,
+                                      const gchar *local_address)
+{
+    NiceAddress addr;
+    NiceAgent *sink_agent;
+    NiceAgent *src_agent;
+    MpRTPSubflow *subflow;
+    GstElement *nicesink;
+    GstElement *nicesrc;
+    GstElement *subflow_bin;
+    gchar *bin_name;
+    gchar *padname;
+    gchar *element_name;
+    gboolean synced_ok;
+    guint sink_stream;
+    guint src_stream;
+    OwrTransportAgentPrivate *priv;
+
+    g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
+    g_return_if_fail(local_address);
+    g_return_if_fail(transport_agent->priv->local_address_added);
+    g_return_if_fail(nice_address_set_from_string(&addr, local_address));
+
+    priv = transport_agent->priv;
+
+    subflow = g_malloc0(sizeof(MpRTPSubflow));
+    subflow->sink_agent = sink_agent = nice_agent_new (NULL, NICE_COMPATIBILITY_RFC5245);
+    subflow->src_agent = src_agent = nice_agent_new (NULL, NICE_COMPATIBILITY_RFC5245);
+
+    nice_agent_add_local_address (sink_agent, &addr);
+    nice_agent_add_local_address (src_agent, &addr);
+
+    subflow->sink_stream = sink_stream = nice_agent_add_stream (sink_agent, 1);
+    subflow->src_stream = src_stream = nice_agent_add_stream (src_agent, 1);
+
+    bin_name = g_strdup_printf("subflow-bin-%hu", subflow_id);
+    subflow->bin = subflow_bin = gst_bin_new(bin_name);
+    g_free(bin_name);
+
+
+    g_signal_connect (G_OBJECT (sink_agent), "candidate-gathering-done",
+        G_CALLBACK (subflow_cb_candidate_gathering_done), src_agent);
+    g_signal_connect (G_OBJECT (src_agent), "candidate-gathering-done",
+        G_CALLBACK (subflow_cb_candidate_gathering_done), sink_agent);
+
+    g_signal_connect (G_OBJECT (sink_agent), "component-state-changed",
+        G_CALLBACK (subflow_cb_component_state_changed), subflow);
+    g_signal_connect (G_OBJECT (src_agent), "component-state-changed",
+        G_CALLBACK (subflow_cb_component_state_changed), subflow);
+
+    credentials_negotiation (sink_agent, src_agent, sink_stream, src_stream);
+    credentials_negotiation (src_agent, sink_agent, src_stream, src_stream);
+
+    nice_agent_gather_candidates (sink_agent, sink_stream);
+    nice_agent_gather_candidates (src_agent, src_stream);
+
+    element_name = g_strdup_printf("subflow-nicesink-%hhu", subflow_id);
+    subflow->nicesink = nicesink = gst_element_factory_make("nicesink", element_name);
+    g_free(element_name);
+    element_name = g_strdup_printf("subflow-nicesrc-%hhu", subflow_id);
+    subflow->nicesrc = nicesrc = gst_element_factory_make("nicesrc", element_name);
+    g_free(element_name);
+
+    if (!gst_bin_add(GST_BIN(transport_agent->priv->transport_bin), subflow_bin)) {
+      GST_ERROR("Failed to add subflow_bin-%hhu to parent bin", subflow_id);
+      return;
+    }
+    if (!gst_element_sync_state_with_parent(subflow_bin)) {
+      GST_ERROR("Failed to sync subflow_bin-%hhu to parent bin", subflow_id);
+      return;
+    }
+    gst_bin_add_many(GST_BIN(subflow_bin), nicesrc, nicesink, NULL);
+
+    g_object_set (nicesink, "agent", sink_agent, "stream", sink_stream,
+        "component", NICE_COMPONENT_TYPE_RTP, NULL);
+    g_object_set (nicesrc, "agent", src_agent, "stream", src_stream,
+        "component", NICE_COMPONENT_TYPE_RTP, NULL);
+
+    g_object_set(nicesink, "enable-last-sample", FALSE, "async", FALSE, NULL);
+
+    synced_ok = gst_element_sync_state_with_parent(nicesink);
+    g_warn_if_fail(synced_ok);
+    synced_ok = gst_element_sync_state_with_parent(nicesrc);
+    g_warn_if_fail(synced_ok);
+
+    padname = g_strdup_printf("sink_%hhu", subflow_id);
+    gst_element_link_pads(nicesrc, "src", priv->mprtp_rcv, padname);
+    g_free(padname);
+    padname = g_strdup_printf("src_%hhu", subflow_id);
+    gst_element_link_pads(priv->mprtp_snd, padname, nicesink, "sink");
+    g_free(padname);
+
+    g_object_set(priv->mprtp_sch, "join-subflow", subflow_id, NULL);
+    g_object_set(priv->mprtp_ply, "join-subflow", subflow_id, NULL);
+
+    g_hash_table_insert(transport_agent->priv->mprtp_subflows,
+                           GINT_TO_POINTER(subflow_id), subflow);
+
+}
+
+
 
 void owr_transport_agent_add_local_address(OwrTransportAgent *transport_agent, const gchar *local_address)
 {
@@ -1075,6 +1250,35 @@ static GstElement *add_nice_element(OwrTransportAgent *transport_agent, guint st
     return nice_element;
 }
 
+//
+//static GstElement *add_external_nice_element(OwrTransportAgent *transport_agent, guint stream_id,
+//    gboolean is_sink, GstElement *bin, NiceAgent *agent, gint external_id)
+//{
+//    GstElement *nice_element = NULL;
+//    gchar *element_name;
+//    gboolean added_ok;
+//
+//    g_return_val_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent), NULL);
+//
+//    element_name = g_strdup_printf("nice-rtp-%s-%u", is_sink
+//        ? "sink" : "src", stream_id + external_id);
+//    nice_element = gst_element_factory_make(is_sink ? "nicesink" : "nicesrc", element_name);
+//    g_free(element_name);
+//
+//    g_object_set(nice_element, "agent", agent,
+//        "stream", stream_id + external_id,
+//        "component", NICE_COMPONENT_TYPE_RTP, NULL);
+//
+//    if (is_sink) {
+//        g_object_set(nice_element, "enable-last-sample", FALSE, "async", FALSE, NULL);
+//    }
+//
+//    added_ok = gst_bin_add(GST_BIN(bin), nice_element);
+//    g_warn_if_fail(added_ok);
+//
+//    return nice_element;
+//}
+
 static void set_srtp_key(OwrMediaSession *media_session, GParamSpec *pspec,
     GstElement *dtls_srtp_bin)
 {
@@ -1249,6 +1453,53 @@ static GstElement *add_mprtp_plaoyouter_element(OwrTransportAgent *transport_age
 }
 
 
+static GstElement *add_mprtp_receiver_element(OwrTransportAgent *transport_agent, guint stream_id,
+    GstElement *bin)
+{
+    GstElement *mprtp_rcv = NULL;
+    gchar *element_name;
+    gboolean added_ok;
+
+    g_return_val_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent), NULL);
+
+    element_name = g_strdup_printf("mprtp_rcv_%d", stream_id);
+
+    mprtp_rcv = gst_element_factory_make("mprtpreceiver", element_name);
+
+    added_ok = gst_bin_add(GST_BIN(bin), mprtp_rcv);
+    g_warn_if_fail(added_ok);
+
+    g_free(element_name);
+
+    return mprtp_rcv;
+}
+
+
+
+static GstElement *add_mprtp_sender_element(OwrTransportAgent *transport_agent, guint stream_id,
+    GstElement *bin)
+{
+    GstElement *mprtp_snd = NULL;
+    gchar *element_name;
+    gboolean added_ok;
+
+    g_return_val_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent), NULL);
+
+    element_name = g_strdup_printf("mprtp_snd_%d", stream_id);
+
+    mprtp_snd = gst_element_factory_make("mprtpsender", element_name);
+
+    added_ok = gst_bin_add(GST_BIN(bin), mprtp_snd);
+    g_warn_if_fail(added_ok);
+
+    g_free(element_name);
+
+    return mprtp_snd;
+}
+
+
+
+
 static GstPad *ghost_pad_and_add_to_bin(GstPad *pad, GstElement *bin, const gchar *pad_name)
 {
     GstPad *ghost_pad;
@@ -1300,7 +1551,7 @@ static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, g
 
     send_bin_info = g_hash_table_lookup(transport_agent->priv->send_bins, GINT_TO_POINTER(stream_id));
     g_return_if_fail(send_bin_info);
-    mprtp_sch = send_bin_info->mprtp_sch;
+    mprtp_sch = transport_agent->priv->mprtp_sch;
     dtls_srtp_bin_rtp = send_bin_info->dtls_srtp_bin_rtp;
     dtls_srtp_bin_rtcp = send_bin_info->dtls_srtp_bin_rtcp;
     send_output_bin = send_bin_info->send_output_bin;
@@ -1388,6 +1639,7 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
     gboolean linked_ok, synced_ok;
     GstElement *send_output_bin;
     GstElement *mprtp_sch;
+    GstElement *mprtp_snd;
     SendBinInfo *send_bin_info;
     gchar *bin_name, *dtls_srtp_pad_name;
 
@@ -1395,6 +1647,7 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
 
     bin_name = g_strdup_printf("send-output-bin-%u", stream_id);
     send_output_bin = gst_bin_new(bin_name);
+
     g_free(bin_name);
 
     if (!gst_bin_add(GST_BIN(transport_agent->priv->transport_bin), send_output_bin)) {
@@ -1406,7 +1659,9 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
         return;
     }
 
+
     nice_element = add_nice_element(transport_agent, stream_id, TRUE, FALSE, send_output_bin);
+    mprtp_snd = add_mprtp_sender_element(transport_agent, stream_id, send_output_bin);
     dtls_srtp_bin_rtp = add_dtls_srtp_bin(transport_agent, stream_id, TRUE, FALSE, send_output_bin);
     mprtp_sch = add_mprtp_scheduler_element(transport_agent, stream_id, send_output_bin);
     dtls_srtp_pad_name = g_strdup_printf("rtp_sink_%u", stream_id);
@@ -1416,8 +1671,15 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
     g_free(dtls_srtp_pad_name);
 
     g_warn_if_fail(linked_ok);
-    linked_ok = gst_element_link(dtls_srtp_bin_rtp, nice_element);
+    //linked_ok = gst_element_link(dtls_srtp_bin_rtp, nice_element);
+    linked_ok = gst_element_link_pads(dtls_srtp_bin_rtp, "src", mprtp_snd, "mprtp_sink");
     g_warn_if_fail(linked_ok);
+    linked_ok = gst_element_link_pads(mprtp_snd, "src_1", nice_element, "sink");
+    g_warn_if_fail(linked_ok);
+    synced_ok = gst_element_sync_state_with_parent(mprtp_snd);
+    g_warn_if_fail(synced_ok);
+    synced_ok = gst_element_sync_state_with_parent(mprtp_sch);
+    g_warn_if_fail(synced_ok);
     synced_ok = gst_element_sync_state_with_parent(nice_element);
     g_warn_if_fail(synced_ok);
     synced_ok = gst_element_sync_state_with_parent(dtls_srtp_bin_rtp);
@@ -1435,13 +1697,16 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
     }
 
     send_bin_info = g_new(SendBinInfo, 1);
-    send_bin_info->mprtp_sch = mprtp_sch;
     send_bin_info->dtls_srtp_bin_rtp = dtls_srtp_bin_rtp;
     send_bin_info->dtls_srtp_bin_rtcp = dtls_srtp_bin_rtcp;
     send_bin_info->send_output_bin = send_output_bin;
     send_bin_info->linked_rtcp = FALSE;
 
+    transport_agent->priv->mprtp_sch = mprtp_sch;
+    transport_agent->priv->mprtp_snd = mprtp_snd;
+
     g_hash_table_insert(transport_agent->priv->send_bins, GINT_TO_POINTER(stream_id), send_bin_info);
+
 }
 
 /* #define TEST_RTX 1 */
@@ -1450,10 +1715,12 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
 {
     GstElement *nice_element, *dtls_srtp_bin, *funnel;
     GstElement *mprtp_ply;
+    GstElement *mprtp_rcv;
     GstPad *rtp_src_pad, *rtcp_src_pad;
     gchar *rtpbin_pad_name;
     gboolean linked_ok, synced_ok;
     GstElement *receive_input_bin;
+
 #ifdef TEST_RTX
     GstElement *identity;
 #endif
@@ -1474,10 +1741,13 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
         return;
     }
 
+    mprtp_rcv = add_mprtp_receiver_element(transport_agent, stream_id, receive_input_bin);
     nice_element = add_nice_element(transport_agent, stream_id, FALSE, FALSE, receive_input_bin);
     dtls_srtp_bin = add_dtls_srtp_bin(transport_agent, stream_id, FALSE, FALSE, receive_input_bin);
     mprtp_ply = add_mprtp_plaoyouter_element(transport_agent, stream_id, receive_input_bin);
 
+    transport_agent->priv->mprtp_rcv = mprtp_rcv;
+    transport_agent->priv->mprtp_ply = mprtp_ply;
     //rtp_src_pad = gst_element_get_static_pad(dtls_srtp_bin, "rtp_src");
     gst_element_link_pads(dtls_srtp_bin, "rtp_src", mprtp_ply, "mprtp_sink");
     rtp_src_pad = gst_element_get_static_pad(mprtp_ply, "mprtp_src");
@@ -1502,7 +1772,10 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
 
     synced_ok = gst_element_sync_state_with_parent(dtls_srtp_bin);
     g_warn_if_fail(synced_ok);
-    linked_ok = gst_element_link(nice_element, dtls_srtp_bin);
+//    linked_ok = gst_element_link(nice_element, dtls_srtp_bin);
+    linked_ok = gst_element_link_pads(nice_element, "src", mprtp_rcv, "sink_1");
+    g_warn_if_fail(linked_ok);
+    linked_ok = gst_element_link_pads(mprtp_rcv, "mprtp_src", dtls_srtp_bin, "sink");
     g_warn_if_fail(linked_ok);
     synced_ok = gst_element_sync_state_with_parent(nice_element);
     g_warn_if_fail(synced_ok);
@@ -1523,7 +1796,7 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
         rtcp_src_pad = gst_element_get_static_pad(funnel, "src");
         ghost_pad_and_add_to_bin(rtcp_src_pad, receive_input_bin, "rtcp_src");
         gst_object_unref(rtcp_src_pad);
-//mprtpplayouter
+
         rtpbin_pad_name = g_strdup_printf("recv_rtcp_sink_%u", stream_id);
         linked_ok = gst_element_link_pads(receive_input_bin, "rtcp_src",
             transport_agent->priv->rtpbin, rtpbin_pad_name);

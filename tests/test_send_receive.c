@@ -182,10 +182,16 @@ static void got_sources(GList *sources, gpointer user_data)
     }
 }
 
+static gboolean added = FALSE;
 static gboolean dump_cb(gpointer *user_data)
 {
     g_print("Dumping send transport agent pipeline!\n");
 
+    if(!added){
+        owr_transport_agent_join_subflow(recv_transport_agent, 2, "127.0.0.2");
+        owr_transport_agent_join_subflow(send_transport_agent, 2, "127.0.0.2");
+        added = TRUE;
+    }
     if (video_source)
         write_dot_file("test_send-got_source-video-source", owr_media_source_get_dot_data(video_source), TRUE);
     if (video_renderer)
@@ -294,6 +300,7 @@ int main(int argc, char **argv)
     owr_transport_agent_set_local_port_range(send_transport_agent, 5000, 5999);
     owr_transport_agent_add_local_address(send_transport_agent, "127.0.0.1");
 
+
     if (!disable_video) {
         recv_session_video = owr_media_session_new(FALSE);
         owr_bus_add_message_origin(bus, OWR_MESSAGE_ORIGIN(recv_session_video));
@@ -344,6 +351,7 @@ int main(int argc, char **argv)
         got_sources, NULL);
 
     g_timeout_add_seconds(10, (GSourceFunc)dump_cb, NULL);
+
 
     owr_run();
 
