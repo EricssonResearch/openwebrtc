@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -30,8 +32,8 @@
 #ifndef _OWR_WINDOW_REGISTRY_PRIVATE_H_
 #define _OWR_WINDOW_REGISTRY_PRIVATE_H_
 
-#include "owr_window_registry.h"
 #include "owr_video_renderer.h"
+#include "owr_window_registry.h"
 
 G_BEGIN_DECLS
 

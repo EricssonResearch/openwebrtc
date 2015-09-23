@@ -1,5 +1,5 @@
 """
-  Copyright (c) 2014, Ericsson AB. All rights reserved.
+  Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
 
   Redistribution and use in source and binary forms, with or without modification,
   are permitted provided that the following conditions are met:
@@ -23,20 +23,28 @@
   OF SUCH DAMAGE.
 """
 
-def symbols_to_source(infile_name, outfile_name):
+
+def symbols_to_source(infile_name, outfile_name, platform):
     with open(infile_name) as infile, open(outfile_name, "w") as outfile:
-        symbols = [line.strip() for line in infile]
+        symbols = []
+        for line in infile:
+            split = line.split(' if ')
+            if not split[1:] or platform in [p.strip() for p in split[1].split(' or ')]:
+                symbols.append(split[0].strip())
+        outfile.write("#include <stdlib.h>\n")
+        outfile.write("#include <stdint.h>\n")
         outfile.writelines(["extern void *%s;\n" % symbol for symbol in symbols])
-        outfile.write("\nvoid _%s()\n{\n" % outfile_name.split(".")[0])
-        outfile.write("    void *symbols[%i];\n    " % len(symbols))
-        lines = ["symbols[%i] = %s" % (i, symbol) for i, symbol in enumerate(symbols)]
+        outfile.write("\nvoid *_%s(void)\n{\n    " % outfile_name.split(".")[0])
+        outfile.write("uintptr_t ret = 0;\n    ")
+        lines = ["ret |= (uintptr_t) %s" % symbol for symbol in symbols]
         outfile.writelines(";\n    ".join(lines))
-        outfile.write(";\n    (void)symbols;\n}\n\n")
+        outfile.write(";\n    ")
+        outfile.write("return (void *) ret;\n}\n\n")
 
 
 if __name__ == "__main__":
     import sys
-    if (len(sys.argv) < 3):
-        print "Usage: %s <infile> <outfile>" % sys.argv[0]
+    if (len(sys.argv) < 4):
+        print "Usage: %s <infile> <outfile> <platform>" % sys.argv[0]
         exit(1)
-    symbols_to_source(sys.argv[1], sys.argv[2])
+    symbols_to_source(sys.argv[1], sys.argv[2], sys.argv[3])

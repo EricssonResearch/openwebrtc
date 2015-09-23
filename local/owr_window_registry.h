@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -52,16 +54,14 @@ typedef struct _OwrWindowRegistry        OwrWindowRegistry;
 typedef struct _OwrWindowRegistryClass   OwrWindowRegistryClass;
 typedef struct _OwrWindowRegistryPrivate OwrWindowRegistryPrivate;
 
-struct _OwrWindowRegistry
-{
+struct _OwrWindowRegistry {
     GObject parent_instance;
 
     /*< private >*/
     OwrWindowRegistryPrivate *priv;
 };
 
-struct _OwrWindowRegistryClass
-{
+struct _OwrWindowRegistryClass {
     GObjectClass parent_class;
 };
 

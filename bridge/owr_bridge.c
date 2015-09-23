@@ -1,5 +1,7 @@
 /*
- * Copyright (C) 2014 Ericsson AB. All rights reserved.
+ * Copyright (C) 2014-2015 Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -42,7 +44,7 @@
 #include "worker/peerhandler.js.h"
 
 #ifdef OWR_STATIC
-#include "Owr-0.1.gir.h"
+#include OWR_GIR_FILE
 #include <gir/GIRepository-2.0.gir.h>
 #include <gir/GLib-2.0.gir.h>
 #include <gir/GObject-2.0.gir.h>
@@ -230,7 +232,7 @@ static void load_typelibs()
         GObject_2_0_gir_sha1,
         Gio_2_0_gir_sha1,
         GIRepository_2_0_gir_sha1,
-        Owr_0_1_gir_sha1,
+        G_PASTE(OWR_GIR_VAR_PREFIX, _gir_sha1),
         NULL
     };
     guint gir_checksum_lengths[G_N_ELEMENTS(gir_checksums)];
@@ -240,7 +242,7 @@ static void load_typelibs()
         GObject_2_0_gir,
         Gio_2_0_gir,
         GIRepository_2_0_gir,
-        Owr_0_1_gir,
+        G_PASTE(OWR_GIR_VAR_PREFIX, _gir),
         NULL
     };
     guint gir_lengths[G_N_ELEMENTS(girs)];
@@ -249,14 +251,14 @@ static void load_typelibs()
     gir_checksum_lengths[1] = GObject_2_0_gir_sha1_len,
     gir_checksum_lengths[2] = Gio_2_0_gir_sha1_len,
     gir_checksum_lengths[3] = GIRepository_2_0_gir_sha1_len,
-    gir_checksum_lengths[4] = Owr_0_1_gir_sha1_len,
+    gir_checksum_lengths[4] = G_PASTE(OWR_GIR_VAR_PREFIX, _gir_sha1_len),
     gir_checksum_lengths[5] = 0;
 
     gir_lengths[0] = GLib_2_0_gir_len;
     gir_lengths[1] = GObject_2_0_gir_len,
     gir_lengths[2] = Gio_2_0_gir_len,
     gir_lengths[3] = GIRepository_2_0_gir_len,
-    gir_lengths[4] = Owr_0_1_gir_len,
+    gir_lengths[4] = G_PASTE(OWR_GIR_VAR_PREFIX, _gir_len),
     gir_lengths[5] = 0;
 
     for (i = 0; gir_checksums[i]; i++)
@@ -312,7 +314,6 @@ static gboolean bridge_ready_callback(GAsyncQueue *msg_queue)
 
 static gpointer run(GAsyncQueue *msg_queue)
 {
-    GMainLoop *main_loop;
     SeedEngine *engine;
     SeedGlobalContext worker_context;
     SeedException exception;
@@ -385,7 +386,7 @@ static gpointer run(GAsyncQueue *msg_queue)
     load_typelibs();
 #endif
 
-    owr_init_with_main_context(g_main_context_default());
+    owr_init(NULL);
     engine = seed_init(&argc, &argv);
     seed_engine_set_search_path(engine, "");
     worker_context = seed_context_create(engine->group, NULL);
@@ -418,9 +419,7 @@ static gpointer run(GAsyncQueue *msg_queue)
     if (msg_queue)
         g_idle_add((GSourceFunc)bridge_ready_callback, msg_queue);
 
-    main_loop = g_main_loop_new(g_main_context_default(), FALSE);
-    g_main_loop_run(main_loop);
-    g_main_loop_unref(main_loop);
+    owr_run();
 
     seed_context_unref(worker_context);
 

@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -28,6 +30,8 @@
 
 #include "owr_session.h"
 
+#include "owr_types.h"
+
 #ifndef __GTK_DOC_IGNORE__
 
 G_BEGIN_DECLS
@@ -36,9 +40,13 @@ GSList * _owr_session_get_remote_candidates(OwrSession *session);
 GSList * _owr_session_get_forced_remote_candidates(OwrSession *session);
 
 void _owr_session_set_on_remote_candidate(OwrSession *session, GClosure *on_remote_candidate);
+void _owr_session_set_on_local_candidate_change(OwrSession *session, GClosure *on_local_candidate_change);
 void _owr_session_clear_closures(OwrSession *session);
 
 void _owr_session_set_dtls_peer_certificate(OwrSession *, const gchar *certificate);
+
+void _owr_session_emit_ice_state_changed(OwrSession *session, guint session_id,
+	OwrComponentType component_type, OwrIceState state);
 
 G_END_DECLS
 

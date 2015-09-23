@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2014 Ericsson AB. All rights reserved.
+ * Copyright (C) 2014-2015 Ericsson AB. All rights reserved.
+ * Copyright (C) 2015 Collabora Ltd.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,34 +29,44 @@
 "use strict";
 
 function PeerHandler(configuration, client, jsonRpc) {
-
     var transportAgent;
-    var mediaSessions = [];
-    var numberOfReceivePreparedMediaSessions = 0;
-    var numberOfSendPreparedMediaSessions = 0;
+    var sessions = [];
+    var numberOfReceivePreparedSessions = 0;
+    var numberOfSendPreparedSessions = 0;
+    var remoteSources = [];
+    var dataSession;
+    var nextDataChannelId;
 
     this.prepareToReceive = function (localSessionInfo, isInitiator) {
-        var dtlsRoles = [];
-        for (var i = mediaSessions.length; i < localSessionInfo.mediaDescriptions.length; i++)
-            dtlsRoles.push(localSessionInfo.mediaDescriptions[i].dtls.mode);
+        var i;
+        var sessionConfigs = [];
+        for (i = sessions.length; i < localSessionInfo.mediaDescriptions.length; i++) {
+            var lmdesc = localSessionInfo.mediaDescriptions[i];
+            var sessionConfig = {
+                "dtlsRole": lmdesc.dtls.setup,
+                "type": lmdesc.type == "application" ? "data" : "media"
+            };
 
-        ensureTransportAgentAndMediaSessions(isInitiator, dtlsRoles);
+            sessionConfigs.push(sessionConfig);
+        }
 
-        for (var i = numberOfReceivePreparedMediaSessions; i < mediaSessions.length; i++)
-            prepareMediaSession(mediaSessions[i], localSessionInfo.mediaDescriptions[i]);
+        ensureTransportAgentAndSessions(isInitiator, sessionConfigs);
 
-        numberOfReceivePreparedMediaSessions = mediaSessions.length;
+        for (i = numberOfReceivePreparedSessions; i < sessions.length; i++) {
+            var lmdesc = localSessionInfo.mediaDescriptions[i];
+            if (lmdesc.type == "application")
+                prepareDataSession(sessions[i], lmdesc);
+            else
+                prepareMediaSession(sessions[i], lmdesc);
 
-        function prepareMediaSession(mediaSession, mdesc) {
-            mediaSession.rtcp_mux = !isInitiator && !!(mdesc.rtcp && mdesc.rtcp.mux);
+            transportAgent.add_session(sessions[i]);
+        }
 
-            mediaSession.signal.connect("notify::send-ssrc", function () {
-                var mdescIndex = localSessionInfo.mediaDescriptions.indexOf(mdesc);
-                client.gotSendSSRC(mdescIndex, mediaSession.send_ssrc, mediaSession.cname);
-            });
+        numberOfReceivePreparedSessions = sessions.length;
 
-            mediaSession.signal.connect("notify::dtls-certificate", function () {
-                var der = atob(mediaSession.dtls_certificate.split(/\r?\n/).slice(1, -2).join(""));
+        function prepareSession(session, mdesc) {
+            session.signal.connect("notify::dtls-certificate", function () {
+                var der = atob(session.dtls_certificate.split(/\r?\n/).slice(1, -2).join(""));
                 var buf = new ArrayBuffer(der.length);
                 var bufView = new Uint8Array(buf);
                 for (var i = 0; i < der.length; i++)
@@ -79,7 +90,7 @@ function PeerHandler(configuration, client, jsonRpc) {
                 });
             });
 
-            mediaSession.signal.on_new_candidate.connect(function (m, candidate) {
+            session.signal.on_new_candidate.connect(function (m, candidate) {
                 var cand = {
                     "type": ["host", "srflx", "prflx", "relay"][candidate.type],
                     "foundation": candidate.foundation,
@@ -96,21 +107,68 @@ function PeerHandler(configuration, client, jsonRpc) {
                     cand.relatedPort = candidate.base_port || 9;
                 }
 
+                if (mdesc.ice && mdesc.ice.ufrag && mdesc.ice.password) {
+                    candidate.ufrag = mdesc.ice.ufrag;
+                    candidate.password = mdesc.ice.password;
+                }
+
                 var mdescIndex = localSessionInfo.mediaDescriptions.indexOf(mdesc);
                 client.gotIceCandidate(mdescIndex, cand, candidate.ufrag, candidate.password);
             });
 
-            mediaSession.signal.on_candidate_gathering_done.connect(function () {
+            session.signal.on_candidate_gathering_done.connect(function () {
                 var mdescIndex = localSessionInfo.mediaDescriptions.indexOf(mdesc);
                 client.candidateGatheringDone(mdescIndex);
             });
 
+        }
+
+        function prepareDataSession(dataSession, mdesc) {
+            prepareSession(dataSession, mdesc);
+            dataSession.sctp_local_port = mdesc.sctp.port;
+
+            dataSession.signal.on_data_channel_requested.connect(function (d,
+                ordered, maxPacketLifeTime, maxRetransmits, protocol, negotiated, id, label) {
+                var settings = {
+                    "ordered": ordered,
+                    "maxPacketLifeTime": maxPacketLifeTime != -1 ? maxPacketLifeTime : null,
+                    "maxRetransmits": maxRetransmits != -1 ? maxRetransmits : null,
+                    "protocol": protocol,
+                    "negotiated": negotiated,
+                    "id": id,
+                    "label": label
+                };
+
+                client.dataChannelRequested(settings);
+            });
+
+            client.dataChannelsEnabled();
+        }
+
+        function prepareMediaSession(mediaSession, mdesc) {
+            prepareSession(mediaSession, mdesc);
+            mediaSession.rtcp_mux = !isInitiator && !!(mdesc.rtcp && mdesc.rtcp.mux);
+
+            if (mdesc.cname && mdesc.ssrcs && mdesc.ssrcs.length) {
+                mediaSession.cname = mdesc.cname;
+                mediaSession.send_ssrc = mdesc.ssrcs[0];
+            }
+
+            mediaSession.signal.connect("notify::send-ssrc", function () {
+                var mdescIndex = localSessionInfo.mediaDescriptions.indexOf(mdesc);
+                client.gotSendSSRC(mdescIndex, mediaSession.send_ssrc, mediaSession.cname);
+            });
+
             mediaSession.signal.on_incoming_source.connect(function (m, remoteSource) {
                 var mdescIndex = localSessionInfo.mediaDescriptions.indexOf(mdesc);
+                remoteSources[mdescIndex] = remoteSource;
                 client.gotRemoteSource(mdescIndex, jsonRpc.createObjectRef(remoteSource));
             });
 
             mdesc.payloads.forEach(function (payload) {
+                if (payload.encodingName.toUpperCase() == "RTX")
+                    return;
+                var rtxPayload = findRtxPayload(mdesc.payloads, payload.type);
                 var receivePayload = (mdesc.type == "audio") ?
                     new owr.AudioPayload({
                         "payload_type": payload.type,
@@ -123,79 +181,129 @@ function PeerHandler(configuration, client, jsonRpc) {
                         "codec_type": owr.CodecType[payload.encodingName.toUpperCase()],
                         "clock_rate": payload.clockRate,
                         "ccm_fir": payload.ccmfir,
-                        "nack_pli": payload.nackpli
+                        "nack_pli": payload.nackpli,
+                        "rtx_payload_type": rtxPayload ? rtxPayload.type : -1,
+                        "rtx_time": rtxPayload && rtxPayload.parameters.rtxTime || 0
                     });
                 mediaSession.add_receive_payload(receivePayload);
             });
-
-            transportAgent.add_session(mediaSession);
         }
     };
 
     this.prepareToSend = function (remoteSessionInfo, isInitiator) {
         var i;
-        var dtlsRoles = [];
-        for (i = mediaSessions.length; i < remoteSessionInfo.mediaDescriptions.length; i++) {
-            var ourRole = remoteSessionInfo.mediaDescriptions[i].dtls.mode == "active" ?
-                "passive" : "active";
-            dtlsRoles.push(ourRole);
+        var sessionConfigs = [];
+        for (var i = sessions.length; i < remoteSessionInfo.mediaDescriptions.length; i++) {
+            var rmdesc = remoteSessionInfo.mediaDescriptions[i];
+            var sessionConfig = {
+                "dtlsRole": rmdesc.dtls.setup == "active" ? "passive" : "active",
+                "type": rmdesc.type == "application" ? "data" : "media"
+            };
+            sessionConfigs.push(sessionConfig);
         }
 
-        ensureTransportAgentAndMediaSessions(isInitiator, dtlsRoles);
+        ensureTransportAgentAndSessions(isInitiator, sessionConfigs);
 
-        for (i = 0; i < mediaSessions.length; i++) {
-            var mediaSession = mediaSessions[i];
+        for (i = 0; i < sessions.length; i++) {
+            var session = sessions[i];
             var mdesc = remoteSessionInfo.mediaDescriptions[i];
             if (!mdesc)
                 continue;
 
-            mediaSession.rtcp_mux = !!(mdesc.rtcp && mdesc.rtcp.mux);
+            if (mdesc.type == "audio" || mdesc.type == "video")
+                session.rtcp_mux = !!(mdesc.rtcp && mdesc.rtcp.mux);
 
             if (mdesc.ice && mdesc.ice.candidates) {
                 mdesc.ice.candidates.forEach(function (candidate) {
-                    internalAddRemoteCandidate(mediaSession, candidate,
+                    internalAddRemoteCandidate(session, candidate,
                         mdesc.ice.ufrag, mdesc.ice.password);
                 });
             }
 
-            if (!mdesc.source || i < numberOfSendPreparedMediaSessions)
+            if (i < numberOfSendPreparedSessions)
                 continue;
 
+            if (mdesc.type == "application") {
+                session.sctp_remote_port = mdesc.sctp.port;
+                numberOfSendPreparedSessions = i + 1;
+                continue;
+            }
+
+            var payload;
+            mdesc.payloads.some(function (p) {
+                if (p.encodingName.toUpperCase() != "RTX") {
+                    payload = p;
+                    return true;
+                }
+            });
+
+            if (!mdesc.source || !payload)
+                continue;
+
+            var rtxPayload = findRtxPayload(mdesc.payloads, payload.type);
             var sendPayload = (mdesc.type == "audio") ?
                 new owr.AudioPayload({
-                    "payload_type": mdesc.payloads[0].type,
-                    "codec_type": owr.CodecType[mdesc.payloads[0].encodingName.toUpperCase()],
-                    "clock_rate": mdesc.payloads[0].clockRate,
-                    "channels": mdesc.payloads[0].channels
+                    "payload_type": payload.type,
+                    "codec_type": owr.CodecType[payload.encodingName.toUpperCase()],
+                    "clock_rate": payload.clockRate,
+                    "channels": payload.channels
                 }) :
                 new owr.VideoPayload({
-                    "payload_type": mdesc.payloads[0].type,
-                    "codec_type": owr.CodecType[mdesc.payloads[0].encodingName.toUpperCase()],
-                    "clock_rate": mdesc.payloads[0].clockRate,
-                    "ccm_fir": !!mdesc.payloads[0].ccmfir,
-                    "nack_pli": !!mdesc.payloads[0].nackpli
+                    "payload_type": payload.type,
+                    "codec_type": owr.CodecType[payload.encodingName.toUpperCase()],
+                    "clock_rate": payload.clockRate,
+                    "ccm_fir": !!payload.ccmfir,
+                    "nack_pli": !!payload.nackpli,
+                    "rtx_payload_type": rtxPayload ? rtxPayload.type : -1,
+                    "rtx_time": rtxPayload && rtxPayload.parameters.rtxTime || 0
                 });
-            mediaSession.set_send_payload(sendPayload);
-            mediaSession.set_send_source(mdesc.source);
-            numberOfSendPreparedMediaSessions = i + 1;
+            session.set_send_payload(sendPayload);
+            session.set_send_source(mdesc.source);
+            numberOfSendPreparedSessions = i + 1;
         }
     }
 
-    this.addRemoteCandidate = function (candidate, mediaSessionIndex, ufrag, password) {
-        internalAddRemoteCandidate(mediaSessions[mediaSessionIndex], candidate, ufrag, password);
+    this.addRemoteCandidate = function (candidate, sessionIndex, ufrag, password) {
+        internalAddRemoteCandidate(sessions[sessionIndex], candidate, ufrag, password);
     };
 
     this.stop = function () {
-        console.log("PeerHandler.stop() called (not implemented)");
+        var i;
+        for (i = 0; i < remoteSources.length; i++) {
+            if (remoteSources[i]) {
+                jsonRpc.removeObjectRef(remoteSources[i]);
+                delete remoteSources[i];
+            }
+        }
+        remoteSources = null;
+        for (i = 0; i < sessions.length; i++) {
+            if (sessions[i].set_send_source)
+                sessions[i].set_send_source(null);
+            delete sessions[i];
+        }
+        sessions = null;
+        transportAgent = null;
     };
 
-    function internalAddRemoteCandidate(mediaSession, candidate, ufrag, password) {
-        if (mediaSession.rtcp_mux && candidate.componentId == owr.ComponentType.RTCP)
+    function findRtxPayload(payloads, apt) {
+        var rtxPayload;
+        payloads.some(function (payload) {
+            if (payload.encodingName.toUpperCase() == "RTX"
+                && payload.parameters && payload.parameters.apt == apt) {
+                rtxPayload = payload;
+                return true;
+            }
+        });
+        return rtxPayload;
+    }
+
+    function internalAddRemoteCandidate(session, candidate, ufrag, password) {
+        if (session.rtcp_mux && candidate.componentId == owr.ComponentType.RTCP)
             return;
 
         var transportType = candidate.tcpType ?
             owr.TransportType["TCP_" + candidate.tcpType.toUpperCase()] : owr.TransportType.UDP;
-        mediaSession.add_remote_candidate(new owr.Candidate({
+        session.add_remote_candidate(new owr.Candidate({
             "type": ["host", "srflx", "prflx", "relay"].indexOf(candidate.type),
             "component_type": candidate.componentId,
             "transport_type": transportType,
@@ -210,7 +318,7 @@ function PeerHandler(configuration, client, jsonRpc) {
         }));
     }
 
-    function ensureTransportAgentAndMediaSessions(isInitiator, newMediaSessionsDtlsRoles) {
+    function ensureTransportAgentAndSessions(isInitiator, sessionConfigs) {
         if (!transportAgent) {
             transportAgent = new owr.TransportAgent();
 
@@ -244,12 +352,86 @@ function PeerHandler(configuration, client, jsonRpc) {
         }
         transportAgent.ice_controlling_mode = isInitiator;
 
-        newMediaSessionsDtlsRoles.forEach(function (role) {
-            var mediaSession = new owr.MediaSession({
-                "rtcp_mux": false,
-                "dtls_client_mode": role == "active"
-            });
-            mediaSessions.push(mediaSession);
+        sessionConfigs.forEach(function (config) {
+            if (config.type == "data") {
+                dataSession = new owr.DataSession({
+                    "dtls_client_mode": config.dtlsRole == "active",
+                    "use_sock_stream": true
+                });
+                sessions.push(dataSession);
+            } else {
+                sessions.push(new owr.MediaSession({
+                    "rtcp_mux": false,
+                    "dtls_client_mode": config.dtlsRole == "active"
+                }));
+            }
         });
     }
+
+    this.createDataChannel = function (settings, client) {
+        if (!settings.negotiated && settings.id == 65535) {
+            if (!nextDataChannelId)
+                nextDataChannelId = +!dataSession.dtls_client_mode; // client uses even ids
+            settings.id = nextDataChannelId;
+            nextDataChannelId += 2;
+        }
+
+        if (settings.maxPacketLifeTime == null)
+            settings.maxPacketLifeTime = -1;
+        if (settings.maxRetransmits == null)
+            settings.maxRetransmits = -1;
+
+        var internalDataChannel = new InternalDataChannel(settings, dataSession, client);
+        return {
+            "channel": createInternalDataChannelRef(internalDataChannel, jsonRpc),
+            "id": settings.id
+        };
+    };
+}
+
+function createInternalDataChannelRef(internalDataChannel, jsonRpc) {
+    var exports = [ "send", "sendBinary", "close" ];
+    exports.forEach(function (name) {
+        jsonRpc.exportFunctions(internalDataChannel[name]);
+    });
+    return jsonRpc.createObjectRef(internalDataChannel, exports)
+}
+
+function InternalDataChannel(settings, dataSession, client) {
+    var dataChannelReadyStateNames = [ "connecting", "open", "closing", "closed" ];
+
+    var channel = new owr.DataChannel({
+        "ordered": settings.ordered,
+        "max_packet_life_time": settings.maxPacketLifeTime,
+        "max_retransmits": settings.maxRetransmits,
+        "protocol": settings.protocol,
+        "negotiated": settings.negotiated,
+        "id": settings.id,
+        "label": settings.label
+    });
+
+    channel.signal.connect("notify::ready-state", function (ch) {
+        client.readyStateChanged(dataChannelReadyStateNames[ch.ready_state]);
+    });
+
+    channel.signal.on_data.connect(function (ch, data) {
+        client.gotData(data);
+    });
+
+    dataSession.add_data_channel(channel);
+
+    this.send = function (data) {
+        channel.send(data);
+        client.setBufferedAmount(channel.buffered_amount);
+    };
+
+    this.sendBinary = function (data) {
+        var buf = Array.prototype.slice.call(new Uint8Array(data));
+        channel.send_binary(buf, buf.length);
+        client.setBufferedAmount(channel.buffered_amount);
+    };
+
+    this.close = function () {
+        channel.close();
+    };
 }

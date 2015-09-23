@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Ericsson AB. All rights reserved.
+ * Copyright (C) 2014-2015 Ericsson AB. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -150,9 +150,7 @@ function WebSocket() {
     function receiveFrame(frameCallback, closeFrameCallback, closeCallback) {
         var minHeaderLen = 2;
         // read minimal header
-        var results = [];
         inputStream.fill_async(minHeaderLen, prio, null, function (is, result) {
-            results.push(result);
             if (!connection.is_connected()) {
                 if (readyState != state.CLOSED)
                     print("websocket: unexpected state (connection is closed)");
@@ -189,7 +187,6 @@ function WebSocket() {
 
             function readExtendedHeader() {
                 inputStream.fill_async(extraHeaderLen, prio, null, function (is, result) {
-                    results.push(result);
                     var fillSize = inputStream.fill_finish(result);
                     if (fillSize < extraHeaderLen)
                         return closeCallback();
@@ -216,19 +213,18 @@ function WebSocket() {
                     if (inputStream.buffer_size < payloadLen)
                         print("Warning: buffer too small to receive frame");
                 }
-                var results = [];
                 inputStream.fill_async(payloadLen, prio, null, function (is, result) {
-                    results.push(result);
                     var fillSize = inputStream.fill_finish(result);
                     if (fillSize < payloadLen)
                         return closeCallback();
 
+                    var i;
                     var payload = [];
                     if (mask.length)
-                        for (var i = 0; i < payloadLen; i++)
+                        for (i = 0; i < payloadLen; i++)
                             payload[i] = inputStream.read_byte() ^ mask[i % 4];
                     else
-                        for (var i = 0; i < payloadLen; i++)
+                        for (i = 0; i < payloadLen; i++)
                             payload[i] = inputStream.read_byte();
 
                     if (isCloseFrame) {
@@ -240,8 +236,12 @@ function WebSocket() {
                             reason = String.fromCharCode.apply(this, payload);
                         }
                         closeFrameCallback(statusCode, reason);
-                    } else
-                        frameCallback(String.fromCharCode.apply(this, payload));
+                    } else {
+                        var data = "";
+                        for (i = 0; i < payload.length; i++)
+                            data += String.fromCharCode(payload[i]);
+                        frameCallback(decodeURIComponent(escape(data)));
+                    }
                 });
             }
         });
@@ -273,7 +273,7 @@ function WebSocket() {
     function processSendQueue() {
         var i;
         var buf = [129];
-        var message = sendQueue[0];
+        var message = unescape(encodeURIComponent(sendQueue[0]));
         var messageLen = message.length;
         if (messageLen < 126)
             buf[1] = messageLen & 0x7f;
@@ -286,12 +286,9 @@ function WebSocket() {
         for (i = 0; i < messageLen; i++)
             buf.push(message.charCodeAt(i));
 
-        var results = [];
         outputStream.write_async(buf, buf.length, prio, null, function (o, result) {
-            results.push(result);
             outputStream.write_finish(result);
             outputStream.flush_async(prio, null, function (o, result) {
-                results.push(result);
                 outputStream.flush_finish(result);
                 sendQueue.shift();
                 if (sendQueue.length > 0)
@@ -348,11 +345,10 @@ function WebSocketServer(port, bindAddress) {
     var _this = this;
     var prio = glib.PRIORITY_DEFAULT;
     var socketService = new gio.SocketService();
-    var addr = socketService.addr = new gio.InetSocketAddress({
+    socketService.add_address(new gio.InetSocketAddress({
         "address": new gio.InetAddress.from_string(bindAddress),
         "port": port
-    });
-    socketService.add_address(addr, gio.SocketType.STREAM, gio.SocketProtocol.TCP);
+    }), gio.SocketType.STREAM, gio.SocketProtocol.TCP);
 
     socketService.signal.incoming.connect(function (service, connection) {
         connection.get_socket().set_blocking(false);
@@ -367,9 +363,7 @@ function WebSocketServer(port, bindAddress) {
             if (!request.headers["sec-websocket-key"]) {
                 request.respond = function (response) {
                     sendFallbackResponse(outputStream, request, response, function () {
-                        var results = [];
                         connection.close_async(prio, null, function(c, result) {
-                            results.push(result);
                             connection.close_finish(result);
                         });
                     });
@@ -397,10 +391,8 @@ function WebSocketServer(port, bindAddress) {
 
     function readHandshakeRequest(inputStream, callback) {
         var request = { "headers": {} };
-        var results = [];
 
         function gotHeaderLine(inputStream, result) {
-            results.push(result);
             var line = inputStream.read_line_finish_utf8(result);
             if (!line || !line.length) {
                 callback(request);
@@ -494,16 +486,13 @@ function WebSocketServer(port, bindAddress) {
         for (var key in headers)
             if (headers.hasOwnProperty(key))
                 responseText += key + ": " + headers[key] + "\r\n";
-        responseText += "\r\n" + body;
+        responseText += "\r\n" + unescape(encodeURIComponent(body));
         var buf = [];
         for (var i = 0; i < responseText.length; i++)
             buf.push(responseText.charCodeAt(i));
-        var results = [];
         outputStream.write_async(buf, buf.length, prio, null, function (o, result) {
-            results.push(result);
             outputStream.write_finish(result);
             outputStream.flush_async(prio, null, function (o, result) {
-                results.push(result);
                 outputStream.flush_finish(result);
                 callback();
             });

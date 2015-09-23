@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -31,15 +33,18 @@
 #include "config.h"
 #endif
 #include "owr_remote_media_source.h"
-#include "owr_remote_media_source_private.h"
 
 #include "owr_media_source.h"
 #include "owr_media_source_private.h"
+#include "owr_private.h"
+#include "owr_remote_media_source_private.h"
 #include "owr_types.h"
 #include "owr_utils.h"
-#include "owr_private.h"
 
 #include <gst/gst.h>
+
+GST_DEBUG_CATEGORY_EXTERN(_owrremotemediasource_debug);
+#define GST_CAT_DEFAULT _owrremotemediasource_debug
 
 #define OWR_REMOTE_MEDIA_SOURCE_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_REMOTE_MEDIA_SOURCE, OwrRemoteMediaSourcePrivate))
 
@@ -61,6 +66,22 @@ static void owr_remote_media_source_init(OwrRemoteMediaSource *source)
     source->priv->stream_id = 0;
 }
 
+static void on_caps(GstElement *source, GParamSpec *pspec, OwrMediaSource *media_source)
+{
+    gchar *media_source_name;
+    GstCaps *caps;
+
+    OWR_UNUSED(pspec);
+
+    g_object_get(source, "caps", &caps, NULL);
+    g_object_get(media_source, "name", &media_source_name, NULL);
+
+    if (GST_IS_CAPS(caps)) {
+        GST_INFO_OBJECT(source, "%s - configured with caps: %" GST_PTR_FORMAT,
+            media_source_name, caps);
+    }
+}
+
 #define LINK_ELEMENTS(a, b) \
     if (!gst_element_link(a, b)) \
         GST_ERROR("Failed to link " #a " -> " #b);
@@ -76,7 +97,6 @@ OwrMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
     gchar *name;
     GstElement *transport_pipeline;
     GstElement *source_bin, *tee;
-    GstElement *fakesink, *queue;
     GstPad *srcpad, *sinkpad, *ghostpad;
     gchar *pad_name, *bin_name;
 
@@ -94,9 +114,6 @@ OwrMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
     priv->stream_id = stream_id;
     g_free(name);
 
-    /* take a ref on the transport bin as the media source element is
-     * unreffed on finalization */
-    g_object_ref(transport_bin);
     _owr_media_source_set_codec(OWR_MEDIA_SOURCE(source), codec_type);
 
     /* create source tee and everything */
@@ -106,23 +123,18 @@ OwrMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
     } else if (media_type == OWR_MEDIA_TYPE_AUDIO) {
         bin_name = g_strdup_printf("audio-src-%u-%u", codec_type, stream_id);
         pad_name = g_strdup_printf("audio_raw_src_%u", stream_id);
-    } else {
+    } else
         g_assert_not_reached();
-    }
 
     source_bin = gst_bin_new(bin_name);
     _owr_media_source_set_source_bin(OWR_MEDIA_SOURCE(source), source_bin);
-    tee = gst_element_factory_make ("tee", "tee");
+    tee = gst_element_factory_make("tee", "tee");
     _owr_media_source_set_source_tee(OWR_MEDIA_SOURCE(source), tee);
-    fakesink = gst_element_factory_make ("fakesink", "fakesink");
-    g_object_set(fakesink, "async", FALSE, NULL);
-    queue = gst_element_factory_make ("queue", "queue");
+    g_object_set(tee, "allow-not-linked", TRUE, NULL);
     g_free(bin_name);
 
     transport_pipeline = GST_ELEMENT(gst_element_get_parent(transport_bin));
-    gst_bin_add_many(GST_BIN(source_bin), tee, queue, fakesink, NULL);
-    LINK_ELEMENTS(tee, queue);
-    LINK_ELEMENTS(queue, fakesink);
+    gst_bin_add_many(GST_BIN(source_bin), tee, NULL);
     sinkpad = gst_element_get_static_pad(tee, "sink");
     ghostpad = gst_ghost_pad_new("sink", sinkpad);
     gst_object_unref(sinkpad);
@@ -130,14 +142,15 @@ OwrMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
     gst_bin_add(GST_BIN(transport_pipeline), source_bin);
     gst_element_sync_state_with_parent(source_bin);
     gst_object_unref(transport_pipeline);
-    gst_object_unref(source_bin);
 
     /* Link the transport bin to our tee */
     srcpad = gst_element_get_static_pad(transport_bin, pad_name);
     g_free(pad_name);
-    if (gst_pad_link(srcpad, ghostpad) != GST_PAD_LINK_OK) {
+    if (gst_pad_link(srcpad, ghostpad) != GST_PAD_LINK_OK)
         GST_ERROR("Failed to link source bin to the outside");
-    }
+
+    g_signal_connect(srcpad, "notify::caps", G_CALLBACK(on_caps), OWR_MEDIA_SOURCE(source));
+    gst_object_unref(srcpad);
 
     return OWR_MEDIA_SOURCE(source);
 }

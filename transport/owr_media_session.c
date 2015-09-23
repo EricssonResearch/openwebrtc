@@ -1,5 +1,8 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
+ *     Author: Arun Raghavan <arun@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -50,6 +53,9 @@
 
 #include <string.h>
 
+GST_DEBUG_CATEGORY_EXTERN(_owrmediasession_debug);
+#define GST_CAT_DEFAULT _owrmediasession_debug
+
 
 #define OWR_MEDIA_SESSION_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_MEDIA_SESSION, OwrMediaSessionPrivate))
 
@@ -69,6 +75,7 @@ struct _OwrMediaSessionPrivate {
     GClosure *on_send_source;
     GSList *remote_sources;
     GMutex remote_source_lock;
+    gint jitter_buffer_latency;
 };
 
 enum {
@@ -88,6 +95,7 @@ enum {
     PROP_OUTGOING_SRTP_KEY,
     PROP_SEND_SSRC,
     PROP_CNAME,
+    PROP_JITTER_BUFFER_LATENCY,
 
     N_PROPERTIES
 };
@@ -126,6 +134,18 @@ static void owr_media_session_set_property(GObject *object, guint property_id, c
         priv->outgoing_srtp_key = g_value_dup_string(value);
         break;
 
+    case PROP_SEND_SSRC:
+        priv->send_ssrc = g_value_get_uint(value);
+        break;
+
+    case PROP_CNAME:
+        priv->cname = g_value_dup_string(value);
+        break;
+
+    case PROP_JITTER_BUFFER_LATENCY:
+        priv->jitter_buffer_latency = g_value_get_uint(value);
+        break;
+
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
         break;
@@ -157,6 +177,10 @@ static void owr_media_session_get_property(GObject *object, guint property_id, G
         g_value_set_string(value, priv->cname);
         break;
 
+    case PROP_JITTER_BUFFER_LATENCY:
+        g_value_set_uint(value, priv->jitter_buffer_latency);
+        break;
+
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
         break;
@@ -185,6 +209,8 @@ static void owr_media_session_finalize(GObject *object)
     OwrMediaSession *media_session = OWR_MEDIA_SESSION(object);
     OwrMediaSessionPrivate *priv = media_session->priv;
 
+    _owr_media_session_clear_closures(media_session);
+
     if (priv->incoming_srtp_key)
         g_free(priv->incoming_srtp_key);
     if (priv->outgoing_srtp_key)
@@ -207,8 +233,6 @@ static void owr_media_session_finalize(GObject *object)
     if (priv->send_payload)
         g_object_unref(priv->send_payload);
     g_ptr_array_unref(priv->receive_payloads);
-
-    _owr_media_session_clear_closures(media_session);
 
     g_rw_lock_clear(&priv->rw_lock);
 
@@ -267,12 +291,18 @@ static void owr_media_session_class_init(OwrMediaSessionClass *klass)
         NULL, G_PARAM_STATIC_STRINGS | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
     obj_properties[PROP_SEND_SSRC] = g_param_spec_uint("send-ssrc", "Send ssrc",
-        "The ssrc used for the outgoing RTP media stream",
-        0, G_MAXUINT, 0, G_PARAM_STATIC_STRINGS | G_PARAM_READABLE | G_PARAM_STATIC_STRINGS);
+        "The ssrc (to be) used for the outgoing RTP media stream",
+        0, G_MAXUINT, 0, G_PARAM_STATIC_STRINGS | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
     obj_properties[PROP_CNAME] = g_param_spec_string("cname", "CNAME",
         "The canonical name identifying this endpoint",
-        NULL, G_PARAM_STATIC_STRINGS | G_PARAM_READABLE | G_PARAM_STATIC_STRINGS);
+        NULL, G_PARAM_STATIC_STRINGS | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+
+    obj_properties[PROP_JITTER_BUFFER_LATENCY] = g_param_spec_uint("jitter-buffer-latency",
+        "Session jitter buffer latency in ms",
+        "The latency introduced by the jitter buffer for this session in ms",
+        0, G_MAXUINT, 50,
+        G_PARAM_STATIC_STRINGS | G_PARAM_READWRITE);
 
     g_object_class_install_properties(gobject_class, N_PROPERTIES, obj_properties);
 
@@ -294,6 +324,7 @@ static void owr_media_session_init(OwrMediaSession *media_session)
     priv->on_send_payload = NULL;
     priv->on_send_source = NULL;
     priv->remote_sources = NULL;
+    priv->jitter_buffer_latency = 50;
     g_mutex_init(&priv->remote_source_lock);
     g_rw_lock_init(&priv->rw_lock);
 }
@@ -315,7 +346,7 @@ OwrMediaSession * owr_media_session_new(gboolean dtls_client_mode)
 /**
  * owr_media_session_add_receive_payload:
  * @media_session: the media session on which to add the receive payload.
- * @payload: (transfer none): the receive payload to add
+ * @payload: (transfer full): the receive payload to add
  *
  * The function adds support for receiving the given payload type.
  */
@@ -326,20 +357,18 @@ void owr_media_session_add_receive_payload(OwrMediaSession *media_session, OwrPa
     g_return_if_fail(media_session);
     g_return_if_fail(payload);
 
-    args = g_hash_table_new(g_str_hash, g_str_equal);
+    args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(media_session));
     g_hash_table_insert(args, "media_session", media_session);
     g_hash_table_insert(args, "payload", payload);
 
     g_object_ref(media_session);
-    g_object_ref(payload);
     _owr_schedule_with_hash_table((GSourceFunc)add_receive_payload, args);
 }
-
 
 /**
  * owr_media_session_set_send_payload:
  * @media_session: The media session on which set the send payload.
- * @payload: (transfer none) (allow-none): the send payload to set
+ * @payload: (transfer full) (allow-none): the send payload to set
  *
  * Sets what payload that will be sent.
  */
@@ -350,16 +379,13 @@ void owr_media_session_set_send_payload(OwrMediaSession *media_session, OwrPaylo
     g_return_if_fail(media_session);
     g_return_if_fail(!payload || OWR_IS_PAYLOAD(payload));
 
-    args = g_hash_table_new(g_str_hash, g_str_equal);
+    args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(media_session));
     g_hash_table_insert(args, "media_session", media_session);
     g_hash_table_insert(args, "payload", payload);
     g_object_ref(media_session);
-    if (payload)
-        g_object_ref(payload);
 
     _owr_schedule_with_hash_table((GSourceFunc)set_send_payload, args);
 }
-
 
 /**
  * owr_media_session_set_send_source:
@@ -375,7 +401,7 @@ void owr_media_session_set_send_source(OwrMediaSession *media_session, OwrMediaS
     g_return_if_fail(OWR_IS_MEDIA_SESSION(media_session));
     g_return_if_fail(!source || OWR_IS_MEDIA_SOURCE(source));
 
-    args = g_hash_table_new(g_str_hash, g_str_equal);
+    args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(media_session));
     g_hash_table_insert(args, "media_session", media_session);
     g_hash_table_insert(args, "source", source);
     g_object_ref(media_session);
@@ -384,7 +410,6 @@ void owr_media_session_set_send_source(OwrMediaSession *media_session, OwrMediaS
 
     _owr_schedule_with_hash_table((GSourceFunc)set_send_source, args);
 }
-
 
 
 /* Internal functions */
@@ -423,9 +448,8 @@ static gboolean add_receive_payload(GHashTable *args)
     if (!payload_found) {
         g_ptr_array_add(payloads, payload);
         g_object_ref(payload);
-    } else {
+    } else
         g_warning("An already existing payload was added to the media session. Action aborted.\n");
-    }
 
     g_rw_lock_writer_unlock(&media_session->priv->rw_lock);
 
@@ -548,6 +572,9 @@ OwrPayload * _owr_media_session_get_receive_payload(OwrMediaSession *media_sessi
         g_object_get(payload, "payload-type", &pt, NULL);
         if (pt == payload_type)
             break;
+        g_object_get(payload, "rtx-payload-type", &pt, NULL);
+        if (pt == payload_type)
+            break;
     }
     if (pt == payload_type)
         g_object_ref(payload);
@@ -556,6 +583,92 @@ OwrPayload * _owr_media_session_get_receive_payload(OwrMediaSession *media_sessi
     if (pt == payload_type)
         return payload;
     return NULL;
+}
+
+static void append_to_pt_map(GstStructure *pt_map, guint pt, guint rtx_pt)
+{
+    gchar *tmp;
+
+    tmp = g_strdup_printf("%u", pt);
+    gst_structure_set(pt_map, tmp, G_TYPE_UINT, rtx_pt, NULL);
+    g_free(tmp);
+}
+
+/**
+ * _owr_media_session_want_receive_rtx:
+ * @media_session:
+ *
+ * Returns:
+ *
+ */
+gboolean _owr_media_session_want_receive_rtx(OwrMediaSession *media_session)
+{
+    GPtrArray *receive_payloads = media_session->priv->receive_payloads;
+    OwrPayload *payload;
+    guint i;
+    gint rtx_pt;
+    gboolean ret = FALSE;
+
+    g_return_val_if_fail(media_session, FALSE);
+    g_return_val_if_fail(receive_payloads, FALSE);
+
+    g_rw_lock_reader_lock(&media_session->priv->rw_lock);
+
+    for (i = 0; i < receive_payloads->len; i++) {
+        payload = g_ptr_array_index(receive_payloads, i);
+
+        g_object_get(payload, "rtx-payload-type", &rtx_pt, NULL);
+
+        if (rtx_pt >= 0) {
+            ret = TRUE;
+            break;
+        }
+    }
+
+    g_rw_lock_reader_unlock(&media_session->priv->rw_lock);
+
+    return ret;
+}
+
+/**
+ * _owr_media_session_get_receive_rtx_pt_map:
+ * @media_session:
+ *
+ * Returns: (transfer full):
+ *
+ */
+GstStructure * _owr_media_session_get_receive_rtx_pt_map(OwrMediaSession *media_session)
+{
+    GPtrArray *receive_payloads = media_session->priv->receive_payloads;
+    OwrPayload *payload;
+    GstStructure *pt_map;
+    guint i, pt;
+    gint rtx_pt;
+
+    g_return_val_if_fail(media_session, NULL);
+    g_return_val_if_fail(receive_payloads, NULL);
+
+    pt_map = gst_structure_new_empty("application/x-rtp-pt-map");
+
+    g_rw_lock_reader_lock(&media_session->priv->rw_lock);
+
+    for (i = 0; i < receive_payloads->len; i++) {
+        payload = g_ptr_array_index(receive_payloads, i);
+
+        g_object_get(payload, "payload-type", &pt, "rtx-payload-type", &rtx_pt, NULL);
+
+        if (rtx_pt >= 0)
+            append_to_pt_map(pt_map, pt, rtx_pt);
+    }
+
+    g_rw_lock_reader_unlock(&media_session->priv->rw_lock);
+
+    if (!gst_structure_n_fields(pt_map)) {
+        gst_structure_free(pt_map);
+        return NULL;
+    }
+
+    return pt_map;
 }
 
 /**
@@ -670,16 +783,4 @@ GstBuffer * _owr_media_session_get_srtp_key_buffer(OwrMediaSession *media_sessio
     key = g_base64_decode(base64_key, &key_len);
     g_warn_if_fail(key_len == 30);
     return gst_buffer_new_wrapped(key, key_len);
-}
-
-void _owr_media_session_set_send_ssrc(OwrMediaSession *media_session, guint send_ssrc)
-{
-    g_return_if_fail(OWR_IS_MEDIA_SESSION(media_session));
-    media_session->priv->send_ssrc = send_ssrc;
-}
-
-void _owr_media_session_set_cname(OwrMediaSession *media_session, const gchar *cname)
-{
-    g_return_if_fail(OWR_IS_MEDIA_SESSION(media_session));
-    media_session->priv->cname = g_strdup(cname);
 }

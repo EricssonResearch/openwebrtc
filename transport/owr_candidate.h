@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -52,6 +54,15 @@ typedef enum {
     OWR_TRANSPORT_TYPE_TCP_PASSIVE,
     OWR_TRANSPORT_TYPE_TCP_SO
 } OwrTransportType;
+
+#define OWR_TYPE_CANDIDATE_TYPE (owr_candidate_type_get_type())
+GType owr_candidate_type_get_type(void);
+
+#define OWR_TYPE_COMPONENT_TYPE (owr_component_type_get_type())
+GType owr_component_type_get_type(void);
+
+#define OWR_TYPE_TRANSPORT_TYPE (owr_transport_type_get_type())
+GType owr_transport_type_get_type(void);
 
 #define OWR_TYPE_CANDIDATE            (owr_candidate_get_type())
 #define OWR_CANDIDATE(obj)            (G_TYPE_CHECK_INSTANCE_CAST((obj), OWR_TYPE_CANDIDATE, OwrCandidate))

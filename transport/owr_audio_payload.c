@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -33,6 +35,11 @@
 #include "owr_audio_payload.h"
 
 #include "owr_types.h"
+
+#include <gst/gst.h>
+
+GST_DEBUG_CATEGORY_EXTERN(_owraudiopayload_debug);
+#define GST_CAT_DEFAULT _owraudiopayload_debug
 
 #define DEFAULT_CHANNELS 0
 #define DEFAULT_PTIME 40000000L
@@ -105,7 +112,7 @@ static void owr_audio_payload_get_property(GObject *object, guint property_id, G
         break;
 
     case PROP_MEDIA_TYPE:
-        g_value_set_uint(value, OWR_MEDIA_TYPE_AUDIO);
+        g_value_set_enum(value, OWR_MEDIA_TYPE_AUDIO);
         break;
 
     default:

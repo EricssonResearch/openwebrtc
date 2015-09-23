@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -42,7 +44,11 @@
 
 #include "owr_candidate_private.h"
 
+#include <gst/gst.h>
 #include <string.h>
+
+GST_DEBUG_CATEGORY_EXTERN(_owrcandidate_debug);
+#define GST_CAT_DEFAULT _owrcandidate_debug
 
 #define OWR_CANDIDATE_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_CANDIDATE, OwrCandidatePrivate))
 
@@ -88,15 +94,15 @@ static void owr_candidate_set_property(GObject *object, guint property_id, const
 
     switch (property_id) {
     case PROP_TYPE:
-        priv->type = g_value_get_uint(value);
+        priv->type = g_value_get_enum(value);
         break;
 
     case PROP_COMPONENT_TYPE:
-        priv->component_type = g_value_get_uint(value);
+        priv->component_type = g_value_get_enum(value);
         break;
 
     case PROP_TRANSPORT_TYPE:
-        priv->transport_type = g_value_get_uint(value);
+        priv->transport_type = g_value_get_enum(value);
         break;
 
     case PROP_ADDRESS:
@@ -153,15 +159,15 @@ static void owr_candidate_get_property(GObject *object, guint property_id, GValu
 
     switch (property_id) {
     case PROP_TYPE:
-        g_value_set_uint(value, priv->type);
+        g_value_set_enum(value, priv->type);
         break;
 
     case PROP_COMPONENT_TYPE:
-        g_value_set_uint(value, priv->component_type);
+        g_value_set_enum(value, priv->component_type);
         break;
 
     case PROP_TRANSPORT_TYPE:
-        g_value_set_uint(value, priv->transport_type);
+        g_value_set_enum(value, priv->transport_type);
         break;
 
     case PROP_ADDRESS:
@@ -225,19 +231,19 @@ static void owr_candidate_class_init(OwrCandidateClass *klass)
     gobject_class->get_property = owr_candidate_get_property;
     gobject_class->finalize = owr_candidate_finalize;
 
-    obj_properties[PROP_TYPE] = g_param_spec_uint("type", "Candidate type",
+    obj_properties[PROP_TYPE] = g_param_spec_enum("type", "Candidate type",
         "The type of candidate",
-        OWR_CANDIDATE_TYPE_HOST, OWR_CANDIDATE_TYPE_RELAY, OWR_CANDIDATE_TYPE_HOST,
+        OWR_TYPE_CANDIDATE_TYPE, OWR_CANDIDATE_TYPE_HOST,
         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS);
 
-    obj_properties[PROP_COMPONENT_TYPE] = g_param_spec_uint("component-type", "Component type",
+    obj_properties[PROP_COMPONENT_TYPE] = g_param_spec_enum("component-type", "Component type",
         "The stream component type (RTP/RTCP)",
-        OWR_COMPONENT_TYPE_RTP, OWR_COMPONENT_TYPE_RTCP, OWR_COMPONENT_TYPE_RTP,
+        OWR_TYPE_COMPONENT_TYPE, OWR_COMPONENT_TYPE_RTP,
         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS);
 
-    obj_properties[PROP_TRANSPORT_TYPE] = g_param_spec_uint("transport-type", "Transport type",
+    obj_properties[PROP_TRANSPORT_TYPE] = g_param_spec_enum("transport-type", "Transport type",
         "The transport type (UDP or TCP (active/passive/simultaneous open))",
-        OWR_TRANSPORT_TYPE_UDP, OWR_TRANSPORT_TYPE_TCP_SO, OWR_TRANSPORT_TYPE_UDP,
+        OWR_TYPE_TRANSPORT_TYPE, OWR_TRANSPORT_TYPE_UDP,
         G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
     obj_properties[PROP_ADDRESS] = g_param_spec_string("address", "Candidate address",
@@ -489,4 +495,59 @@ NiceCandidate * _owr_candidate_to_nice_candidate(OwrCandidate *candidate)
 OwrComponentType _owr_candidate_get_component_type(OwrCandidate *candidate)
 {
     return candidate->priv->component_type;
+}
+
+GType owr_candidate_type_get_type(void)
+{
+    static const GEnumValue types[] = {
+        {OWR_CANDIDATE_TYPE_HOST, "Host", "host"},
+        {OWR_CANDIDATE_TYPE_SERVER_REFLEXIVE, "Server reflexive", "srflx"},
+        {OWR_CANDIDATE_TYPE_PEER_REFLEXIVE, "Peer reflexive", "prflx"},
+        {OWR_CANDIDATE_TYPE_RELAY, "Relay", "relay"},
+        {0, NULL, NULL}
+    };
+    static volatile GType id = 0;
+
+    if (g_once_init_enter((gsize *)&id)) {
+        GType _id = g_enum_register_static("OwrCandidateTypes", types);
+        g_once_init_leave((gsize *)&id, _id);
+    }
+
+    return id;
+}
+
+GType owr_component_type_get_type(void)
+{
+    static const GEnumValue types[] = {
+        {OWR_COMPONENT_TYPE_RTP, "RTP", "rtp"},
+        {OWR_COMPONENT_TYPE_RTCP, "RTCP", "rtcp"},
+        {0, NULL, NULL}
+    };
+    static volatile GType id = 0;
+
+    if (g_once_init_enter((gsize *)&id)) {
+        GType _id = g_enum_register_static("OwrComponentTypes", types);
+        g_once_init_leave((gsize *)&id, _id);
+    }
+
+    return id;
+}
+
+GType owr_transport_type_get_type(void)
+{
+    static const GEnumValue types[] = {
+        {OWR_TRANSPORT_TYPE_UDP, "UDP", "UDP"},
+        {OWR_TRANSPORT_TYPE_TCP_ACTIVE, "TCP active", "TCP-active"},
+        {OWR_TRANSPORT_TYPE_TCP_PASSIVE, "TCP passive", "TCP-passive"},
+        {OWR_TRANSPORT_TYPE_TCP_SO, "TCP so", "TCP-so"},
+        {0, NULL, NULL}
+    };
+    static volatile GType id = 0;
+
+    if (g_once_init_enter((gsize *)&id)) {
+        GType _id = g_enum_register_static("OwrTransportTypes", types);
+        g_once_init_leave((gsize *)&id, _id);
+    }
+
+    return id;
 }

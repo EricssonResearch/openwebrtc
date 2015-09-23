@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Ericsson AB. All rights reserved.
+ * Copyright (C) 2014-2015 Ericsson AB. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -137,25 +137,37 @@ function checkDictionary(name, dict, typeMap) {
 }
 
 function checkArguments(name, argsTypeTemplate, numRequired, args) {
-    if (args.length < numRequired) {
-        throw new TypeError(name + ": Too few arguments (got " + args.length + " expected " +
-            numRequired + ")");
-    }
+    var error = getArgumentsError(argsTypeTemplate, numRequired, args);
+    if (error)
+        throw createError("TypeError", name + ": " + error);
+}
+
+function checkType(name, value, typeTemplate) {
+    var error = getTypeError(name, value, typeTemplate);
+    if (error)
+        throw createError("TypeError", name + ": " + error);
+}
+
+function getArgumentsError(argsTypeTemplate, numRequired, args) {
+    if (args.length < numRequired)
+        return "Too few arguments (got " + args.length + " expected " + numRequired + ")";
 
     var typeTemplates = argsTypeTemplate.split(/\s*,\s*/);
 
     for (var i = 0; i < args.length && i < typeTemplates.length; i++) {
-        var message = name + ": Argument " + (i + 1);
-        checkType(message, args[i], typeTemplates[i]);
+        var prefix = "Argument " + (i + 1);
+        var error = getTypeError(prefix, args[i], typeTemplates[i]);
+        if (error)
+            return error;
     }
+    return null;
 }
 
-function checkType(name, value, typeTemplate) {
+function getTypeError(prefix, value, typeTemplate) {
     var expectedTypes = typeTemplate.split(/\s*\|\s*/);
-    if (!canConvert(value, expectedTypes)) {
-        throw new TypeError(name + " is of wrong type (expected " +
-            expectedTypes.join(" or ") + ")");
-    }
+    if (!canConvert(value, expectedTypes))
+        return prefix + " is of wrong type (expected " + expectedTypes.join(" or ") + ")";
+    return null;
 }
 
 function canConvert(value, expectedTypes) {
@@ -167,6 +179,10 @@ function canConvert(value, expectedTypes) {
         if (expectedType == "number") {
             var asNumber = +value;
             if (!isNaN(asNumber) && asNumber != -Infinity && asNumber != Infinity)
+                return true;
+        }
+        if (expectedType == "dictionary") { // object, undefined and null can be converted
+            if (type == "object" || type == "undefined" || type == "null")
                 return true;
         }
         if (type == "object") {
@@ -183,10 +199,25 @@ function canConvert(value, expectedTypes) {
     return false;
 }
 
-function randomString() {
-    var randomValues = new Uint8Array(27);
+function getDictionaryMember(dict, name, type, defaultValue) {
+    if (!dict.hasOwnProperty(name) || dict[name] == null)
+        return defaultValue;
+    if (type == "string")
+        return String(dict[name]);
+    if (type == "boolean")
+        return !!dict[name];
+    if (type == "number")
+        return +dict[name];
+}
+
+function randomNumber(bits) {
+    return Math.floor(Math.random() * Math.pow(2, bits));
+}
+
+function randomString(length) {
+    var randomValues = new Uint8Array(Math.ceil(length * 3 / 4));
     crypto.getRandomValues(randomValues);
-    return btoa(String.fromCharCode.apply(null, randomValues));
+    return btoa(String.fromCharCode.apply(null, randomValues)).substr(0, length);
 }
 
 function createError(name, message) {

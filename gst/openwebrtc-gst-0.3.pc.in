@@ -1,0 +1,13 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+datarootdir=@datarootdir@
+datadir=@datadir@
+includedir=@includedir@
+
+Name: libopenwebrtc-gst
+Description: libopenwebrtc-gst
+Version: @VERSION@
+Requires: openwebrtc-@OWR_API_VERSION@ gstreamer-1.0
+Libs: -L${libdir} -lopenwebrtc_gst
+Cflags: -I${includedir}

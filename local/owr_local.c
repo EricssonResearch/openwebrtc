@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -32,13 +34,16 @@
 #endif
 #include "owr_local.h"
 
+#include "owr_device_list_private.h"
 #include "owr_local_media_source.h"
 #include "owr_local_media_source_private.h"
 #include "owr_media_source.h"
 #include "owr_media_source_private.h"
-#include "owr_device_list_private.h"
-#include "owr_utils.h"
 #include "owr_private.h"
+#include "owr_utils.h"
+
+GST_DEBUG_CATEGORY_EXTERN(_owrlocal_debug);
+#define GST_CAT_DEFAULT _owrlocal_debug
 
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
@@ -64,11 +69,11 @@ static GList *get_test_sources(OwrMediaType types)
     if (g_once_init_enter(&cached_sources)) {
         GList *sources = NULL;
 
-	source = _owr_local_media_source_new_cached(-1, "Audio test source", OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_TEST);
-	sources = g_list_append(sources, OWR_MEDIA_SOURCE(source));
+        source = _owr_local_media_source_new_cached(-1, "Audio test source", OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_TEST);
+        sources = g_list_append(sources, OWR_MEDIA_SOURCE(source));
 
-	source = _owr_local_media_source_new_cached(-1, "Video test source", OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_TEST);
-	sources = g_list_append(sources, OWR_MEDIA_SOURCE(source));
+        source = _owr_local_media_source_new_cached(-1, "Video test source", OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_TEST);
+        sources = g_list_append(sources, OWR_MEDIA_SOURCE(source));
 
         g_once_init_leave(&cached_sources, sources);
     }
@@ -116,16 +121,21 @@ void owr_get_capture_sources(OwrMediaType types, OwrCaptureSourcesCallback callb
     g_closure_set_marshal(closure, g_cclosure_marshal_generic);
 
     if (g_getenv("OWR_USE_TEST_SOURCES")) {
-        merger = _owr_utils_list_closure_merger_new(closure, (GDestroyNotify) g_object_unref);
+        GList *sources;
+
+        merger = _owr_utils_list_closure_merger_new(closure,
+            (GCopyFunc) g_object_ref,
+            (GDestroyNotify) g_object_unref);
 
         g_closure_ref(merger);
         _owr_get_capture_devices(types, merger);
 
         g_closure_ref(merger);
-        _owr_utils_call_closure_with_list(merger, get_test_sources(types));
+        sources = get_test_sources(types);
+        _owr_utils_call_closure_with_list(merger, sources);
+        g_list_free_full(sources, g_object_unref);
 
         g_closure_unref(merger);
-    } else {
+    } else
         _owr_get_capture_devices(types, closure);
-    }
 }

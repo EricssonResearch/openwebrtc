@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -31,8 +33,6 @@
 #include "owr_local.h"
 #include "owr_media_source.h"
 
-static GMainLoop *loop;
-
 static void got_sources(GList *sources, gpointer user_data)
 {
     OwrMediaSource *source = NULL;
@@ -54,19 +54,15 @@ static void got_sources(GList *sources, gpointer user_data)
         sources = sources->next;
     }
 
-    g_main_loop_quit(loop);
+    owr_quit();
 }
 
 int main() {
-    GMainContext *ctx = g_main_context_default();
-
-    loop = g_main_loop_new(ctx, FALSE);
-
-    owr_init_with_main_context(ctx);
+    owr_init(NULL);
 
     owr_get_capture_sources(OWR_MEDIA_TYPE_AUDIO|OWR_MEDIA_TYPE_VIDEO, got_sources, NULL);
 
-    g_main_loop_run(loop);
+    owr_run();
 
     return 0;
 }

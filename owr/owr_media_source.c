@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -32,6 +34,8 @@
 #endif
 #include "owr_media_source.h"
 
+#include "owr_inter_sink.h"
+#include "owr_inter_src.h"
 #include "owr_media_source_private.h"
 #include "owr_private.h"
 #include "owr_types.h"
@@ -44,7 +48,10 @@
 #include <TargetConditionals.h>
 #endif
 
-#if defined(__APPLE__) && !TARGET_IPHONE_SIMULATOR && !defined(__arm64__)
+GST_DEBUG_CATEGORY_EXTERN(_owrmediasource_debug);
+#define GST_CAT_DEFAULT _owrmediasource_debug
+
+#if defined(__APPLE__) && !TARGET_IPHONE_SIMULATOR
 #if TARGET_OS_IPHONE
 #define VIDEO_CONVERT "ercolorspace"
 #else
@@ -52,7 +59,7 @@
 #endif
 
 #elif defined(__ANDROID__)
-#define VIDEO_CONVERT "ercolorspace"
+#define VIDEO_CONVERT "videoconvert"
 
 #elif defined(__linux__)
 #define VIDEO_CONVERT "videoconvert"
@@ -241,20 +248,6 @@ static void owr_media_source_get_property(GObject *object, guint property_id,
     }
 }
 
-static GstPadProbeReturn
-drop_gap_buffers(GstPad *pad, GstPadProbeInfo *info, gpointer user_data)
-{
-    OWR_UNUSED(pad);
-    OWR_UNUSED(user_data);
-
-    /* Drop GAP buffers, they're just duplicated buffers and we don't
-     * care about constant framerate here */
-    if (GST_BUFFER_FLAG_IS_SET (info->data, GST_BUFFER_FLAG_GAP)) {
-        return GST_PAD_PROBE_DROP;
-    }
-    return GST_PAD_PROBE_OK;
-}
-
 /*
  * The following chain is created after the tee for each output from the
  * source:
@@ -274,7 +267,7 @@ static GstElement *owr_media_source_request_source_default(OwrMediaSource *media
     GstPad *bin_pad = NULL, *srcpad, *sinkpad;
     gchar *bin_name;
     guint source_id;
-    gchar *channel_name;
+    gchar *sink_name, *source_name;
 
     g_return_val_if_fail(media_source->priv->source_bin, NULL);
     g_return_val_if_fail(media_source->priv->source_tee, NULL);
@@ -300,9 +293,6 @@ static GstElement *owr_media_source_request_source_default(OwrMediaSource *media
         {
         GstElement *audioresample, *audioconvert;
 
-        CREATE_ELEMENT_WITH_ID(source, "interaudiosrc", "source", source_id);
-        CREATE_ELEMENT_WITH_ID(sink, "interaudiosink", "sink", source_id);
-
         g_object_set(capsfilter, "caps", caps, NULL);
 
         CREATE_ELEMENT_WITH_ID(audioresample, "audioresample", "source-audio-resample", source_id);
@@ -319,14 +309,22 @@ static GstElement *owr_media_source_request_source_default(OwrMediaSource *media
         }
     case OWR_MEDIA_TYPE_VIDEO:
         {
-        GstElement *videoscale, *videoconvert;
+        GstElement *videorate = NULL, *videoscale, *videoconvert;
+        GstStructure *s;
 
-        CREATE_ELEMENT_WITH_ID(source, "intervideosrc", "source", source_id);
-        CREATE_ELEMENT_WITH_ID(sink, "intervideosink", "sink", source_id);
+        s = gst_caps_get_structure(caps, 0);
+        if (gst_structure_has_field(s, "framerate")) {
+            gint fps_n = 0, fps_d = 0;
 
-        srcpad = gst_element_get_static_pad(source, "src");
-        gst_pad_add_probe(srcpad, GST_PAD_PROBE_TYPE_BUFFER, drop_gap_buffers, NULL, NULL);
-        gst_object_unref(srcpad);
+            gst_structure_get_fraction(s, "framerate", &fps_n, &fps_d);
+            g_assert(fps_d);
+
+            CREATE_ELEMENT_WITH_ID(videorate, "videorate", "source-video-rate", source_id);
+            g_object_set(videorate, "drop-only", TRUE, "max-rate", fps_n / fps_d, NULL);
+
+            gst_structure_remove_field(s, "framerate");
+            gst_bin_add(GST_BIN(source_bin), videorate);
+        }
 
         g_object_set(capsfilter, "caps", caps, NULL);
 
@@ -338,7 +336,12 @@ static GstElement *owr_media_source_request_source_default(OwrMediaSource *media
         LINK_ELEMENTS(capsfilter, queue_post);
         LINK_ELEMENTS(videoconvert, capsfilter);
         LINK_ELEMENTS(videoscale, videoconvert);
-        LINK_ELEMENTS(queue_pre, videoscale);
+
+        if (videorate) {
+            LINK_ELEMENTS(videorate, videoscale);
+            LINK_ELEMENTS(queue_pre, videorate);
+        } else
+            LINK_ELEMENTS(queue_pre, videoscale);
 
         break;
         }
@@ -348,10 +351,16 @@ static GstElement *owr_media_source_request_source_default(OwrMediaSource *media
         goto done;
     }
 
-    channel_name = g_strdup_printf("source-%u", source_id);
-    g_object_set(source, "channel", channel_name, NULL);
-    g_object_set(sink, "channel", channel_name, NULL);
-    g_free(channel_name);
+    source_name = g_strdup_printf("source-%u", source_id);
+    source = g_object_new(OWR_TYPE_INTER_SRC, "name", source_name, NULL);
+    g_free(source_name);
+
+    sink_name = g_strdup_printf("sink-%u", source_id);
+    sink = g_object_new(OWR_TYPE_INTER_SINK, "name", sink_name, NULL);
+    g_free(sink_name);
+
+    g_weak_ref_set(&OWR_INTER_SRC(source)->sink_sinkpad, OWR_INTER_SINK(sink)->sinkpad);
+    g_weak_ref_set(&OWR_INTER_SINK(sink)->src_srcpad, OWR_INTER_SRC(source)->internal_srcpad);
 
     /* Add and link the inter*sink to the actual source pipeline */
     bin_name = g_strdup_printf("source-sink-bin-%u", source_id);
@@ -596,15 +605,16 @@ void _owr_media_source_set_codec(OwrMediaSource *media_source, OwrCodecType code
     g_atomic_int_set(&media_source->priv->codec_type, codec_type);
 }
 
-void owr_media_source_dump_dot_file(OwrMediaSource *source, const gchar *base_file_name, gboolean with_ts)
+gchar * owr_media_source_get_dot_data(OwrMediaSource *source)
 {
-    g_return_if_fail(OWR_IS_MEDIA_SOURCE(source));
-    g_return_if_fail(base_file_name != NULL);
-    g_return_if_fail(source->priv->source_bin);
+    g_return_val_if_fail(OWR_IS_MEDIA_SOURCE(source), NULL);
 
-    if (with_ts) {
-        GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(source->priv->source_bin), GST_DEBUG_GRAPH_SHOW_ALL, base_file_name);
-    } else {
-        GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(source->priv->source_bin), GST_DEBUG_GRAPH_SHOW_ALL, base_file_name);
-    }
+    if (!source->priv->source_bin)
+        return g_strdup("");
+
+#if GST_CHECK_VERSION(1, 5, 0)
+    return gst_debug_bin_to_dot_data(GST_BIN(source->priv->source_bin), GST_DEBUG_GRAPH_SHOW_ALL);
+#else
+    return g_strdup("");
+#endif
 }

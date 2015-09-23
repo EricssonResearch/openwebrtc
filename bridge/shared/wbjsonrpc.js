@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2014 Ericsson AB. All rights reserved.
+ * Copyright (C) 2009-2015 Ericsson AB. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -188,8 +188,13 @@ var JsonRpc = function (msgLink, optionsOrRestricted) {
                         requestId = id + "_" + count++;
                         callbacks[requestId] = params.pop();
                     }
-                    for (var j = 0; j < params.length; j++)
-                        substituteRefObject(params, j);
+                    for (var j = 0; j < params.length; j++) {
+                        var p = params[j];
+                        if (p instanceof ArrayBuffer || ArrayBuffer.isView(p))
+                            params[j] = encodeArrayBufferArgument(p);
+                        else
+                            substituteRefObject(params, j);
+                    }
 
                     var request = {
                         "id": requestId,
@@ -202,6 +207,29 @@ var JsonRpc = function (msgLink, optionsOrRestricted) {
                 };
             })(names[i]);
         }
+    }
+
+    function encodeArrayBufferArgument(buffer) {
+        return {
+            "__argumentType": buffer.constructor.name,
+            "base64": btoa(Array.prototype.map.call(new Uint8Array(buffer),
+                function (byte) {
+                    return String.fromCharCode(byte);
+                }).join(""))
+        };
+    }
+
+    function decodeArrayBufferArgument(obj) {
+        var data = atob(obj.base64 || "");
+        var arr = new Uint8Array(data.length);
+        for (var i = 0; i < data.length; i++)
+            arr[i] = data.charCodeAt(i);
+
+        var constructor = self[obj.__argumentType];
+        if (constructor && constructor.BYTES_PER_ELEMENT)
+            return new constructor(arr);
+
+        return arr.buffer;
     }
 
     function substituteRefObject(parent, pname) {
@@ -288,12 +316,20 @@ var JsonRpc = function (msgLink, optionsOrRestricted) {
             response.id = msg.id;
             if (f instanceof Function) {
                 try {
-                    for (var i = 0; i < msg.params.length; i++)
-                        substituteReferencedObject(msg.params, i);
+                    for (var i = 0; i < msg.params.length; i++) {
+                        var p = msg.params[i];
+                        if (p && p.__argumentType)
+                            msg.params[i] = decodeArrayBufferArgument(p);
+                        else
+                            substituteReferencedObject(msg.params, i);
+                    }
                     prepareRefObj(msg.params);
                     //var functionScope = !msg.__refId ? thisObj : obj; // FIXME: !!
                     var functionScope = !msg.__refId && obj == scope ? thisObj : obj;
                     response.result = f.apply(functionScope, msg.params);
+                    var resultType = response.__resultType = typeof response.result;
+                    if (resultType == "function" || resultType == "undefined")
+                        response.result = null;
                 }
                 catch (e) {
                     response.error = msg.method + ": " + (e.message || e);
@@ -307,10 +343,14 @@ var JsonRpc = function (msgLink, optionsOrRestricted) {
             if (msg.id != null || response.error)
                 msgLink.postMessage(JSON.stringify(response));
         }
-        else if (msg.result) {
+        else if (msg.hasOwnProperty("result")) {
             var cb = callbacks[msg.id];
             if (cb) {
                 delete callbacks[msg.id];
+                if (msg.__resultType == "undefined")
+                    delete msg.result;
+                else if (msg.__resultType == "function")
+                    msg.result = function () { throw "can't call remote function"; };
                 prepareRefObj(msg.result);
                 cb(msg.result);
             }
@@ -333,5 +373,12 @@ var JsonRpc = function (msgLink, optionsOrRestricted) {
 };
 
 // for node.js
-if (typeof exports !== "undefined")
+if (typeof exports !== "undefined") {
+    global.btoa = function (s) {
+        return new Buffer(s).toString("base64");
+    };
+    global.atob = function (s) {
+        return new Buffer(s, "base64").toString();
+    };
     module.exports = JsonRpc;
+}

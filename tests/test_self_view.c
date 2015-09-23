@@ -1,5 +1,8 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
+ *     Author: Arun Raghavan <arun@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -25,14 +28,13 @@
 
 #define _GNU_SOURCE 1
 
-#include <string.h>
-
 #include "owr.h"
-#include "owr_local.h"
-#include "owr_media_source.h"
-#include "owr_media_renderer.h"
 #include "owr_audio_renderer.h"
+#include "owr_local.h"
+#include "owr_media_renderer.h"
+#include "owr_media_source.h"
 #include "owr_video_renderer.h"
+#include "test_utils.h"
 
 static OwrMediaSource *audio_source = NULL, *video_source = NULL;
 static OwrMediaRenderer *audio_renderer = NULL, *video_renderer = NULL;
@@ -42,19 +44,23 @@ static OwrMediaRenderer *audio_renderer = NULL, *video_renderer = NULL;
 /* For reading source selection from console in manual mode*/
 #include <stdio.h>
 
+#include <string.h>
+
+
 gboolean dump_pipeline(gpointer user_data)
 {
     g_print("Dumping pipelines\n");
 
     if (audio_source)
-        owr_media_source_dump_dot_file(audio_source, "test_self_view-audio_source", FALSE);
+        write_dot_file("test_self_view-audio_source", owr_media_source_get_dot_data(audio_source), FALSE);
     if (audio_renderer)
-        owr_media_renderer_dump_dot_file(audio_renderer, "test_self_view-audio_renderer", FALSE);
+        write_dot_file("test_self_view-audio_renderer", owr_media_renderer_get_dot_data(audio_renderer), FALSE);
 
     if (video_source)
-        owr_media_source_dump_dot_file(video_source, "test_self_view-video_source", FALSE);
+        write_dot_file("test_self_view-video_source", owr_media_source_get_dot_data(video_source), FALSE);
     if (video_renderer)
-        owr_media_renderer_dump_dot_file(video_renderer, "test_self_view-video_renderer", FALSE);
+        write_dot_file("test_self_view-video_renderer", owr_media_renderer_get_dot_data(video_renderer), FALSE);
+
     return FALSE;
 }
 
@@ -151,15 +157,13 @@ void got_sources(GList *sources, gpointer user_data)
     g_timeout_add(5000, dump_pipeline, NULL);
 }
 
-int main() {
-    GMainContext *ctx = g_main_context_default();
-    GMainLoop *loop = g_main_loop_new(ctx, FALSE);
+int main()
+{
+    owr_init(NULL);
 
-    owr_init_with_main_context(ctx);
+    owr_get_capture_sources(OWR_MEDIA_TYPE_AUDIO | OWR_MEDIA_TYPE_VIDEO, got_sources, NULL);
 
-    owr_get_capture_sources(OWR_MEDIA_TYPE_AUDIO|OWR_MEDIA_TYPE_VIDEO, got_sources, NULL);
-
-    g_main_loop_run(loop);
+    owr_run();
 
     return 0;
 }

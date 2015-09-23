@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -34,11 +36,18 @@
 
 #include "owr_types.h"
 
+#include <gst/gst.h>
+
+GST_DEBUG_CATEGORY_EXTERN(_owrvideopayload_debug);
+#define GST_CAT_DEFAULT _owrvideopayload_debug
+
 #define DEFAULT_CCM_FIR FALSE
 #define DEFAULT_NACK_PLI FALSE
 #define DEFAULT_WIDTH 0
 #define DEFAULT_HEIGHT 0
 #define DEFAULT_FRAMERATE 0.0
+#define DEFAULT_ROTATION 0
+#define DEFAULT_MIRROR FALSE
 
 #define OWR_VIDEO_PAYLOAD_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_VIDEO_PAYLOAD, OwrVideoPayloadPrivate))
 
@@ -50,6 +59,8 @@ struct _OwrVideoPayloadPrivate {
     guint width;
     guint height;
     gdouble framerate;
+    gint rotation;
+    gboolean mirror;
 };
 
 
@@ -61,6 +72,8 @@ enum {
     PROP_WIDTH,
     PROP_HEIGHT,
     PROP_FRAMERATE,
+    PROP_ROTATION,
+    PROP_MIRROR,
 
     N_PROPERTIES,
 
@@ -101,6 +114,14 @@ static void owr_video_payload_set_property(GObject *object, guint property_id, c
         priv->framerate = g_value_get_double(value);
         break;
 
+    case PROP_ROTATION:
+        priv->rotation = g_value_get_uint(value);
+        break;
+
+    case PROP_MIRROR:
+        priv->mirror = g_value_get_boolean(value);
+        break;
+
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
         break;
@@ -138,8 +159,16 @@ static void owr_video_payload_get_property(GObject *object, guint property_id, G
         g_value_set_double(value, priv->framerate);
         break;
 
+    case PROP_ROTATION:
+        g_value_set_uint(value, priv->rotation);
+        break;
+
+    case PROP_MIRROR:
+        g_value_set_boolean(value, priv->mirror);
+        break;
+
     case PROP_MEDIA_TYPE:
-        g_value_set_uint(value, OWR_MEDIA_TYPE_VIDEO);
+        g_value_set_enum(value, OWR_MEDIA_TYPE_VIDEO);
         break;
 
     default:
@@ -185,6 +214,16 @@ static void owr_video_payload_class_init(OwrVideoPayloadClass *klass)
         0.0, G_MAXDOUBLE, DEFAULT_FRAMERATE,
         G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS | G_PARAM_STATIC_STRINGS);
 
+    obj_properties[PROP_ROTATION] = g_param_spec_uint("rotation", "rotation",
+        "Clockwise video rotation in multiple of 90 degrees"
+        " (NOTE: currently only works for send payloads)", 0, 3, DEFAULT_ROTATION,
+        G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+
+    obj_properties[PROP_MIRROR] = g_param_spec_boolean("mirror", "mirror",
+        "Whether the video should be mirrored around the y-axis "
+        "(NOTE: currently only works for send payloads)", DEFAULT_MIRROR,
+        G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+
     g_object_class_install_properties(gobject_class, N_PROPERTIES, obj_properties);
 }
 
@@ -196,6 +235,8 @@ static void owr_video_payload_init(OwrVideoPayload *video_payload)
     video_payload->priv->width = DEFAULT_WIDTH;
     video_payload->priv->height = DEFAULT_HEIGHT;
     video_payload->priv->framerate = DEFAULT_FRAMERATE;
+    video_payload->priv->rotation = DEFAULT_ROTATION;
+    video_payload->priv->mirror = DEFAULT_MIRROR;
 }
 
 OwrPayload * owr_video_payload_new(OwrCodecType codec_type, guint payload_type, guint clock_rate,

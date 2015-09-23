@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -38,7 +40,11 @@
 #include <gio/gio.h>
 #include <string.h>
 
+GST_DEBUG_CATEGORY_EXTERN(_owrimageserver_debug);
+#define GST_CAT_DEFAULT _owrimageserver_debug
+
 #define DEFAULT_PORT 3325
+#define DEFAULT_ALLOW_ORIGIN "null"
 
 #define OWR_IMAGE_SERVER_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_IMAGE_SERVER, OwrImageServerPrivate))
 
@@ -47,6 +53,7 @@ G_DEFINE_TYPE(OwrImageServer, owr_image_server, G_TYPE_OBJECT)
 enum {
     PROP_0,
     PROP_PORT,
+    PROP_ALLOW_ORIGIN,
     N_PROPERTIES
 };
 
@@ -62,6 +69,7 @@ static gboolean on_incoming_connection(GThreadedSocketService *service,
 
 struct _OwrImageServerPrivate {
     guint port;
+    gchar *allow_origin;
 
     GHashTable *image_renderers;
     GMutex image_renderers_mutex;
@@ -84,6 +92,8 @@ static void owr_image_server_finalize(GObject *object)
     g_mutex_unlock(&priv->image_renderers_mutex);
     g_mutex_clear(&priv->image_renderers_mutex);
 
+    g_free(priv->allow_origin);
+
     G_OBJECT_CLASS(owr_image_server_parent_class)->finalize(object);
 }
 
@@ -97,6 +107,12 @@ static void owr_image_server_class_init(OwrImageServerClass *klass)
         "The port to listen on for incoming connections",
         0, 65535, DEFAULT_PORT,
         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS);
+
+    obj_properties[PROP_ALLOW_ORIGIN] = g_param_spec_string("allow-origin", "Allow origin",
+        "Space-separated list of origins allowed for cross-origin resource sharing"
+        " (alternatively, \"null\" for none or \"*\" for all)",
+        DEFAULT_ALLOW_ORIGIN,
+        G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
     gobject_class->set_property = owr_image_server_set_property;
     gobject_class->get_property = owr_image_server_get_property;
@@ -112,6 +128,7 @@ static void owr_image_server_init(OwrImageServer *image_server)
     image_server->priv = priv = OWR_IMAGE_SERVER_GET_PRIVATE(image_server);
 
     priv->port = DEFAULT_PORT;
+    priv->allow_origin = g_strdup(DEFAULT_ALLOW_ORIGIN);
 
     priv->image_renderers = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_object_unref);
     g_mutex_init(&priv->image_renderers_mutex);
@@ -134,6 +151,12 @@ static void owr_image_server_set_property(GObject *object, guint property_id,
         priv->port = g_value_get_uint(value);
         break;
 
+    case PROP_ALLOW_ORIGIN:
+        g_free(priv->allow_origin);
+        priv->allow_origin = g_value_dup_string(value);
+        g_strdelimit(priv->allow_origin, "\r\n", ' ');
+        break;
+
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
         break;
@@ -151,6 +174,10 @@ static void owr_image_server_get_property(GObject *object, guint property_id,
     switch (property_id) {
     case PROP_PORT:
         g_value_set_uint(value, priv->port);
+        break;
+
+    case PROP_ALLOW_ORIGIN:
+        g_value_set_string(value, priv->allow_origin);
         break;
 
     default:
@@ -191,9 +218,9 @@ void owr_image_server_add_image_renderer(OwrImageServer *image_server,
 
     g_mutex_lock(&priv->image_renderers_mutex);
 
-    if (!g_hash_table_contains(priv->image_renderers, tag)) {
+    if (!g_hash_table_contains(priv->image_renderers, tag))
         g_hash_table_insert(priv->image_renderers, g_strdup(tag), image_renderer);
-    } else {
+    else {
         g_object_unref(image_renderer);
         g_warning("Image renderer not added, an image renderer is already added for this tag");
     }
@@ -232,6 +259,7 @@ void owr_image_server_remove_image_renderer(OwrImageServer *image_server, const 
 "Content-Length: %u\r\n" \
 "Cache-Control: no-cache,no-store\r\n" \
 "Pragma: no-cache\r\n" \
+"Access-Control-Allow-Origin: %s\r\n" \
 "\r\n"
 
 static gboolean on_incoming_connection(GThreadedSocketService *service,
@@ -259,7 +287,7 @@ static gboolean on_incoming_connection(GThreadedSocketService *service,
 
     error_body = "404 Not Found";
     error_header = g_strdup_printf(HTTP_RESPONSE_HEADER_TEMPLATE, 404, "Not Found",
-        "text/plain", (guint)strlen(error_body));
+        "text/plain", (guint)strlen(error_body), "*");
 
     while (TRUE) {
         line = g_data_input_stream_read_line(dis, &line_length, NULL, NULL);
@@ -314,7 +342,7 @@ static gboolean on_incoming_connection(GThreadedSocketService *service,
             content_length = image_data_size;
             g_free(response_header);
             response_header = g_strdup_printf(HTTP_RESPONSE_HEADER_TEMPLATE, 200, "OK",
-                "image/bmp", content_length);
+                "image/bmp", content_length, image_server->priv->allow_origin);
             g_buffered_output_stream_set_buffer_size(G_BUFFERED_OUTPUT_STREAM(bos),
                 strlen(response_header) + content_length);
         }

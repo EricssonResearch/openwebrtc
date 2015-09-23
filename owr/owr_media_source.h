@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -64,7 +66,7 @@ struct _OwrMediaSourceClass {
 };
 
 GType owr_media_source_get_type(void) G_GNUC_CONST;
-void owr_media_source_dump_dot_file(OwrMediaSource *source, const gchar *base_file_name, gboolean with_ts);
+gchar * owr_media_source_get_dot_data(OwrMediaSource *source);
 
 G_END_DECLS
 

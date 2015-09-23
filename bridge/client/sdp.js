@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Ericsson AB. All rights reserved.
+ * Copyright (C) 2014-2015 Ericsson AB. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -41,6 +41,8 @@ if (typeof(SDP) == "undefined")
         "mblock": "^m=(audio|video|application) ([\\d]+) ([A-Z/]+)([\\d ]*)$\\r?\\n",
         "mode": "^a=(sendrecv|sendonly|recvonly|inactive).*$",
         "rtpmap": "^a=rtpmap:${type} ([\\w\\-]+)/([\\d]+)/?([\\d]+)?.*$",
+        "fmtp": "^a=fmtp:${type} ([\\w\\-=;]+).*$",
+        "param": "([\\w\\-]+)=([\\w\\-]+);?",
         "nack": "^a=rtcp-fb:${type} nack$",
         "nackpli": "^a=rtcp-fb:${type} nack pli$",
         "ccmfir": "^a=rtcp-fb:${type} ccm fir$",
@@ -55,7 +57,7 @@ if (typeof(SDP) == "undefined")
             "( tcptype (active|passive|so))?.*$",
         "fingerprint": "^a=fingerprint:(sha-1|sha-256) ([A-Fa-f\\d\:]+).*$",
         "setup": "^a=setup:(actpass|active|passive).*$",
-        "sctpmap": "^a=sctpmap:${port} ([\\w\\-]+)( [\\d]{3,})?( [\\d]+)?.*$"
+        "sctpmap": "^a=sctpmap:${port} ([\\w\\-]+)( [\\d]+)?.*$"
     };
 
     var templates = {
@@ -75,6 +77,7 @@ if (typeof(SDP) == "undefined")
             "${rtcpMuxLine}" +
             "a=${mode}\r\n" +
             "${rtpMapLines}" +
+            "${fmtpLines}" +
             "${nackLines}" +
             "${nackpliLines}" +
             "${ccmfirLines}" +
@@ -90,6 +93,7 @@ if (typeof(SDP) == "undefined")
         "rtcpMux": "a=rtcp-mux\r\n",
 
         "rtpMap": "a=rtpmap:${type} ${encodingName}/${clockRate}${[/]channels}\r\n",
+        "fmtp": "a=fmtp:${type} ${parameters}\r\n",
         "nack": "a=rtcp-fb:${type} nack\r\n",
         "nackpli": "a=rtcp-fb:${type} nack pli\r\n",
         "ccmfir": "a=rtcp-fb:${type} ccm fir\r\n",
@@ -108,7 +112,7 @@ if (typeof(SDP) == "undefined")
         "dtlsFingerprint": "a=fingerprint:${fingerprintHashFunction} ${fingerprint}\r\n",
         "dtlsSetup": "a=setup:${setup}\r\n",
 
-        "sctpmap": "a=sctpmap:${port} ${app}${[ ]maxMessageSize}${[ ]streams}\r\n"
+        "sctpmap": "a=sctpmap:${port} ${app}${[ ]streams}\r\n"
     };
 
     function match(data, pattern, flags, alt) {
@@ -154,7 +158,7 @@ if (typeof(SDP) == "undefined")
         if (originator) {
             sdpObj.originator = {
                 "username": originator[1],
-                "sessionId": parseInt(originator[2]),
+                "sessionId": originator[2],
                 "sessionVersion": parseInt(originator[3]),
                 "netType": "IN",
                 "addressType": originator[4],
@@ -175,12 +179,14 @@ if (typeof(SDP) == "undefined")
         for (var i = 0; i < parts.length; i += 5) {
             var mediaDescription = {
                 "type": parts[i],
-                "port": parts[i + 1],
+                "port": parseInt(parts[i + 1]),
                 "protocol": parts[i + 2],
             };
-            var fmt = parts[i + 3].trimLeft().split(/ +/).map(function (x) {
-                return parseInt(x);
-            });
+            var fmt = parts[i + 3].replace(/^[\s\uFEFF\xA0]+/, '')
+                .split(/ +/)
+                .map(function (x) {
+                    return parseInt(x);
+                });
             var mblock = parts[i + 4];
 
             var connection = match(mblock, regexps.cline, "m", sblock);
@@ -219,6 +225,18 @@ if (typeof(SDP) == "undefined")
                     payload.encodingName = payloadType == 8 ? "PCMA" : "PCMU";
                     payload.clockRate = 8000;
                     payload.channels = 1;
+                }
+                var fmtpLine = fillTemplate(regexps.fmtp, payload);
+                var fmtp = match(mblock, fmtpLine, "m");
+                if (fmtp) {
+                    payload.parameters = {};
+                    fmtp[1].replace(new RegExp(regexps.param, "g"),
+                        function(_, key, value) {
+                            key = key.replace(/-([a-z])/g, function (_, c) {
+                                return c.toUpperCase();
+                            });
+                            payload.parameters[key] = isNaN(+value) ? value : +value;
+                    });
                 }
                 mediaDescription.payloads.push(payload);
             });
@@ -294,6 +312,8 @@ if (typeof(SDP) == "undefined")
                         if (candidate.port == 0 || candidate.port == 9) {
                             candidate.tcpType = "active";
                             candidate.port = 9;
+                        } else {
+                            return;
                         }
                     }
                     mediaDescription.ice.candidates.push(candidate);
@@ -323,9 +343,7 @@ if (typeof(SDP) == "undefined")
                 if (sctpmap) {
                     mediaDescription.sctp.app = sctpmap[1];
                     if (sctpmap[2])
-                        mediaDescription.sctp.maxMessageSize = parseInt(sctpmap[2]);
-                    if (sctpmap[3])
-                        mediaDescription.sctp.streams = parseInt(sctpmap[3]);
+                        mediaDescription.sctp.streams = parseInt(sctpmap[2]);
                 }
             }
 
@@ -347,7 +365,7 @@ if (typeof(SDP) == "undefined")
         });
         addDefaults(sdpObj.originator, {
             "username": "-",
-            "sessionId": Math.floor((Math.random() + +new Date()) * 1e6),
+            "sessionId": "" + Math.floor((Math.random() + +new Date()) * 1e6),
             "sessionVersion": 1,
             "netType": "IN",
             "addressType": "IP4",
@@ -382,7 +400,7 @@ if (typeof(SDP) == "undefined")
             });
             var mblock = fillTemplate(templates.mblock, mediaDescription);
 
-            var payloadInfo = {"rtpMapLines": "", "nackLines": "",
+            var payloadInfo = {"rtpMapLines": "", "fmtpLines": "", "nackLines": "",
                 "nackpliLines": "", "ccmfirLines": ""};
             mediaDescription.payloads.forEach(function (payload) {
                 if (payloadInfo.fmt)
@@ -392,6 +410,18 @@ if (typeof(SDP) == "undefined")
                 if (!payload.channels || payload.channels == 1)
                     payload.channels = null;
                 payloadInfo.rtpMapLines += fillTemplate(templates.rtpMap, payload);
+                if (payload.parameters) {
+                    var fmtpInfo = { "type": payload.type, "parameters": "" };
+                    for (var p in payload.parameters) {
+                        var param = p.replace(/([A-Z])([a-z])/g, function (_, a, b) {
+                            return "-" + a.toLowerCase() + b;
+                        });
+                        if (fmtpInfo.parameters)
+                            fmtpInfo.parameters += ";";
+                        fmtpInfo.parameters += param + "=" + payload.parameters[p];
+                    }
+                    payloadInfo.fmtpLines += fillTemplate(templates.fmtp, fmtpInfo);
+                }
                 if (payload.nack)
                     payloadInfo.nackLines += fillTemplate(templates.nack, payload);
                 if (payload.nackpli)
@@ -465,7 +495,7 @@ if (typeof(SDP) == "undefined")
 
             var sctpInfo = {"sctpmapLine": "", "fmt": ""};
             if (mediaDescription.sctp) {
-                addDefaults(mediaDescription.sctp, {"maxMessageSize": null, "streams": null});
+                addDefaults(mediaDescription.sctp, {"streams": null});
                 sctpInfo.sctpmapLine = fillTemplate(templates.sctpmap, mediaDescription.sctp);
                 sctpInfo.fmt = mediaDescription.sctp.port;
             }

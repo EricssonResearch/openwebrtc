@@ -3,11 +3,11 @@ exec_prefix=@exec_prefix@
 libdir=@libdir@
 datarootdir=@datarootdir@
 datadir=@datadir@
-includedir=@includedir@/libopenwebrtc-bridge-0.1
+includedir=@includedir@
 
 Name: libopenwebrtc-bridge
 Description: libopenwebrtc-bridge
 Version: @VERSION@
-Requires: glib-2.0 gobject-2.0 gmodule-2.0 gthread-2.0 seed
+Requires: openwebrtc-@OWR_API_VERSION@ glib-2.0 gobject-2.0 gmodule-2.0 gthread-2.0 seed
 Libs: -L${libdir} -lopenwebrtc_bridge
 Cflags: -I${includedir}

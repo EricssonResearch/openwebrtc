@@ -1,5 +1,8 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
+ *     Author: Arun Raghavan <arun@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -31,29 +34,33 @@
 #include "config.h"
 #endif
 
-#include <gst/gstinfo.h>
-
 #include "owr_device_list_private.h"
 #include "owr_local_media_source_private.h"
 #include "owr_media_source.h"
+#include "owr_private.h"
 #include "owr_types.h"
 #include "owr_utils.h"
-#include "owr_private.h"
+
+#include <gst/gstinfo.h>
+
+GST_DEBUG_CATEGORY_EXTERN(_owrdevicelist_debug);
+#define GST_CAT_DEFAULT _owrdevicelist_debug
 
 #ifdef __APPLE__
-#include <TargetConditionals.h>
 #include "owr_device_list_avf_private.h"
+#include <TargetConditionals.h>
 
 #elif defined(__ANDROID__)
 #include <assert.h>
+#include <dlfcn.h>
 #include <jni.h>
 #include <stdlib.h>
-#include <dlfcn.h>
 
 #elif defined(__linux__)
 #include <fcntl.h>
 #include <linux/videodev2.h>
-#include <libv4l2.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
 
 #endif /* defined(__linux__) */
 
@@ -69,6 +76,7 @@ typedef struct {
 static gboolean cb_call_closure_with_list_later(CallbackAndList *cal)
 {
     _owr_utils_call_closure_with_list(cal->callback, cal->list);
+    g_list_free_full(cal->list, g_object_unref);
 
     g_slice_free(CallbackAndList, cal);
 
@@ -93,11 +101,12 @@ void _owr_get_capture_devices(OwrMediaType types, GClosure *callback)
 
     g_return_if_fail(callback);
 
-    if (G_CLOSURE_NEEDS_MARSHAL(callback)) {
+    if (G_CLOSURE_NEEDS_MARSHAL(callback))
         g_closure_set_marshal(callback, g_cclosure_marshal_generic);
-    }
 
-    merger = _owr_utils_list_closure_merger_new(callback, (GDestroyNotify) g_object_unref);
+    merger = _owr_utils_list_closure_merger_new(callback,
+        (GCopyFunc) g_object_ref,
+        (GDestroyNotify) g_object_unref);
 
     if (types & OWR_MEDIA_TYPE_VIDEO) {
         g_closure_ref(merger);
@@ -118,13 +127,17 @@ void _owr_get_capture_devices(OwrMediaType types, GClosure *callback)
 
 static gboolean enumerate_video_source_devices(GClosure *callback)
 {
-    _owr_utils_call_closure_with_list(callback, _owr_get_avf_video_sources());
+    GList *sources = _owr_get_avf_video_sources();
+    _owr_utils_call_closure_with_list(callback, sources);
+    g_list_free_full(sources, g_object_unref);
     return FALSE;
 }
 
 static gboolean enumerate_audio_source_devices(GClosure *callback)
 {
-    _owr_utils_call_closure_with_list(callback, _owr_get_core_audio_sources());
+    GList *sources = _owr_get_core_audio_sources();
+    _owr_utils_call_closure_with_list(callback, sources);
+    g_list_free_full(sources, g_object_unref);
     return FALSE;
 }
 
@@ -211,15 +224,14 @@ static void on_pulse_context_state_change(pa_context *pa_context, AudioListConte
 {
     gint error;
     error = pa_context_errno(pa_context);
-    if (error) {
-        g_print("PulseAudio: error: %s", pa_strerror(error));
-    }
+    if (error)
+        g_warning("PulseAudio: error: %s", pa_strerror(error));
     switch (pa_context_get_state(pa_context)) {
     case PA_CONTEXT_READY:
         pa_context_get_source_info_list(pa_context, (pa_source_info_cb_t) source_info_iterator, context);
         break;
     case PA_CONTEXT_FAILED:
-        g_print("PulseAudio: failed to connect to daemon");
+        g_warning("PulseAudio: failed to connect to daemon");
         finish_pa_list(context);
         break;
     case PA_CONTEXT_TERMINATED:
@@ -244,7 +256,7 @@ static void source_info_iterator(pa_context *pa_context, const pa_source_info *i
     if (!eol) {
         OwrLocalMediaSource *source;
 
-        if (info->monitor_of_sink_name != NULL) {
+        if (info->monitor_of_sink_name) {
             /* We don't want to list monitor sources */
             return;
         }
@@ -268,10 +280,13 @@ static void source_info_iterator(pa_context *pa_context, const pa_source_info *i
 static gboolean enumerate_audio_source_devices(GClosure *callback)
 {
     OwrLocalMediaSource *source;
+    GList *sources = NULL;
 
     source = _owr_local_media_source_new_cached(-1,
         "Default audio input", OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_CAPTURE);
-    _owr_utils_call_closure_with_list(callback, g_list_prepend(NULL, source));
+    sources = g_list_prepend(sources, source);
+    _owr_utils_call_closure_with_list(callback, sources);
+    g_list_free_full(sources, g_object_unref);
 
     return FALSE;
 }
@@ -286,28 +301,26 @@ static gchar *get_v4l2_device_name(gchar *filename)
 {
     gchar *device_name;
     int fd = 0;
+    struct v4l2_capability vcap;
 
     fd = open(filename, O_RDWR);
 
     if (fd <= 0) {
-        g_print("v4l: failed to open %s", filename);
+        g_warning("v4l: failed to open %s", filename);
 
         device_name = g_strdup(filename);
 
-	return NULL;
-    } else {
-        struct v4l2_capability vcap;
-
-        if (v4l2_ioctl(fd, VIDIOC_QUERYCAP, &vcap) < 0) {
-            g_print("v4l: failed to query %s", filename);
-
-            device_name = g_strdup(filename);
-        } else {
-            device_name = g_strdup((const gchar *)vcap.card);
-        }
+        return NULL;
     }
 
-    g_print("v4l: found device: %s\n", device_name);
+    if (ioctl(fd, VIDIOC_QUERYCAP, &vcap) < 0) {
+        g_warning("v4l: failed to query %s", filename);
+
+        device_name = g_strdup(filename);
+    } else
+        device_name = g_strdup((const gchar *)vcap.card);
+
+    g_debug("v4l: found device: %s", device_name);
 
     close(fd);
 
@@ -341,13 +354,13 @@ static OwrLocalMediaSource *maybe_create_source_from_filename(const gchar *name)
         g_free(filename);
         filename = NULL;
 
-	if (!device_name)
-            return NULL;
+    if (!device_name)
+        return NULL;
 
         source = _owr_local_media_source_new_cached(index, device_name,
             OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE);
 
-        g_print("v4l: filename match: %s\n", device_name);
+        g_debug("v4l: filename match: %s", device_name);
 
         g_free(device_name);
     }
@@ -370,15 +383,15 @@ static gboolean enumerate_video_source_devices(GClosure *callback)
     while ((filename = g_dir_read_name(dev_dir))) {
         source = maybe_create_source_from_filename(filename);
 
-        if (source) {
+        if (source)
             sources = g_list_prepend(sources, source);
-        }
     }
 
     g_dir_close(dev_dir);
 
     sources = g_list_reverse(sources);
     _owr_utils_call_closure_with_list(callback, sources);
+    g_list_free_full(sources, g_object_unref);
 
     return FALSE;
 }
@@ -411,7 +424,7 @@ static void on_java_detach(JavaVM *jvm)
 {
     g_return_if_fail(jvm);
 
-    g_print("%s detached thread(%ld) from Java VM", __FUNCTION__, pthread_self());
+    g_debug("%s detached thread(%ld) from Java VM", __FUNCTION__, pthread_self());
     (*jvm)->DetachCurrentThread(jvm);
     pthread_setspecific(detach_key, NULL);
 }
@@ -435,7 +448,7 @@ static int get_android_sdk_version(JNIEnv *env)
     }
 
     version = (*env)->GetStaticIntField(env, ref, field_id);
-    g_print("android device list: android sdk version is: %d\n", version);
+    g_debug("android device list: android sdk version is: %d", version);
 
     (*env)->DeleteLocalRef(env, ref);
 
@@ -459,16 +472,14 @@ static JNIEnv* get_jni_env_from_jvm(JavaVM *jvm)
             return NULL;
         }
 
-        g_print("attached thread (%ld) to jvm\n", pthread_self());
+        g_debug("attached thread (%ld) to jvm", pthread_self());
 
-        if (pthread_key_create(&detach_key, (void (*)(void *)) on_java_detach)) {
+        if (pthread_key_create(&detach_key, (void (*)(void *)) on_java_detach))
             g_warning("android device list: failed to set on_java_detach");
-        }
 
-        pthread_setspecific(detach_key, env);
-    } else if (JNI_OK != err) {
+        pthread_setspecific(detach_key, jvm);
+    } else if (JNI_OK != err)
         g_warning("jvm->GetEnv() failed");
-    }
 
     return env;
 }
@@ -496,7 +507,7 @@ static JavaVM *get_java_vm(void)
     gpointer handle = NULL;
     static JavaVM *jvm = NULL;
     const gchar *error_string;
-    jsize num_jvms = NULL;
+    jsize num_jvms = 0;
     gint lib_index = 0;
     gint err;
 
@@ -505,15 +516,13 @@ static JavaVM *get_java_vm(void)
         handle = dlopen(android_runtime_libs[lib_index], RTLD_LOCAL | RTLD_LAZY);
         error_string = dlerror();
 
-        if (error_string) {
-            g_print("failed to load %s: %s\n", android_runtime_libs[lib_index], error_string);
-        }
+        if (error_string)
+            g_debug("failed to load %s: %s", android_runtime_libs[lib_index], error_string);
 
-        if (handle) {
-            g_print("Android runtime loaded from %s\n", android_runtime_libs[lib_index]);
-        } else {
+        if (handle)
+            g_debug("Android runtime loaded from %s", android_runtime_libs[lib_index]);
+        else
             ++lib_index;
-        }
     }
 
     if (handle) {
@@ -528,19 +537,16 @@ static JavaVM *get_java_vm(void)
 
         get_created_java_vms(&jvm, 1, &num_jvms);
 
-        if (num_jvms < 1) {
-            g_print("get_created_java_vms returned %d jvms", num_jvms);
-        } else {
-            g_print("found existing jvm");
-        }
+        if (num_jvms < 1)
+            g_debug("get_created_java_vms returned %d jvms", num_jvms);
+        else
+            g_debug("found existing jvm");
 
         err = dlclose(handle);
-        if (err) {
+        if (err)
             g_warning("dlclose() of android runtime handle failed");
-        }
-    } else {
-        g_warning("Failed to get jvm");
-    }
+    } else
+        g_error("Failed to get jvm");
 
     return jvm;
 }
@@ -632,42 +638,33 @@ static gint get_number_of_cameras(void)
     return (*env)->CallStaticIntMethod(env, Camera.class, Camera.getNumberOfCameras);
 }
 
-static gchar *get_camera_name(gint camera_index)
+static jint get_camera_facing(gint camera_index)
 {
     jint facing;
     jobject camera_info_instance;
     JNIEnv *env;
 
     env = get_jni_env();
-    g_return_val_if_fail(env, NULL);
+    g_return_val_if_fail(env, 0);
 
     camera_info_instance = (*env)->NewObject(env, CameraInfo.class, CameraInfo.constructor);
     if ((*env)->ExceptionCheck(env)) {
         (*env)->ExceptionClear(env);
         g_warning("android device list: failed to create CameraInfo object");
-        return NULL;
+        return -1;
     }
 
     (*env)->CallStaticVoidMethod(env, Camera.class, Camera.getCameraInfo, camera_index, camera_info_instance);
     if ((*env)->ExceptionCheck(env)) {
         (*env)->ExceptionClear(env);
         g_warning("android device list: could not get camera info");
-        return NULL;
+        return -1;
     }
 
     facing = (*env)->GetIntField(env, camera_info_instance, CameraInfo.facing);
     (*env)->DeleteLocalRef(env, camera_info_instance);
 
-    if (facing == CameraInfo.CAMERA_FACING_FRONT) {
-        g_print("found front facing camera\n");
-        return g_strdup("Front facing Camera");
-    } else if (facing == CameraInfo.CAMERA_FACING_BACK) {
-        g_print("found back facing camera\n");
-        return g_strdup("Back facing Camera");
-    } else {
-        g_print("found camera with unknown position\n");
-        return g_strdup("Unknown Camera");
-    }
+    return facing;
 }
 
 static gboolean enumerate_video_source_devices(GClosure *callback)
@@ -680,14 +677,22 @@ static gboolean enumerate_video_source_devices(GClosure *callback)
     num = get_number_of_cameras();
 
     for (i = 0; i < num; ++i) {
-        source = _owr_local_media_source_new_cached(i, get_camera_name(i),
-            OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE);
+        jint facing = get_camera_facing(i);
 
-        sources = g_list_prepend(sources, source);
+        if (facing == CameraInfo.CAMERA_FACING_FRONT) {
+            source = _owr_local_media_source_new_cached(i, "Front facing Camera",
+                OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE);
+            sources = g_list_prepend(sources, source);
+        } else if (facing == CameraInfo.CAMERA_FACING_BACK) {
+            source = _owr_local_media_source_new_cached(i, "Back facing Camera",
+                OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE);
+            sources = g_list_append(sources, source);
+        }
+
     }
 
-    sources = g_list_reverse(sources);
     _owr_utils_call_closure_with_list(callback, sources);
+    g_list_free_full(sources, g_object_unref);
 
     return FALSE;
 }

@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -31,11 +33,13 @@
 #include "config.h"
 #endif
 #include "owr_audio_renderer.h"
+
 #include "owr_media_renderer_private.h"
+#include "owr_private.h"
 #include "owr_utils.h"
 
-#include "owr_private.h"
-
+GST_DEBUG_CATEGORY_EXTERN(_owraudiorenderer_debug);
+#define GST_CAT_DEFAULT _owraudiorenderer_debug
 
 #ifdef __APPLE__
 #include <TargetConditionals.h>
@@ -77,6 +81,7 @@ static void owr_audio_renderer_constructed(GObject *object);
 
 static GstElement *owr_audio_renderer_get_element(OwrMediaRenderer *renderer);
 static GstCaps *owr_audio_renderer_get_caps(OwrMediaRenderer *renderer);
+static GstElement *owr_audio_renderer_get_sink(OwrMediaRenderer *renderer);
 
 struct _OwrAudioRendererPrivate {
     gint dummy;
@@ -92,6 +97,7 @@ static void owr_audio_renderer_class_init(OwrAudioRendererClass *klass)
     gobject_class->constructed = owr_audio_renderer_constructed;
 
     media_renderer_class->get_caps = (void *(*)(OwrMediaRenderer *))owr_audio_renderer_get_caps;
+    media_renderer_class->get_sink = (void *(*)(OwrMediaRenderer *))owr_audio_renderer_get_sink;
 
 }
 
@@ -142,11 +148,8 @@ static GstElement *owr_audio_renderer_get_element(OwrMediaRenderer *renderer)
     volume = gst_element_factory_make("volume", "audio-renderer-volume");
     g_object_bind_property(renderer, "disabled", volume, "mute", G_BINDING_SYNC_CREATE);
 
-    sink = gst_element_factory_make(AUDIO_SINK, "audio-renderer-sink");
+    sink = OWR_MEDIA_RENDERER_GET_CLASS(renderer)->get_sink(renderer);
     g_assert(sink);
-
-    g_object_set(sink, "buffer-time", SINK_BUFFER_TIME,
-        "latency-time", G_GINT64_CONSTANT(10000), NULL);
 
     gst_bin_add_many(GST_BIN(renderer_bin), audioresample, audioconvert, capsfilter,
         volume, sink, NULL);
@@ -186,4 +189,17 @@ static GstCaps *owr_audio_renderer_get_caps(OwrMediaRenderer *renderer)
         "layout", G_TYPE_STRING, "interleaved",
         NULL);
     return caps;
+}
+
+static GstElement *owr_audio_renderer_get_sink(OwrMediaRenderer *renderer)
+{
+    GstElement *sink = NULL;
+
+    OWR_UNUSED(renderer);
+
+    sink = gst_element_factory_make(AUDIO_SINK, "audio-renderer-sink");
+    g_object_set(sink, "buffer-time", SINK_BUFFER_TIME,
+        "latency-time", G_GINT64_CONSTANT(10000),
+        "enable-last-sample", FALSE, NULL);
+    return sink;
 }

@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -40,14 +42,14 @@ OwrPayload * _owr_media_session_get_receive_payload(OwrMediaSession *media_sessi
 OwrPayload * _owr_media_session_get_send_payload(OwrMediaSession *media_session);
 OwrMediaSource * _owr_media_session_get_send_source(OwrMediaSession *media_session);
 
+gboolean _owr_media_session_want_receive_rtx(OwrMediaSession *media_session);
+GstStructure * _owr_media_session_get_receive_rtx_pt_map(OwrMediaSession *media_session);
+
 void _owr_media_session_set_on_send_payload(OwrMediaSession *media_session, GClosure *on_send_payload);
 void _owr_media_session_set_on_send_source(OwrMediaSession *media_session, GClosure *on_send_source);
 void _owr_media_session_clear_closures(OwrMediaSession *media_session);
 
 GstBuffer * _owr_media_session_get_srtp_key_buffer(OwrMediaSession *media_session, const gchar *keyname);
-
-void _owr_media_session_set_send_ssrc(OwrMediaSession *media_session, guint send_ssrc);
-void _owr_media_session_set_cname(OwrMediaSession *media_session, const gchar *cname);
 
 G_END_DECLS
 

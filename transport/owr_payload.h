@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2014, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -42,6 +44,8 @@ G_BEGIN_DECLS
 #define OWR_IS_PAYLOAD(obj)         (G_TYPE_CHECK_INSTANCE_TYPE((obj), OWR_TYPE_PAYLOAD))
 #define OWR_IS_PAYLOAD_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass), OWR_TYPE_PAYLOAD))
 #define OWR_PAYLOAD_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS((obj), OWR_TYPE_PAYLOAD, OwrPayloadClass))
+
+#define OWR_RTX_PAYLOAD_TYPE_DISABLED -1
 
 typedef struct _OwrPayload        OwrPayload;
 typedef struct _OwrPayloadClass   OwrPayloadClass;

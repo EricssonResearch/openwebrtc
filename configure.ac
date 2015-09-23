@@ -1,10 +1,15 @@
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT(openwebrtc, 0.1)
+AC_INIT(openwebrtc, 0.3.0)
 
 AC_CONFIG_HEADERS([config.h])
 
 AC_CONFIG_MACRO_DIR(m4)
+
+OWR_API_VERSION=0.3
+AC_SUBST(OWR_API_VERSION)
+OWR_API_VERSION_UNDERSCORE=0_3
+AC_SUBST(OWR_API_VERSION_UNDERSCORE)
 
 AM_INIT_AUTOMAKE([1.11 -Wno-portability foreign])
 
@@ -24,16 +29,32 @@ GST_REQUIRED=1.4
 PKG_CHECK_MODULES(GLIB, [glib-2.0, gobject-2.0, gmodule-2.0, gthread-2.0])
 PKG_CHECK_MODULES(GSTREAMER, [gstreamer-1.0 >= $GST_REQUIRED gstreamer-rtp-1.0 >= $GST_REQUIRED gstreamer-video-1.0 >= $GST_REQUIRED gstreamer-app-1.0 >= $GST_REQUIRED])
 PKG_CHECK_MODULES(NICE, [nice >= 0.1.7.1])
+PKG_CHECK_MODULES(GSTREAMER_SCTP, [gstreamer-sctp-1.0])
 PKG_CHECK_MODULES(ORC, [orc-0.4])
-PKG_CHECK_MODULES(SEED, [seed])
+
+dnl build bridge or not
+AC_MSG_CHECKING([whether to build bridge or not])
+AC_ARG_ENABLE(bridge,
+AC_HELP_STRING(
+  [--enable-bridge],
+  [Enable bridge @<:@default=yes@:>@]),
+[case "${enableval}" in
+  yes) enable_bridge=yes ;;
+  no)  enable_bridge=no ;;
+  *) AC_MSG_ERROR(bad value ${enableval} for --enable-bridge) ;;
+esac],[enable_bridge=yes])
+AC_MSG_RESULT([$enable_bridge])
+if test "x$enable_bridge" = xyes; then
+  AC_DEFINE(OWR_BRIDGE, 1,
+  [Define if building bridge])
+  PKG_CHECK_MODULES(SEED, [seed])
+fi
+AM_CONDITIONAL(OWR_BRIDGE, test x$enable_bridge = xyes)
+
+AC_CONFIG_MACRO_DIR(m4)
 
 # check for gobject-introspection
-m4_ifdef([GOBJECT_INTROSPECTION_CHECK], [
 GOBJECT_INTROSPECTION_CHECK([1.30.0])
-],[
-AM_CONDITIONAL([ENABLE_GOBJECT_INTROSPECTION], false)
-])
-AC_CONFIG_MACRO_DIR(m4)
 
 m4_ifdef([GTK_DOC_CHECK], [
 GTK_DOC_CHECK([1.18],[--flavour no-tmpl])
@@ -59,6 +80,26 @@ if test "x$enable_debug" = xyes; then
 fi
 AM_CONDITIONAL(OWR_DEBUG, test x$enable_debug = xyes)
 
+dnl build debug or not
+AC_MSG_CHECKING([whether to build tests or not])
+AC_ARG_ENABLE(tests,
+AC_HELP_STRING(
+  [--enable-tests],
+  [Enable tests @<:@default=yes@:>@]),
+[case "${enableval}" in
+  yes) enable_tests=yes ;;
+  no)  enable_tests=no ;;
+  *) AC_MSG_ERROR(bad value ${enableval} for --enable-tests) ;;
+esac],[enable_tests=yes])
+AC_MSG_RESULT([$enable_tests])
+if test "x$enable_tests" = xyes; then
+  PKG_CHECK_MODULES(JSON_GLIB, [json-glib-1.0])
+  PKG_CHECK_MODULES(LIBSOUP, [libsoup-2.4])
+  AC_DEFINE(OWR_TESTS, 1,
+  [Define if building tests])
+fi
+AM_CONDITIONAL(OWR_TESTS, test x$enable_tests = xyes)
+
 dnl build static or not
 AC_MSG_CHECKING([whether to build static owr or not])
 AC_ARG_ENABLE(owr-static,
@@ -78,23 +119,68 @@ fi
 AC_SUBST(GST_STATIC_PLUGINS_DIR)
 AM_CONDITIONAL(OWR_STATIC, test x$enable_owr_static = xyes)
 
+dnl build GStreamer library or not
+AC_MSG_CHECKING([whether to build owr-gst or not])
+AC_ARG_ENABLE(owr-gst,
+AC_HELP_STRING(
+  [--enable-owr-gst],
+  [Enable owr-gst @<:@default=no@:>@]),
+[case "${enableval}" in
+  yes) enable_owr_gst=yes ;;
+  no)  enable_owr_gst=no ;;
+  *) AC_MSG_ERROR(bad value ${enableval} for --enable-owr-gst) ;;
+esac],[enable_owr_gst=no])
+AC_MSG_RESULT([$enable_owr_gst])
+if test "x$enable_owr_gst" = xyes; then
+  if test x$enable_owr_static = xyes; then
+    AC_MSG_ERROR(owr-gst is not supported with owr-static)
+  fi
+  AC_DEFINE(OWR_GST, 1,
+  [Define if building owr-gst])
+fi
+AM_CONDITIONAL(OWR_GST, test x$enable_owr_gst = xyes)
+
 dnl pick dependencies and build flags based on OS
 case "$host_os" in
   darwin*)
     is_apple=yes
-    OWR_DEVICE_LIST_EXT_LIBS="-framework AVFoundation"
+    AC_CHECK_HEADER(AVFoundation/AVFoundation.h, ,
+                    AC_MSG_ERROR(AVFoundation is needed while building for OS X or iOS),
+                    [-])
+    AC_CHECK_HEADER(MobileCoreServices/MobileCoreServices.h, is_ios="yes",
+                    is_ios="no", [-])
+    if test "x$is_ios" == "xno"; then
+      dnl OS X frameworks
+      OWR_DEVICE_LIST_EXT_LIBS="-framework AVFoundation "
+    else
+      dnl iOS frameworks
+      m4_foreach([check_header],
+                 [[AssetsLibrary/AssetsLibrary.h], [CoreMedia/CoreMedia.h],
+                  [CoreVideo/CoreVideo.h], [OpenGLES/ES2/gl.h],
+                  [CoreAudio/CoreAudio.h], [AudioToolbox/AudioToolbox.h]],
+                 AC_CHECK_HEADER([check_header], ,
+                                 AC_MSG_ERROR([check_header is needed while
+					       building for iOS]),
+                                 [-]))
+      OWR_DEVICE_LIST_EXT_LIBS="-framework AssetsLibrary -framework CoreMedia \
+        -framework CoreVideo -framework AVFoundation -framework Foundation \
+        -framework OpenGLES -framework CoreAudio -framework AudioToolbox \
+        -weak_framework VideoToolbox -lc++ "
+    fi
     ;;
   linux-android*)
+    is_android=yes
+    OWR_DEVICE_LIST_EXT_CFLAGS=""
+    OWR_DEVICE_LIST_EXT_LIBS=""
     ;;
   linux*)
     PKG_CHECK_MODULES(PULSE, [libpulse libpulse-mainloop-glib])
-    PKG_CHECK_MODULES(V4L2, [libv4l2])
-    OWR_DEVICE_LIST_EXT_CFLAGS="\$(PULSE_CFLAGS) \$(V4L2_CFLAGS)"
-    OWR_DEVICE_LIST_EXT_LIBS="\$(PULSE_LIBS) \$(V4L2_LIBS)"
+    OWR_DEVICE_LIST_EXT_CFLAGS="\$(PULSE_CFLAGS)"
+    OWR_DEVICE_LIST_EXT_LIBS="\$(PULSE_LIBS)"
     ;;
 esac
-AC_SUBST(OWR_DEVICE_LIST_EXT_LIBS)
 AM_CONDITIONAL(TARGET_APPLE, test x$is_apple = xyes)
+dnl We substitute OWR_DEVICE_LIST_EXT_LIBS in the end
 
 dnl generate java bindings or not
 AC_MSG_CHECKING([whether to generate java bindings or not])
@@ -109,6 +195,9 @@ AC_HELP_STRING(
 esac],[enable_owr_java=no])
 AC_MSG_RESULT([$enable_owr_java])
 if test "x$enable_owr_java" = xyes; then
+  if test "x$is_android" != xyes; then
+    AC_MSG_ERROR([--enable-owr-java is only valid when building for Android])
+  fi
   if test "x$enable_shared" != xyes; then
     AC_MSG_ERROR([--enable-owr-java needs --enabled-shared])
   fi
@@ -119,6 +208,10 @@ if test "x$enable_owr_java" = xyes; then
   AC_PATH_PROG(JAR, jar)
   if test -z "$JAR"; then
     AC_MSG_ERROR([You need 'jar' to build the Android bindings])
+  fi
+  AC_PATH_PROG(JAVADOC, javadoc)
+  if test -z "$JAVADOC"; then
+    AC_MSG_ERROR([You need 'javadoc' to build the Android bindings])
   fi
   AC_DEFINE(OWR_JAVA, 1,
   [Define if generating bindings for java])
@@ -134,6 +227,15 @@ AC_ARG_WITH(jardir,
 AC_MSG_RESULT([$jardir])
 AC_SUBST(jardir)
 
+dnl The Javadoc installation path is needed as well
+AC_MSG_CHECKING([for javadoc installation path])
+AC_ARG_WITH(javadocdir,
+            AS_HELP_STRING([--with-javadocdir],
+                           [javadoc file installation path [LIBDIR/share/javadoc]]),
+            javadocdir=${withval}, javadocdir=${datarootdir}/javadoc/openwebrtc)
+AC_MSG_RESULT([$javadocdir])
+AC_SUBST(javadocdir)
+
 dnl Android SDK path is needed when Java bindings are enabled
 AC_ARG_WITH(android-sdk,
             AS_HELP_STRING([--with-android-sdk],
@@ -141,7 +243,7 @@ AC_ARG_WITH(android-sdk,
             androidsdkdir=${withval}, androidsdkdir=)
 if test "x$enable_owr_java" = xyes; then
   AC_MSG_CHECKING([for android.jar])
-  if test -a "x$androidsdkdir" = x; then
+  if test "x$androidsdkdir" = x; then
     AC_MSG_ERROR([Need path to the Android SDK when building Android bindings])
   fi
   ANDROID_CLASSPATH="$androidsdkdir/platforms/android-20/android.jar"
@@ -155,15 +257,15 @@ if test "x$enable_owr_java" = xyes; then
 fi
 AC_SUBST(ANDROID_CLASSPATH)
 
-dnl Android NDK path is needed when Java bindings are enabled
+dnl Android NDK path is needed when building for Android
 AC_ARG_WITH(android-ndk,
             AS_HELP_STRING([--with-android-ndk],
                            [path to the Android NDK]),
             androidndkdir=${withval}, androidndkdir=)
-if test "x$enable_owr_java" = xyes; then
+if test "x$is_android" = xyes; then
   AC_MSG_CHECKING([for the Android NDK prefix])
-  if test -a "x$androidndkdir" = x; then
-    AC_MSG_ERROR([Need path to the Android NDK when building Android bindings])
+  if test "x$androidndkdir" = x; then
+    AC_MSG_ERROR([Need path to the Android NDK when building for Android])
   fi
   case "$target" in
     i?86-*|x86_64-*)
@@ -186,15 +288,29 @@ if test "x$enable_owr_java" = xyes; then
 fi
 AC_SUBST(ANDROID_NDK_PREFIX)
 
+if test "x$is_android" = xyes; then
+  dnl The GNU C++ STL is needed for JNI. This pkg-config file is
+  dnl only provided by Cerbero.
+  PKG_CHECK_MODULES(GNU_CXXSTL, [gnustl])
+
+  OWR_DEVICE_LIST_EXT_CFLAGS="$OWR_DEVICE_LIST_EXT_CFLAGS $GNU_CXXSTL_CFLAGS"
+  OWR_DEVICE_LIST_EXT_LIBS="$OWR_DEVICE_LIST_EXT_LIBS $GNU_CXXSTL_LIBS"
+fi
+AC_SUBST(OWR_DEVICE_LIST_EXT_CFLAGS)
+AC_SUBST(OWR_DEVICE_LIST_EXT_LIBS)
+
 AC_OUTPUT([
 Makefile
 bridge/Makefile
+bridge/openwebrtc-bridge-$OWR_API_VERSION.pc
 bridge/client/Makefile
 bridge/seed/Makefile
 bridge/shared/Makefile
 bridge/worker/Makefile
+gst/Makefile
+gst/openwebrtc-gst-$OWR_API_VERSION.pc
 owr/Makefile
-owr/openwebrtc-0.1.pc
+owr/openwebrtc-$OWR_API_VERSION.pc
 transport/Makefile
 local/Makefile
 tests/Makefile
