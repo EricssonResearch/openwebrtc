@@ -187,9 +187,7 @@ void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback)
 
     g_value_init(&params[0], G_TYPE_STRING);
     g_value_init(&params[1], G_TYPE_STRING);
-    g_value_set_string(&params[1], pem_cert);
     g_value_init(&params[2], G_TYPE_STRING);
-    g_value_set_string(&params[2], char_fprint);
 
   if (errorDetected) {
     g_print("error detected \n");

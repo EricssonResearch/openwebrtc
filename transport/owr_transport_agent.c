@@ -1201,18 +1201,15 @@ static GstElement *add_dtls_srtp_bin(OwrTransportAgent *transport_agent, guint s
     if (!is_encoder) {
         g_object_get(session, "dtls-certificate", &cert, NULL);
         g_object_get(session, "dtls-key", &key, NULL);
-        g_print("transport_agent cert = %s\nkey = %s\n", cert, key);
-
+        GST_CAT_INFO_OBJECT(_owrsession_debug, session, "transport_agent cert = %s\nkey = %s\n", cert, key);
         if (!g_strcmp0(cert, "(auto)")) {
             g_object_get(dtls_srtp_bin, "pem", &cert, NULL);
             g_object_set(session, "dtls-certificate", cert, NULL);
             g_object_set(session, "dtls-key", NULL, NULL);
-            g_print("used auto generated cert stuff.. THIS SHOULD NOT HAPPEND!!!!\n");
+            g_print("used auto generated cert stuff.. THIS SHOULD NOT HAPPEN!!!!\n");
         } else {
             cert_key = (cert && key) ? g_strdup_printf("%s%s", cert, key) : NULL;
-            g_print("setting pem on dtls_srtp_bin\n");
             g_object_set(dtls_srtp_bin, "pem", cert_key, NULL);
-            g_print("Set pem to %s\n", cert_key);
             g_free(cert_key);
         }
         g_signal_connect_object(dtls_srtp_bin, "notify::peer-pem",
