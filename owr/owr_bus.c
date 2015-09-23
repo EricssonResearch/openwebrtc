@@ -103,9 +103,8 @@ static void owr_bus_init(OwrBus *bus)
 
     priv->message_type_mask = DEFAULT_MESSAGE_TYPE_MASK;
 
-    priv->thread = g_thread_new("owr-bus-thread", (GThreadFunc) bus_thread_func, bus);
-
     priv->queue = g_async_queue_new_full((GDestroyNotify) _owr_message_unref);
+    priv->thread = g_thread_new("owr-bus-thread", (GThreadFunc) bus_thread_func, bus);
 
     priv->callback_func = NULL;
     priv->callback_user_data = NULL;
