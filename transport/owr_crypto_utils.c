@@ -144,7 +144,7 @@ void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback)
   X509_sign (cert, key_pair, EVP_sha256 ());
 
   if (!X509_digest(cert, fprint_type, fprint, &fprint_size)) {
-    g_print("Error creating the certificate fingerprint.\n");
+    GST_DEBUG("Error in owr_crypto_utils.c, could not create certificate fingerprint \n");
     errorDetected = TRUE;
   }
 
@@ -157,25 +157,25 @@ void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback)
   char_fprint = g_string_free(string_fprint, FALSE);
 
   if (!PEM_write_bio_X509 (bio_cert, (X509 *) cert)) {
-    g_print("could not write certificate bio \n");
+    GST_DEBUG("Error in owr_crypto_utils.c, could not write certificate bio \n");
     errorDetected = TRUE;
   }
 
 
   if (!PEM_write_bio_PrivateKey (bio_key, (EVP_PKEY *) key_pair, NULL, NULL, 0, 0, NULL)) {
-    g_print("could not write PrivateKey bio \n");
+    GST_DEBUG("Error in owr_crypto_utils.c, could not write PrivateKey bio \n");
     errorDetected = TRUE;
   }
 
   len_cert = BIO_read (bio_cert, buffer_cert, GST_DTLS_BIO_BUFFER_SIZE);
   if (!len_cert) {
-    g_print("no cert length \n");
+    GST_DEBUG("Error in owr_crypto_utils.c, no cert length\n");
     errorDetected = TRUE;
   }
 
   len_key = BIO_read (bio_key, buffer_key, GST_DTLS_BIO_BUFFER_SIZE);
   if (!len_key) {
-    g_print("no key length \n");
+    GST_DEBUG("Error in owr_crypto_utils.c, no key length\n");
     errorDetected = TRUE;
   }
 
@@ -190,7 +190,7 @@ void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback)
     g_value_init(&params[2], G_TYPE_STRING);
 
   if (errorDetected) {
-    g_print("error detected \n");
+    GST_DEBUG("Returning with error in owr_crypto_utils.c\n");
     g_value_set_string(&params[0], "Failure");
     g_value_set_string(&params[1], "Failure");
     g_value_set_string(&params[2], "Failure");
