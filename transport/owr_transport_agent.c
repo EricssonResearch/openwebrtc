@@ -4163,10 +4163,13 @@ static gint compare_rtcp_scream(GHashTable *a, GHashTable *b)
 static GstPadProbeReturn probe_rtp_info(GstPad *srcpad, GstPadProbeInfo *info, ScreamRx *scream_rx)
 {
     GstBuffer *buffer = NULL;
+    GstRTPBuffer rtp_buf = { 0 };
     guint64 arrival_time = 0;
     OwrTransportAgent *transport_agent = NULL;
     OwrTransportAgentPrivate *priv = NULL;
     guint session_id = 0;
+    guint8 pt;
+    gboolean rtp_mapped = FALSE;
 
     transport_agent = scream_rx->transport_agent;
     session_id = scream_rx->session_id;
@@ -4174,17 +4177,30 @@ static GstPadProbeReturn probe_rtp_info(GstPad *srcpad, GstPadProbeInfo *info, S
     g_assert(transport_agent);
     priv = transport_agent->priv;
 
+    buffer = GST_PAD_PROBE_INFO_BUFFER(info);
+
+    if (scream_rx->rtx_pt == -2 || scream_rx->adapt) {
+        if (!gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp_buf)) {
+            g_warning("Failed to map RTP buffer");
+            goto end;
+        }
+
+        rtp_mapped = TRUE;
+        pt = gst_rtp_buffer_get_payload_type(&rtp_buf);
+    }
+
+
     if (G_UNLIKELY(scream_rx->rtx_pt == -2)) {
         OwrMediaSession *media_session;
-        OwrPayload *send_payload;
+        OwrPayload *rx_payload;
         OwrAdaptationType adapt_type;
         media_session = OWR_MEDIA_SESSION(get_session(transport_agent, session_id));
-        send_payload = _owr_media_session_get_send_payload(media_session);
-        g_object_get(send_payload, "rtx-payload-type", &scream_rx->rtx_pt,
+        rx_payload = _owr_media_session_get_receive_payload(media_session, pt);
+        g_object_get(rx_payload, "rtx-payload-type", &scream_rx->rtx_pt,
             "adaptation", &adapt_type, NULL);
         scream_rx->adapt = (adapt_type == OWR_ADAPTATION_TYPE_SCREAM);
         g_object_unref(media_session);
-        g_object_unref(send_payload);
+        g_object_unref(rx_payload);
     }
 
     OWR_UNUSED(srcpad);
@@ -4193,16 +4209,13 @@ static GstPadProbeReturn probe_rtp_info(GstPad *srcpad, GstPadProbeInfo *info, S
         gpointer state = NULL;
         GstMeta *meta;
         const GstMetaInfo *meta_info = OWR_ARRIVAL_TIME_META_INFO;
-        GstRTPBuffer rtp_buf = {NULL, 0, {NULL}, {0}, {{NULL, 0, NULL, 0, 0, {0}, {0}}}};
         GHashTable *rtcp_info;
-        guint8 pt = 0;
         guint16 seq = 0;
         guint ssrc = 0, timestamp = 0, length = 0;
         gboolean marker = FALSE;
         guint size = 0;
         GList *it;
         guint diff, tmp_highest_seq, tmp_seq;
-        buffer = GST_PAD_PROBE_INFO_BUFFER(info);
         GObject *rtp_session;
 
         while ((meta = gst_buffer_iterate_meta(buffer, &state))) {
@@ -4214,22 +4227,15 @@ static GstPadProbeReturn probe_rtp_info(GstPad *srcpad, GstPadProbeInfo *info, S
         }
 
         if (!arrival_time) {
-            g_warning("No arraival time available for RTP packet");
-            goto end;
-        }
-
-        if (!gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp_buf)) {
-            /*g_warning("Failed to map RTP buffer");*/
+            g_warning("No arrival time available for RTP packet");
             goto end;
         }
 
         ssrc = gst_rtp_buffer_get_ssrc(&rtp_buf);
         seq = gst_rtp_buffer_get_seq(&rtp_buf);
-        pt = gst_rtp_buffer_get_payload_type(&rtp_buf);
         timestamp = gst_rtp_buffer_get_timestamp(&rtp_buf);
         marker = gst_rtp_buffer_get_marker(&rtp_buf);
         length = gst_rtp_buffer_get_packet_len(&rtp_buf);
-        gst_rtp_buffer_unmap(&rtp_buf);
 
         if (pt == scream_rx->rtx_pt && scream_rx->adapt)
             goto end;
@@ -4312,6 +4318,9 @@ static GstPadProbeReturn probe_rtp_info(GstPad *srcpad, GstPadProbeInfo *info, S
     }
 
 end:
+    if (rtp_mapped)
+        gst_rtp_buffer_unmap(&rtp_buf);
+
     return GST_PAD_PROBE_OK;
 }
 
