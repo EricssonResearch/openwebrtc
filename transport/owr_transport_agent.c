@@ -4213,9 +4213,7 @@ static GstPadProbeReturn probe_rtp_info(GstPad *srcpad, GstPadProbeInfo *info, S
         const GstMetaInfo *meta_info = OWR_ARRIVAL_TIME_META_INFO;
         GHashTable *rtcp_info;
         guint16 seq = 0;
-        guint ssrc = 0, timestamp = 0, length = 0;
-        gboolean marker = FALSE;
-        guint size = 0;
+        guint ssrc = 0;
         GList *it;
         guint diff, tmp_highest_seq, tmp_seq;
         GObject *rtp_session;
@@ -4232,17 +4230,9 @@ static GstPadProbeReturn probe_rtp_info(GstPad *srcpad, GstPadProbeInfo *info, S
 
         ssrc = gst_rtp_buffer_get_ssrc(&rtp_buf);
         seq = gst_rtp_buffer_get_seq(&rtp_buf);
-        timestamp = gst_rtp_buffer_get_timestamp(&rtp_buf);
-        marker = gst_rtp_buffer_get_marker(&rtp_buf);
-        length = gst_rtp_buffer_get_packet_len(&rtp_buf);
 
         if (pt == scream_rx->rtx_pt && scream_rx->adapt)
             goto end;
-
-        OWR_UNUSED(timestamp);
-        OWR_UNUSED(length);
-        OWR_UNUSED(marker);
-        OWR_UNUSED(size);
 
         tmp_seq = seq;
         tmp_highest_seq = scream_rx->highest_seq;
