@@ -228,7 +228,7 @@ static void on_new_selected_pair(NiceAgent *nice_agent,
 static gboolean on_sending_rtcp(GObject *session, GstBuffer *buffer, gboolean early, OwrTransportAgent *agent);
 static void on_receiving_rtcp(GObject *session, GstBuffer *buffer, OwrTransportAgent *agent);
 static void on_feedback_rtcp(GObject *session, guint type, guint fbtype, guint sender_ssrc, guint media_ssrc, GstBuffer *fci, OwrTransportAgent *transport_agent);
-static GstPadProbeReturn probe_save_ts(GstPad *srcpad, GstPadProbeInfo *info, OwrTransportAgent *agent);
+static GstPadProbeReturn probe_save_ts(GstPad *srcpad, GstPadProbeInfo *info, void *user_data);
 static GstPadProbeReturn probe_rtp_info(GstPad *srcpad, GstPadProbeInfo *info, ScreamRx *scream_rx);
 static void on_ssrc_active(GstElement *rtpbin, guint session_id, guint ssrc, OwrTransportAgent *transport_agent);
 static void on_new_jitterbuffer(GstElement *rtpbin, GstElement *jitterbuffer, guint session_id, guint ssrc, OwrTransportAgent *transport_agent);
@@ -1152,8 +1152,7 @@ static GstElement *add_nice_element(OwrTransportAgent *transport_agent, guint st
         GstPad *nice_src_pad = NULL;
 
         nice_src_pad = gst_element_get_static_pad(nice_element, "src");
-        gst_pad_add_probe(nice_src_pad, GST_PAD_PROBE_TYPE_BUFFER,
-            (GstPadProbeCallback)probe_save_ts, transport_agent, NULL);
+        gst_pad_add_probe(nice_src_pad, GST_PAD_PROBE_TYPE_BUFFER, probe_save_ts, NULL, NULL);
         gst_object_unref(nice_src_pad);
     }
 
@@ -4135,15 +4134,15 @@ static void on_feedback_rtcp(GObject *session, guint type, guint fbtype, guint s
 }
 
 
-static GstPadProbeReturn probe_save_ts(GstPad *srcpad, GstPadProbeInfo *info, OwrTransportAgent *agent)
+static GstPadProbeReturn probe_save_ts(GstPad *srcpad, GstPadProbeInfo *info, void *user_data)
 {
     GstBuffer *buffer = NULL;
+    OWR_UNUSED(user_data);
+    OWR_UNUSED(srcpad);
 
-    OWR_UNUSED(agent);
     buffer = GST_PAD_PROBE_INFO_BUFFER(info);
     _owr_buffer_add_arrival_time_meta(buffer, GST_BUFFER_DTS(buffer));
 
-    OWR_UNUSED(srcpad);
     return GST_PAD_PROBE_OK;
 }
 
