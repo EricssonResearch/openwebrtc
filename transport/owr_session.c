@@ -148,7 +148,7 @@ static void owr_session_set_property(GObject *object, guint property_id, const G
             g_free(priv->dtls_certificate);
             priv->dtls_certificate = NULL;
         }
-        GST_DEBUG_OBJECT(OWR_SESSION(object), "cert in owr_session.c: %s\n", priv->dtls_certificate);
+        GST_DEBUG_OBJECT(OWR_SESSION(object), "certificate generated: %s\n", priv->dtls_certificate);
         g_warn_if_fail(!priv->dtls_certificate
             || g_str_has_prefix(priv->dtls_certificate, "-----BEGIN CERTIFICATE-----"));
         break;

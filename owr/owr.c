@@ -72,6 +72,7 @@ GST_DEBUG_CATEGORY(_owrbus_debug);
 GST_DEBUG_CATEGORY(_owrcandidate_debug);
 GST_DEBUG_CATEGORY(_owrdatachannel_debug);
 GST_DEBUG_CATEGORY(_owrdatasession_debug);
+GST_DEBUG_CATEGORY(_owrcrypto_debug);
 GST_DEBUG_CATEGORY(_owrdevicelist_debug);
 GST_DEBUG_CATEGORY(_owrimagerenderer_debug);
 GST_DEBUG_CATEGORY(_owrimageserver_debug);
@@ -224,6 +225,8 @@ void owr_init(GMainContext *main_context)
         "OpenWebRTC Bus");
     GST_DEBUG_CATEGORY_INIT(_owrcandidate_debug, "owrcandidate", 0,
         "OpenWebRTC Candidate");
+    GST_DEBUG_CATEGORY_INIT(_owrcrypto_debug, "owrcrypto", 0,
+        "OpenWebRTC Cryptography");
     GST_DEBUG_CATEGORY_INIT(_owrdatachannel_debug, "owrdatachannel", 0,
         "OpenWebRTC Data Channel");
     GST_DEBUG_CATEGORY_INIT(_owrdatasession_debug, "owrdatasession", 0,

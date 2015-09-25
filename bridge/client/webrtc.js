@@ -109,7 +109,7 @@
     bridge.importFunctions("createPeerHandler", "requestSources", "renderSources", "createKeys");
 
     var dtlsInfo;
-    var deferredCreatePeerHandler;
+    var deferredCreatePeerHandlers = [];
 
     (function () {
         var client = {}; 
@@ -117,9 +117,11 @@
             dtlsInfo = generatedDtlsInfo;
             if (!dtlsInfo) 
                 console.log("createKeys returned without any dtlsInfo - anything involving use of PeerConnection won't work");
-            else
-                if (deferredCreatePeerHandler)
-                    deferredCreatePeerHandler();
+            else {
+                var func;
+                while ((func = deferredCreatePeerHandlers.shift()))
+                    func();
+            }
             bridge.removeObjectRef(client);
         }
     
@@ -388,7 +390,7 @@
         if (dtlsInfo)
             createPeerHandler()
         else
-            deferredCreatePeerHandler = createPeerHandler;
+            deferredCreatePeerHandlers.push(createPeerHandler);
 
 
         function whenPeerHandler(func) {

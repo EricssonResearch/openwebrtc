@@ -58,6 +58,9 @@
 #include <openssl/evp.h>
 #include <openssl/rsa.h>
 
+GST_DEBUG_CATEGORY_EXTERN(_owrcrypto_debug);
+#define GST_CAT_DEFAULT _owrcrypto_debug
+
 /* PUBLIC */
 
 /**
@@ -144,7 +147,7 @@ void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback)
   X509_sign (cert, key_pair, EVP_sha256 ());
 
   if (!X509_digest(cert, fprint_type, fprint, &fprint_size)) {
-    GST_DEBUG("Error, could not create certificate fingerprint");
+    GST_ERROR("Error, could not create certificate fingerprint");
     errorDetected = TRUE;
   }
 
@@ -157,25 +160,25 @@ void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback)
   char_fprint = g_string_free(string_fprint, FALSE);
 
   if (!PEM_write_bio_X509 (bio_cert, (X509 *) cert)) {
-    GST_DEBUG("Error, could not write certificate bio");
+    GST_ERROR("Error, could not write certificate bio");
     errorDetected = TRUE;
   }
 
 
   if (!PEM_write_bio_PrivateKey (bio_key, (EVP_PKEY *) key_pair, NULL, NULL, 0, 0, NULL)) {
-    GST_DEBUG("Error, could not write PrivateKey bio");
+    GST_ERROR("Error, could not write PrivateKey bio");
     errorDetected = TRUE;
   }
 
   len_cert = BIO_read (bio_cert, buffer_cert, GST_DTLS_BIO_BUFFER_SIZE);
   if (!len_cert) {
-    GST_DEBUG("Error, no cert length");
+    GST_ERROR("Error, no certificate length");
     errorDetected = TRUE;
   }
 
   len_key = BIO_read (bio_key, buffer_key, GST_DTLS_BIO_BUFFER_SIZE);
   if (!len_key) {
-    GST_DEBUG("Error, no key length");
+    GST_ERROR("Error, no key length");
     errorDetected = TRUE;
   }
 
@@ -190,7 +193,7 @@ void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback)
     g_value_init(&params[2], G_TYPE_STRING);
 
   if (errorDetected) {
-    GST_DEBUG("Returning with error");
+    GST_ERROR("Returning with error");
     g_value_set_string(&params[0], "Failure");
     g_value_set_string(&params[1], "Failure");
     g_value_set_string(&params[2], "Failure");
