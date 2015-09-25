@@ -61,8 +61,13 @@ const GstMetaInfo *_owr_arrival_time_meta_get_info(void)
 static gboolean _owr_arrival_time_meta_init(GstMeta *meta, gpointer params, GstBuffer *buffer)
 {
     OwrArrivalTimeMeta *at_meta = (OwrArrivalTimeMeta *)meta;
-    at_meta->arrival_time = GST_BUFFER_DTS(buffer);
-    OWR_UNUSED(params);
+    OWR_UNUSED(buffer);
+
+    if (params)
+        at_meta->arrival_time = *((guint64 *) params);
+    else
+        at_meta->arrival_time = GST_CLOCK_TIME_NONE;
+
     return TRUE;
 }
 
@@ -83,7 +88,7 @@ OwrArrivalTimeMeta * _owr_buffer_add_arrival_time_meta(GstBuffer *buffer, guint6
     OwrArrivalTimeMeta *at_meta = NULL;
 
     g_return_val_if_fail(GST_IS_BUFFER(buffer), NULL);
-    at_meta = (OwrArrivalTimeMeta *) gst_buffer_add_meta(buffer, OWR_ARRIVAL_TIME_META_INFO, NULL);
-    at_meta->arrival_time = arrival_time;
+    at_meta = (OwrArrivalTimeMeta *) gst_buffer_add_meta(buffer, OWR_ARRIVAL_TIME_META_INFO, &arrival_time);
+
     return at_meta;
 }

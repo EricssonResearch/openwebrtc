@@ -4168,7 +4168,7 @@ static GstPadProbeReturn probe_rtp_info(GstPad *srcpad, GstPadProbeInfo *info, S
 {
     GstBuffer *buffer = NULL;
     GstRTPBuffer rtp_buf = { 0 };
-    guint64 arrival_time = 0;
+    guint64 arrival_time = GST_CLOCK_TIME_NONE;
     OwrTransportAgent *transport_agent = NULL;
     OwrTransportAgentPrivate *priv = NULL;
     guint session_id = 0;
@@ -4210,7 +4210,6 @@ static GstPadProbeReturn probe_rtp_info(GstPad *srcpad, GstPadProbeInfo *info, S
     OWR_UNUSED(srcpad);
 
     if (scream_rx->adapt) {
-        gpointer state = NULL;
         GstMeta *meta;
         const GstMetaInfo *meta_info = OWR_ARRIVAL_TIME_META_INFO;
         GHashTable *rtcp_info;
@@ -4222,15 +4221,12 @@ static GstPadProbeReturn probe_rtp_info(GstPad *srcpad, GstPadProbeInfo *info, S
         guint diff, tmp_highest_seq, tmp_seq;
         GObject *rtp_session;
 
-        while ((meta = gst_buffer_iterate_meta(buffer, &state))) {
-            if (meta->info->api == meta_info->api) {
-                OwrArrivalTimeMeta *atmeta = (OwrArrivalTimeMeta *) meta;
-                arrival_time = atmeta->arrival_time;
-                break;
-            }
+        if ((meta = gst_buffer_get_meta(buffer, meta_info->api))) {
+            OwrArrivalTimeMeta *atmeta = (OwrArrivalTimeMeta *) meta;
+            arrival_time = atmeta->arrival_time;
         }
 
-        if (!arrival_time) {
+        if (arrival_time == GST_CLOCK_TIME_NONE) {
             g_warning("No arrival time available for RTP packet");
             goto end;
         }
