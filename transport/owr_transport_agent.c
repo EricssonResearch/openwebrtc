@@ -2807,6 +2807,10 @@ static void print_rtcp_feedback_type(GObject *session, guint session_id,
             GST_CAT_INFO_OBJECT(_owrsession_debug, session, "Session %u, %s RTCP feedback for %u: Request an SR packet for early synchronization\n",
                 session_id, is_received ? "Received" : "Sent", media_ssrc);
             break;
+        case GST_RTCP_RTPFB_TYPE_SCREAM:
+            GST_CAT_INFO_OBJECT(_owrsession_debug, session, "Session %u, %s RTCP feedback for %u: SCReAM\n",
+                session_id, is_received ? "Received" : "Sent", media_ssrc);
+            break;
         default:
             GST_CAT_WARNING_OBJECT(_owrsession_debug, session, "Session %u, %s RTCP feedback for %u: Unknown feedback type %u\n",
                 session_id, is_received ? "Received" : "Sent", media_ssrc, fbtype);
