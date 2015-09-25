@@ -1334,7 +1334,12 @@ static void on_bitrate_change(GstElement *scream_queue, guint bitrate, guint ssr
     g_return_if_fail(session);
     payload = _owr_media_session_get_send_payload(session);
     if (payload) {
-        g_object_set(payload, "bitrate", bitrate, NULL);
+        guint old_bitrate = 0;
+        g_object_get(payload, "bitrate", &old_bitrate, NULL);
+        if (bitrate != old_bitrate) {
+            GST_INFO("Updating bitrate of pt %u to %u from %u", pt, bitrate, old_bitrate);
+            g_object_set(payload, "bitrate", bitrate, NULL);
+        }
     } else
         g_warning("No send payload set for media session");
     OWR_UNUSED(scream_queue);
