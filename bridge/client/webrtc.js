@@ -114,7 +114,6 @@
     (function () {
         var client = {}; 
         client.dtlsInfoGenerationDone = function (generatedDtlsInfo) {
-            console.log("callback from createKeys");
             dtlsInfo = generatedDtlsInfo;
             if (!dtlsInfo) 
                 console.log("createKeys returned without any dtlsInfo - anything involving use of PeerConnection won't work");
@@ -128,11 +127,8 @@
     
     
         bridge.createKeys(bridge.createObjectRef(client, "dtlsInfoGenerationDone"));
-        console.log("called createKeys");
     })();
 
-    console.log("after the function about createKe");
-    
     function getUserMedia(options) {
         checkArguments("getUserMedia", "dictionary", 1, arguments);
 
