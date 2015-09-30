@@ -2941,6 +2941,10 @@ static gboolean on_sending_rtcp(GObject *session, GstBuffer *buffer, gboolean ea
                 /* qbit not implemented yet  */
                 GST_WRITE_UINT32_BE(fci_buf + 8, 0);
                 do_not_suppress = TRUE;
+
+                GST_DEBUG_OBJECT(session, "Sending scream feedback: "
+                    "highest_seq: %u, n_loss: %u, n_ecn: %u, last_fb_wc: %u",
+                    highest_seq, n_loss, n_ecn, last_fb_wc);
             }
 
             next = g_list_next(it);
@@ -4224,7 +4228,7 @@ static GstPadProbeReturn probe_rtp_info(GstPad *srcpad, GstPadProbeInfo *info, S
         }
 
         if (arrival_time == GST_CLOCK_TIME_NONE) {
-            g_warning("No arrival time available for RTP packet");
+            GST_WARNING("No arrival time available for RTP packet");
             goto end;
         }
 
@@ -4289,6 +4293,10 @@ static GstPadProbeReturn probe_rtp_info(GstPad *srcpad, GstPadProbeInfo *info, S
         g_hash_table_insert(rtcp_info, "n-loss", GUINT_TO_POINTER(scream_rx->n_loss));
         g_hash_table_insert(rtcp_info, "n-ecn", GUINT_TO_POINTER(scream_rx->n_ecn));
         g_hash_table_insert(rtcp_info, "session-id", GUINT_TO_POINTER(session_id));
+
+        GST_LOG_OBJECT(transport_agent, "queuing up scream feedback: %u, %u, %u, %u",
+            scream_rx->highest_seq, scream_rx->n_loss, scream_rx->n_ecn,
+            scream_rx->last_feedback_wallclock);
 
         g_mutex_lock(&priv->rtcp_lock);
         it = g_list_find_custom(priv->rtcp_list, (gpointer)rtcp_info,
