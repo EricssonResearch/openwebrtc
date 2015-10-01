@@ -1326,24 +1326,49 @@ static void on_rtcp_mux_changed(OwrMediaSession *media_session, GParamSpec *pspe
     g_free(pad_name);
 }
 
-static void on_bitrate_change(GstElement *scream_queue, guint bitrate, guint ssrc, guint pt,
-    OwrMediaSession *session)
+static gboolean emit_bitrate_change(GHashTable *args)
 {
+    OwrMediaSession *session;
     OwrPayload *payload;
-    g_return_if_fail(session);
+    guint bitrate;
+
+    session = g_hash_table_lookup(args, "session");
+    bitrate = GPOINTER_TO_UINT(g_hash_table_lookup(args, "bitrate"));
+
     payload = _owr_media_session_get_send_payload(session);
+
     if (payload) {
         guint old_bitrate = 0;
         g_object_get(payload, "bitrate", &old_bitrate, NULL);
         if (bitrate != old_bitrate) {
-            GST_INFO("Updating bitrate of pt %u to %u from %u", pt, bitrate, old_bitrate);
+            GST_INFO("Updating bitrate to %u from %u", bitrate, old_bitrate);
             g_object_set(payload, "bitrate", bitrate, NULL);
         }
     } else
-        g_warning("No send payload set for media session");
+        GST_WARNING("No send payload set for media session");
+
+    g_object_unref(session);
+    g_hash_table_destroy(args);
+
+    return FALSE;
+}
+
+static void on_bitrate_change(GstElement *scream_queue, guint bitrate, guint ssrc, guint pt,
+    OwrMediaSession *session)
+{
+    GHashTable *args;
     OWR_UNUSED(scream_queue);
     OWR_UNUSED(ssrc);
     OWR_UNUSED(pt);
+
+    g_return_if_fail(session);
+
+    args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(session));
+
+    g_hash_table_insert(args, "session", g_object_ref(session));
+    g_hash_table_insert(args, "bitrate", GUINT_TO_POINTER(bitrate));
+
+    _owr_schedule_with_hash_table((GSourceFunc)emit_bitrate_change, args);
 }
 
 static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, guint stream_id, gboolean rtp, gboolean rtcp)
