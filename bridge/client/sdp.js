@@ -48,7 +48,7 @@ if (typeof(SDP) == "undefined")
         "ccmfir": "^a=rtcp-fb:${type} ccm fir$",
         "rtcp": "^a=rtcp:([\\d]+)( IN (IP[46]) ([\\d\\.a-f\\:]+))?.*$",
         "rtcpmux": "^a=rtcp-mux.*$",
-        "cname": "^a=ssrc:(\\d+) cname:([\\w+/\\-@\\.]+).*$",
+        "cname": "^a=ssrc:(\\d+) cname:([\\w+/\\-@\\.\\{\\}]+).*$",
         "msid": "^a=(ssrc:\\d+ )?msid:([\\w+/\\-=]+) +([\\w+/\\-=]+).*$",
         "ufrag": "^a=ice-ufrag:([\\w+/]*).*$",
         "pwd": "^a=ice-pwd:([\\w+/]*).*$",
