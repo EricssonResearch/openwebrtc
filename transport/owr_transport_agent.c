@@ -776,15 +776,14 @@ void owr_transport_agent_join_snd_subflow(OwrTransportAgent *transport_agent,
     g_object_set (udpsink, "port", port, "host", remote_address, "sync",
           FALSE, "async", FALSE, NULL);
 
-    synced_ok = gst_element_sync_state_with_parent(udpsink);
-    g_warn_if_fail(synced_ok);
-
     padname = g_strdup_printf("src_%hhu", subflow_id);
     gst_element_link_pads(priv->mprtp_snd, padname, udpsink, "sink");
     g_free(padname);
 
     g_object_set(priv->mprtp_sch, "join-subflow", subflow_id, NULL);
 
+    synced_ok = gst_element_sync_state_with_parent(udpsink);
+    g_warn_if_fail(synced_ok);
 }
 
 
@@ -802,7 +801,7 @@ void owr_transport_agent_join_rcv_subflow(OwrTransportAgent *transport_agent,
     gchar *element_name;
     gboolean synced_ok;
     OwrTransportAgentPrivate *priv;
-
+    g_print("!!!!!!!!!!!!!BAZD MEG MAGAD!!!!!!!!!!!!!\n");
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
 
     priv = transport_agent->priv;
@@ -836,15 +835,14 @@ void owr_transport_agent_join_rcv_subflow(OwrTransportAgent *transport_agent,
 
     g_object_set (udpsrc, "port", port, NULL);
 
-    synced_ok = gst_element_sync_state_with_parent(udpsrc);
-    g_warn_if_fail(synced_ok);
-
-    padname = g_strdup_printf("src_%hhu", subflow_id);
-    gst_element_link_pads(priv->mprtp_snd, padname, udpsrc, "sink");
+    padname = g_strdup_printf("sink_%hhu", subflow_id);
+    gst_element_link_pads(udpsrc, "src", priv->mprtp_rcv, padname);
     g_free(padname);
 
     g_object_set(priv->mprtp_ply, "join-subflow", subflow_id, NULL);
 
+    synced_ok = gst_element_sync_state_with_parent(udpsrc);
+    g_warn_if_fail(synced_ok);
 }
 
 
