@@ -154,7 +154,7 @@ struct _OwrTransportAgentPrivate {
     GstElement *mprtp_rcv;
     GstElement *mprtp_ply;
     GHashTable *mprtp_subflows;
-
+//    GstCaps    *mprtp_caps;
     /* session_id -> struct MPRtpElements */
     //GHashTable *mprtp_elements;
 
@@ -256,6 +256,9 @@ static void complete_data_channel_and_ack(OwrTransportAgent *transport_agent,
 static void on_datachannel_send(OwrTransportAgent *transport_agent, guint8 *data, guint len,
     gboolean is_binary, OwrDataChannel *data_channel);
 static void maybe_close_data_channel(OwrTransportAgent *transport_agent, DataChannel *data_channel_info);
+static GstElement *add_mprtp_scheduler_element(OwrTransportAgent *transport_agent, guint stream_id,
+    GstElement *bin);
+
 
 static void owr_transport_agent_finalize(GObject *object)
 {
@@ -304,6 +307,10 @@ static void owr_transport_agent_finalize(GObject *object)
 
     owr_message_origin_bus_set_free(priv->message_origin_bus_set);
     priv->message_origin_bus_set = NULL;
+
+//    if(priv->mprtp_caps != NULL){
+//      gst_buffer_unref(priv->mprtp_caps);
+//    }
 
     G_OBJECT_CLASS(owr_transport_agent_parent_class)->finalize(object);
 }
@@ -476,7 +483,7 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
 
     priv->send_bins = g_hash_table_new_full(NULL, NULL, NULL, g_free);
     priv->mprtp_subflows = g_hash_table_new_full(NULL, NULL, NULL, g_free);
-
+//    priv->mprtp_caps = NULL;
     priv->message_origin_bus_set = owr_message_origin_bus_set_new();
 }
 
@@ -567,154 +574,278 @@ void owr_transport_agent_add_helper_server(OwrTransportAgent *transport_agent,
     g_object_unref(resolver);
 }
 
+//
+//
+//static void
+//subflow_cb_candidate_gathering_done (NiceAgent * agent, guint stream_id, gpointer data)
+//{
+//  GSList *candidates;
+//
+//  GST_INFO ("Candidates gathered on agent %" GST_PTR_FORMAT ", stream: %d",
+//      agent, stream_id);
+//
+//  candidates = nice_agent_get_local_candidates (agent, stream_id, 1);
+//
+//  nice_agent_set_remote_candidates (NICE_AGENT (data), stream_id, 1,
+//      candidates);
+//
+//  g_slist_free_full (candidates, (GDestroyNotify) nice_candidate_free);
+//}
+//
+//static void
+//credentials_negotiation (NiceAgent * a_agent, NiceAgent * b_agent,
+//    guint a_stream, guint b_stream)
+//{
+//  gchar *user = NULL;
+//  gchar *passwd = NULL;
+//
+//  nice_agent_get_local_credentials (a_agent, a_stream, &user, &passwd);
+//  nice_agent_set_remote_credentials (b_agent, b_stream, user, passwd);
+//
+//  g_free (user);
+//  g_free (passwd);
+//}
+//
+//static void
+//subflow_cb_component_state_changed (NiceAgent * agent, guint stream_id,
+//    guint component_id, guint state, gpointer user_data)
+//{
+//  MpRTPSubflow *subflow = (MpRTPSubflow *)user_data;
+//  NiceComponentState *stateptr;
+//
+//  g_return_if_fail(subflow);
+//  stateptr = (subflow->src_stream == stream_id) ? &subflow->src_state : &subflow->sink_state;
+//  *stateptr = state;
+//  subflow->component_id = component_id;
+//  g_print("unused parameters at "
+//      "subflow_cb_component_state_changed: %p\n", agent);
+//}
 
 
-static void
-subflow_cb_candidate_gathering_done (NiceAgent * agent, guint stream_id, gpointer data)
-{
-  GSList *candidates;
+//
+//void owr_transport_agent_join_subflow(OwrTransportAgent *transport_agent,
+//                                      guint8 subflow_id,
+//                                      const gchar *local_address)
+//{
+//    NiceAddress addr;
+//    NiceAgent *sink_agent;
+//    NiceAgent *src_agent;
+//    MpRTPSubflow *subflow;
+//    GstElement *nicesink;
+//    GstElement *nicesrc;
+//    GstElement *subflow_bin;
+//    gchar *bin_name;
+//    gchar *padname;
+//    gchar *element_name;
+//    gboolean synced_ok;
+//    guint sink_stream;
+//    guint src_stream;
+//    OwrTransportAgentPrivate *priv;
+//
+//    g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
+//    g_return_if_fail(local_address);
+//    g_return_if_fail(transport_agent->priv->local_address_added);
+//    g_return_if_fail(nice_address_set_from_string(&addr, local_address));
+//
+//    priv = transport_agent->priv;
+//
+//    subflow = g_malloc0(sizeof(MpRTPSubflow));
+//    subflow->sink_agent = sink_agent = nice_agent_new (NULL, NICE_COMPATIBILITY_RFC5245);
+//    subflow->src_agent = src_agent = nice_agent_new (NULL, NICE_COMPATIBILITY_RFC5245);
+//
+//    nice_agent_add_local_address (sink_agent, &addr);
+//    nice_agent_add_local_address (src_agent, &addr);
+//
+//    subflow->sink_stream = sink_stream = nice_agent_add_stream (sink_agent, 1);
+//    subflow->src_stream = src_stream = nice_agent_add_stream (src_agent, 1);
+//
+//    bin_name = g_strdup_printf("subflow-bin-%hu", subflow_id);
+//    subflow->bin = subflow_bin = gst_bin_new(bin_name);
+//    g_free(bin_name);
+//
+//
+//    g_signal_connect (G_OBJECT (sink_agent), "candidate-gathering-done",
+//        G_CALLBACK (subflow_cb_candidate_gathering_done), src_agent);
+//    g_signal_connect (G_OBJECT (src_agent), "candidate-gathering-done",
+//        G_CALLBACK (subflow_cb_candidate_gathering_done), sink_agent);
+//
+//    g_signal_connect (G_OBJECT (sink_agent), "component-state-changed",
+//        G_CALLBACK (subflow_cb_component_state_changed), subflow);
+//    g_signal_connect (G_OBJECT (src_agent), "component-state-changed",
+//        G_CALLBACK (subflow_cb_component_state_changed), subflow);
+//
+//    credentials_negotiation (sink_agent, src_agent, sink_stream, src_stream);
+//    credentials_negotiation (src_agent, sink_agent, src_stream, src_stream);
+//
+//    nice_agent_gather_candidates (sink_agent, sink_stream);
+//    nice_agent_gather_candidates (src_agent, src_stream);
+//
+//    element_name = g_strdup_printf("subflow-nicesink-%hhu", subflow_id);
+//    subflow->nicesink = nicesink = gst_element_factory_make("nicesink", element_name);
+//    g_free(element_name);
+//    element_name = g_strdup_printf("subflow-nicesrc-%hhu", subflow_id);
+//    subflow->nicesrc = nicesrc = gst_element_factory_make("nicesrc", element_name);
+//    g_free(element_name);
+//
+//    if (!gst_bin_add(GST_BIN(transport_agent->priv->transport_bin), subflow_bin)) {
+//      GST_ERROR("Failed to add subflow_bin-%hhu to parent bin", subflow_id);
+//      return;
+//    }
+//    if (!gst_element_sync_state_with_parent(subflow_bin)) {
+//      GST_ERROR("Failed to sync subflow_bin-%hhu to parent bin", subflow_id);
+//      return;
+//    }
+//    gst_bin_add_many(GST_BIN(subflow_bin), nicesrc, nicesink, NULL);
+//
+//    g_object_set (nicesink, "agent", sink_agent, "stream", sink_stream,
+//        "component", NICE_COMPONENT_TYPE_RTP, NULL);
+//    g_object_set (nicesrc, "agent", src_agent, "stream", src_stream,
+//        "component", NICE_COMPONENT_TYPE_RTP, NULL);
+//
+//    g_object_set(nicesink, "enable-last-sample", FALSE, "async", FALSE, NULL);
+//
+//    synced_ok = gst_element_sync_state_with_parent(nicesink);
+//    g_warn_if_fail(synced_ok);
+//    synced_ok = gst_element_sync_state_with_parent(nicesrc);
+//    g_warn_if_fail(synced_ok);
+//
+//    padname = g_strdup_printf("sink_%hhu", subflow_id);
+//    gst_element_link_pads(nicesrc, "src", priv->mprtp_rcv, padname);
+//    g_free(padname);
+//    padname = g_strdup_printf("src_%hhu", subflow_id);
+//    gst_element_link_pads(priv->mprtp_snd, padname, nicesink, "sink");
+//    g_free(padname);
+//
+//    g_object_set(priv->mprtp_sch, "join-subflow", subflow_id, NULL);
+//    g_object_set(priv->mprtp_ply, "join-subflow", subflow_id, NULL);
+//
+//    g_hash_table_insert(transport_agent->priv->mprtp_subflows,
+//                           GINT_TO_POINTER(subflow_id), subflow);
+//
+//}
 
-  GST_INFO ("Candidates gathered on agent %" GST_PTR_FORMAT ", stream: %d",
-      agent, stream_id);
 
-  candidates = nice_agent_get_local_candidates (agent, stream_id, 1);
 
-  nice_agent_set_remote_candidates (NICE_AGENT (data), stream_id, 1,
-      candidates);
-
-  g_slist_free_full (candidates, (GDestroyNotify) nice_candidate_free);
-}
-
-static void
-credentials_negotiation (NiceAgent * a_agent, NiceAgent * b_agent,
-    guint a_stream, guint b_stream)
-{
-  gchar *user = NULL;
-  gchar *passwd = NULL;
-
-  nice_agent_get_local_credentials (a_agent, a_stream, &user, &passwd);
-  nice_agent_set_remote_credentials (b_agent, b_stream, user, passwd);
-
-  g_free (user);
-  g_free (passwd);
-}
-
-static void
-subflow_cb_component_state_changed (NiceAgent * agent, guint stream_id,
-    guint component_id, guint state, gpointer user_data)
-{
-  MpRTPSubflow *subflow = (MpRTPSubflow *)user_data;
-  NiceComponentState *stateptr;
-
-  g_return_if_fail(subflow);
-  stateptr = (subflow->src_stream == stream_id) ? &subflow->src_state : &subflow->sink_state;
-  *stateptr = state;
-  subflow->component_id = component_id;
-  g_print("unused parameters at "
-      "subflow_cb_component_state_changed: %p\n", agent);
-}
-
-void owr_transport_agent_join_subflow(OwrTransportAgent *transport_agent,
+void owr_transport_agent_join_snd_subflow(OwrTransportAgent *transport_agent,
                                       guint8 subflow_id,
-                                      const gchar *local_address)
+                                      const gchar *remote_address,
+                                      guint port)
 {
-    NiceAddress addr;
-    NiceAgent *sink_agent;
-    NiceAgent *src_agent;
+
     MpRTPSubflow *subflow;
-    GstElement *nicesink;
-    GstElement *nicesrc;
+    GstElement *udpsink;
     GstElement *subflow_bin;
     gchar *bin_name;
     gchar *padname;
     gchar *element_name;
     gboolean synced_ok;
-    guint sink_stream;
-    guint src_stream;
     OwrTransportAgentPrivate *priv;
 
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
-    g_return_if_fail(local_address);
-    g_return_if_fail(transport_agent->priv->local_address_added);
-    g_return_if_fail(nice_address_set_from_string(&addr, local_address));
+    g_return_if_fail(remote_address);
 
     priv = transport_agent->priv;
 
-    subflow = g_malloc0(sizeof(MpRTPSubflow));
-    subflow->sink_agent = sink_agent = nice_agent_new (NULL, NICE_COMPATIBILITY_RFC5245);
-    subflow->src_agent = src_agent = nice_agent_new (NULL, NICE_COMPATIBILITY_RFC5245);
 
-    nice_agent_add_local_address (sink_agent, &addr);
-    nice_agent_add_local_address (src_agent, &addr);
-
-    subflow->sink_stream = sink_stream = nice_agent_add_stream (sink_agent, 1);
-    subflow->src_stream = src_stream = nice_agent_add_stream (src_agent, 1);
-
-    bin_name = g_strdup_printf("subflow-bin-%hu", subflow_id);
-    subflow->bin = subflow_bin = gst_bin_new(bin_name);
-    g_free(bin_name);
-
-
-    g_signal_connect (G_OBJECT (sink_agent), "candidate-gathering-done",
-        G_CALLBACK (subflow_cb_candidate_gathering_done), src_agent);
-    g_signal_connect (G_OBJECT (src_agent), "candidate-gathering-done",
-        G_CALLBACK (subflow_cb_candidate_gathering_done), sink_agent);
-
-    g_signal_connect (G_OBJECT (sink_agent), "component-state-changed",
-        G_CALLBACK (subflow_cb_component_state_changed), subflow);
-    g_signal_connect (G_OBJECT (src_agent), "component-state-changed",
-        G_CALLBACK (subflow_cb_component_state_changed), subflow);
-
-    credentials_negotiation (sink_agent, src_agent, sink_stream, src_stream);
-    credentials_negotiation (src_agent, sink_agent, src_stream, src_stream);
-
-    nice_agent_gather_candidates (sink_agent, sink_stream);
-    nice_agent_gather_candidates (src_agent, src_stream);
+    subflow = (MpRTPSubflow*) g_hash_table_lookup(priv->mprtp_subflows, GUINT_TO_POINTER(subflow_id));
+    if(subflow == NULL){
+        subflow = g_malloc0(sizeof(MpRTPSubflow));
+        g_hash_table_insert(transport_agent->priv->mprtp_subflows,
+                               GINT_TO_POINTER(subflow_id), subflow);
+        bin_name = g_strdup_printf("subflow-bin-%hu", subflow_id);
+        subflow->bin = subflow_bin = gst_bin_new(bin_name);
+        g_free(bin_name);
+    }else{
+        subflow_bin = subflow->bin;
+    }
 
     element_name = g_strdup_printf("subflow-nicesink-%hhu", subflow_id);
-    subflow->nicesink = nicesink = gst_element_factory_make("nicesink", element_name);
-    g_free(element_name);
-    element_name = g_strdup_printf("subflow-nicesrc-%hhu", subflow_id);
-    subflow->nicesrc = nicesrc = gst_element_factory_make("nicesrc", element_name);
+    subflow->nicesink = udpsink = gst_element_factory_make("udpsink", element_name);
     g_free(element_name);
 
     if (!gst_bin_add(GST_BIN(transport_agent->priv->transport_bin), subflow_bin)) {
-      GST_ERROR("Failed to add subflow_bin-%hhu to parent bin", subflow_id);
+      GST_WARNING("Failed to add subflow_bin-%hhu to parent bin", subflow_id);
       return;
     }
     if (!gst_element_sync_state_with_parent(subflow_bin)) {
-      GST_ERROR("Failed to sync subflow_bin-%hhu to parent bin", subflow_id);
+       GST_WARNING("Failed to sync subflow_bin-%hhu to parent bin", subflow_id);
       return;
     }
-    gst_bin_add_many(GST_BIN(subflow_bin), nicesrc, nicesink, NULL);
+    gst_bin_add_many(GST_BIN(subflow_bin), udpsink, NULL);
 
-    g_object_set (nicesink, "agent", sink_agent, "stream", sink_stream,
-        "component", NICE_COMPONENT_TYPE_RTP, NULL);
-    g_object_set (nicesrc, "agent", src_agent, "stream", src_stream,
-        "component", NICE_COMPONENT_TYPE_RTP, NULL);
+    g_object_set (udpsink, "port", port, "host", remote_address, "sync",
+          FALSE, "async", FALSE, NULL);
 
-    g_object_set(nicesink, "enable-last-sample", FALSE, "async", FALSE, NULL);
-
-    synced_ok = gst_element_sync_state_with_parent(nicesink);
-    g_warn_if_fail(synced_ok);
-    synced_ok = gst_element_sync_state_with_parent(nicesrc);
+    synced_ok = gst_element_sync_state_with_parent(udpsink);
     g_warn_if_fail(synced_ok);
 
-    padname = g_strdup_printf("sink_%hhu", subflow_id);
-    gst_element_link_pads(nicesrc, "src", priv->mprtp_rcv, padname);
-    g_free(padname);
     padname = g_strdup_printf("src_%hhu", subflow_id);
-    gst_element_link_pads(priv->mprtp_snd, padname, nicesink, "sink");
+    gst_element_link_pads(priv->mprtp_snd, padname, udpsink, "sink");
     g_free(padname);
 
     g_object_set(priv->mprtp_sch, "join-subflow", subflow_id, NULL);
-    g_object_set(priv->mprtp_ply, "join-subflow", subflow_id, NULL);
-
-    g_hash_table_insert(transport_agent->priv->mprtp_subflows,
-                           GINT_TO_POINTER(subflow_id), subflow);
 
 }
 
+
+
+void owr_transport_agent_join_rcv_subflow(OwrTransportAgent *transport_agent,
+                                      guint8 subflow_id,
+                                      guint port)
+{
+
+    MpRTPSubflow *subflow;
+    GstElement *udpsrc;
+    GstElement *subflow_bin;
+    gchar *bin_name;
+    gchar *padname;
+    gchar *element_name;
+    gboolean synced_ok;
+    OwrTransportAgentPrivate *priv;
+
+    g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
+
+    priv = transport_agent->priv;
+
+    subflow = (MpRTPSubflow*) g_hash_table_lookup(priv->mprtp_subflows, GUINT_TO_POINTER(subflow_id));
+    if(subflow == NULL){
+        subflow = g_malloc0(sizeof(MpRTPSubflow));
+        g_hash_table_insert(transport_agent->priv->mprtp_subflows,
+                               GINT_TO_POINTER(subflow_id), subflow);
+        bin_name = g_strdup_printf("subflow-bin-%hu", subflow_id);
+        subflow->bin = subflow_bin = gst_bin_new(bin_name);
+        g_free(bin_name);
+    }else{
+        subflow_bin = subflow->bin;
+    }
+
+
+    element_name = g_strdup_printf("subflow-nicesrc-%hhu", subflow_id);
+    subflow->nicesrc = udpsrc = gst_element_factory_make("udpsrc", element_name);
+    g_free(element_name);
+
+    if (!gst_bin_add(GST_BIN(transport_agent->priv->transport_bin), subflow_bin)) {
+      GST_WARNING("Failed to add subflow_bin-%hhu to parent bin", subflow_id);
+      return;
+    }
+    if (!gst_element_sync_state_with_parent(subflow_bin)) {
+       GST_WARNING("Failed to sync subflow_bin-%hhu to parent bin", subflow_id);
+      return;
+    }
+    gst_bin_add_many(GST_BIN(subflow_bin), udpsrc, NULL);
+
+    g_object_set (udpsrc, "port", port, NULL);
+
+    synced_ok = gst_element_sync_state_with_parent(udpsrc);
+    g_warn_if_fail(synced_ok);
+
+    padname = g_strdup_printf("src_%hhu", subflow_id);
+    gst_element_link_pads(priv->mprtp_snd, padname, udpsrc, "sink");
+    g_free(padname);
+
+    g_object_set(priv->mprtp_ply, "join-subflow", subflow_id, NULL);
+
+}
 
 
 void owr_transport_agent_add_local_address(OwrTransportAgent *transport_agent, const gchar *local_address)
@@ -938,8 +1069,16 @@ static void handle_new_send_source(OwrTransportAgent *transport_agent,
      * and if one is reusable, use it, else raw?
     g_object_get(send_payload, "codec-type", &codec_type, NULL);
     */
-
     caps = _owr_payload_create_raw_caps(send_payload);
+//    if(transport_agent->priv->mprtp_caps == NULL){
+//        g_print("Halleluja!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+//        transport_agent->priv->mprtp_caps = caps;
+//        gst_buffer_ref(transport_agent->priv->mprtp_caps);
+//    }else{
+//        gst_buffer_unref(transport_agent->priv->mprtp_caps);
+//        transport_agent->priv->mprtp_caps = caps;
+//        gst_buffer_ref(transport_agent->priv->mprtp_caps);
+//    }
     src = _owr_media_source_request_source(send_source, caps);
     g_assert(src);
     gst_caps_unref(caps);
@@ -1416,7 +1555,6 @@ static GstElement *add_mprtp_scheduler_element(OwrTransportAgent *transport_agen
 
     mprtp_sch = gst_element_factory_make("mprtpscheduler", element_name);
 
-    g_object_set(mprtp_sch, "subflow-riports-enabled", FALSE, NULL);
     g_object_set(mprtp_sch, "join-subflow", 1, NULL);
 
     added_ok = gst_bin_add(GST_BIN(bin), mprtp_sch);
@@ -1441,7 +1579,6 @@ static GstElement *add_mprtp_plaoyouter_element(OwrTransportAgent *transport_age
 
     mprtp_sch = gst_element_factory_make("mprtpplayouter", element_name);
 
-    g_object_set(mprtp_sch, "subflow-riports-enabled", FALSE, NULL);
     g_object_set(mprtp_sch, "join-subflow", 1, NULL);
 
     added_ok = gst_bin_add(GST_BIN(bin), mprtp_sch);

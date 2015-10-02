@@ -73,7 +73,18 @@ OwrTransportAgent * owr_transport_agent_new(gboolean ice_controlling_mode);
 void owr_transport_agent_add_helper_server(OwrTransportAgent *transport_agent, OwrHelperServerType type,
     const gchar *address, guint port, const gchar *username, const gchar *password);
 void owr_transport_agent_add_local_address(OwrTransportAgent *transport_agent, const gchar *local_address);
-void owr_transport_agent_join_subflow(OwrTransportAgent *transport_agent, guint8 subflow_id, const gchar *local_address);
+//void owr_transport_agent_join_subflow(OwrTransportAgent *transport_agent,
+//                                      guint8 subflow_id,
+//                                      const gchar *local_address,
+//                                      guint snd_port,
+//                                      guint rcv_port);
+void owr_transport_agent_join_rcv_subflow(OwrTransportAgent *transport_agent,
+                                      guint8 subflow_id,
+                                      guint port);
+void owr_transport_agent_join_snd_subflow(OwrTransportAgent *transport_agent,
+                                      guint8 subflow_id,
+                                      const gchar *remote_address,
+                                      guint port);
 void owr_transport_agent_set_local_port_range(OwrTransportAgent *transport_agent, guint min_port, guint max_port);
 void owr_transport_agent_add_session(OwrTransportAgent *agent, OwrSession *session);
 gchar * owr_transport_agent_get_dot_data(OwrTransportAgent *transport_agent);

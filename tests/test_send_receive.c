@@ -188,8 +188,10 @@ static gboolean dump_cb(gpointer *user_data)
     g_print("Dumping send transport agent pipeline!\n");
 
     if(!added){
-        owr_transport_agent_join_subflow(recv_transport_agent, 2, "127.0.0.2");
-        owr_transport_agent_join_subflow(send_transport_agent, 2, "127.0.0.2");
+        //owr_transport_agent_join_subflow(recv_transport_agent, 2, "127.1.0.2", 56780, 56790);
+        //owr_transport_agent_join_subflow(send_transport_agent, 2, "127.1.0.2", 56790, 56780);
+        owr_transport_agent_join_snd_subflow(send_transport_agent, 2, "127.2.1.1", 5565);
+        owr_transport_agent_join_rcv_subflow(recv_transport_agent, 2, 5565);
         added = TRUE;
     }
     if (video_source)
