@@ -186,6 +186,18 @@ static void send_answer()
             json_builder_set_member_name(builder, "nackpli");
             nack_pli = GPOINTER_TO_UINT(g_object_steal_data(media_session, "nack-pli"));
             json_builder_add_boolean_value(builder, nack_pli);
+
+            if (!g_strcmp0(encoding_name, "H264")) {
+                json_builder_set_member_name(builder, "parameters");
+                json_builder_begin_object(builder);
+                json_builder_set_member_name(builder, "levelAsymmetryAllowed");
+                json_builder_add_int_value(builder, 1);
+                json_builder_set_member_name(builder, "packetizationMode");
+                json_builder_add_int_value(builder, 1);
+                json_builder_set_member_name(builder, "profileLevelId");
+                json_builder_add_string_value(builder, "42e01f");
+                json_builder_end_object(builder);
+            }
         } else
             g_warn_if_reached();
 
