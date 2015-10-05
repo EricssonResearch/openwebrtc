@@ -432,7 +432,7 @@ static void handle_offer(gchar *message, gsize message_length)
     GObject *session;
     gint j, number_of_payloads, number_of_candidates;
     gint64 payload_type, clock_rate, channels = 0;
-    const gchar *encoding_name;
+    gchar *encoding_name;
     gboolean ccm_fir = FALSE, nack_pli = FALSE;
     OwrCodecType codec_type;
     OwrCandidate *remote_candidate;
@@ -474,7 +474,7 @@ static void handle_offer(gchar *message, gsize message_length)
             json_reader_read_element(reader, j);
 
             json_reader_read_member(reader, "encodingName");
-            encoding_name = json_reader_get_string_value(reader);
+            encoding_name = g_ascii_strup(json_reader_get_string_value(reader), -1);
             json_reader_end_member(reader);
 
             json_reader_read_member(reader, "type");
@@ -492,10 +492,10 @@ static void handle_offer(gchar *message, gsize message_length)
                     codec_type = OWR_CODEC_TYPE_PCMA;
                 else if (!g_strcmp0(encoding_name, "PCMU"))
                     codec_type = OWR_CODEC_TYPE_PCMU;
-                else if (!g_strcmp0(encoding_name, "OPUS") || !g_strcmp0(encoding_name, "opus"))
+                else if (!g_strcmp0(encoding_name, "OPUS"))
                     codec_type = OWR_CODEC_TYPE_OPUS;
                 else
-                    continue;
+                    goto end_payload;
 
                 json_reader_read_member(reader, "channels");
                 channels = json_reader_get_int_value(reader);
@@ -512,7 +512,7 @@ static void handle_offer(gchar *message, gsize message_length)
                 else if (!g_strcmp0(encoding_name, "VP8"))
                     codec_type = OWR_CODEC_TYPE_VP8;
                 else
-                    continue;
+                    goto end_payload;
 
                 json_reader_read_member(reader, "ccmfir");
                 ccm_fir = json_reader_get_boolean_value(reader);
@@ -543,6 +543,8 @@ static void handle_offer(gchar *message, gsize message_length)
                 owr_media_session_add_receive_payload(media_session, receive_payload);
                 owr_media_session_set_send_payload(media_session, send_payload);
             }
+end_payload:
+            g_free(encoding_name);
             json_reader_end_element(reader);
         }
         json_reader_end_member(reader); /* payloads */
