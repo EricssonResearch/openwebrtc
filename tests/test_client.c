@@ -44,6 +44,12 @@
 
 #define SERVER_URL "http://demo.openwebrtc.org:38080"
 
+#define ENABLE_PCMA TRUE
+#define ENABLE_PCMU TRUE
+#define ENABLE_OPUS TRUE
+#define ENABLE_H264 TRUE
+#define ENABLE_VP8  TRUE
+
 static GList *local_sources, *renderers;
 static OwrTransportAgent *transport_agent;
 static gchar *session_id, *peer_id;
@@ -488,11 +494,11 @@ static void handle_offer(gchar *message, gsize message_length)
             send_payload = receive_payload = NULL;
             if (!g_strcmp0(mtype, "audio")) {
                 media_type = OWR_MEDIA_TYPE_AUDIO;
-                if (!g_strcmp0(encoding_name, "PCMA"))
+                if (ENABLE_PCMA && !g_strcmp0(encoding_name, "PCMA"))
                     codec_type = OWR_CODEC_TYPE_PCMA;
-                else if (!g_strcmp0(encoding_name, "PCMU"))
+                else if (ENABLE_PCMU && !g_strcmp0(encoding_name, "PCMU"))
                     codec_type = OWR_CODEC_TYPE_PCMU;
-                else if (!g_strcmp0(encoding_name, "OPUS"))
+                else if (ENABLE_OPUS && !g_strcmp0(encoding_name, "OPUS"))
                     codec_type = OWR_CODEC_TYPE_OPUS;
                 else
                     goto end_payload;
@@ -507,9 +513,9 @@ static void handle_offer(gchar *message, gsize message_length)
                     channels);
             } else if (!g_strcmp0(mtype, "video")) {
                 media_type = OWR_MEDIA_TYPE_VIDEO;
-                if (!g_strcmp0(encoding_name, "H264"))
+                if (ENABLE_H264 && !g_strcmp0(encoding_name, "H264"))
                     codec_type = OWR_CODEC_TYPE_H264;
-                else if (!g_strcmp0(encoding_name, "VP8"))
+                else if (ENABLE_VP8 && !g_strcmp0(encoding_name, "VP8"))
                     codec_type = OWR_CODEC_TYPE_VP8;
                 else
                     goto end_payload;
