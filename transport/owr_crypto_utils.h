@@ -41,6 +41,11 @@ G_BEGIN_DECLS
 typedef void (*OwrCryptoDataCallback) (gchar *privatekey, gchar *certificate, gchar *fingerprint);
 
 void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback);
+/*< private >*/
+
+gpointer _create_crypto_worker_run(gpointer data);
+
+gboolean _create_crypto_worker_report(gpointer data);
 
 G_END_DECLS
 

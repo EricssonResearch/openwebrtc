@@ -121,10 +121,7 @@ server.onaccept = function (event) {
 
     rpcScope.createKeys = function (client) {
         var localcertificate, localprivatekey, localfingerprint;
-        console.log("calling crypto_create_crypto_data");
         owr.crypto_create_crypto_data(function (privatekey, certificate, fingerprint) {
-            console.log("callback from crypto_create_crypto_data");
-
             if ((privatekey && certificate && fingerprint)) {
                 if (fingerprint == "Failure") {
                     console.log("generation of crypto data has failed");
@@ -140,9 +137,6 @@ server.onaccept = function (event) {
                 }
             }
         });
-        console.log("after calling crypto_create_crypto_data");
-
-
     }
 
     rpcScope.requestSources = function (options, client) {

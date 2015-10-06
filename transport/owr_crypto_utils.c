@@ -78,16 +78,29 @@ GST_DEBUG_CATEGORY_EXTERN(_owrcrypto_debug);
  * Prototype for the callback passed to owr_get_capture_sources()
  */
 
+typedef struct {
+  OwrCryptoDataCallback callback;
+  gboolean errorDetected;
+  gchar *pem_key;
+  gchar *pem_cert;
+  gchar *char_fprint;
+} CryptoData;
+
 
 void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback)
 {
+  GThread *crypto_worker;
 
-  GClosure *closure;
 
-  g_return_if_fail(callback);
+  crypto_worker = g_thread_new("crypto_worker", _create_crypto_worker_run, (gpointer)callback);
 
-  closure = g_cclosure_new(G_CALLBACK(callback), NULL, NULL);
-  g_closure_set_marshal(closure, g_cclosure_marshal_generic);
+}
+
+gpointer _create_crypto_worker_run(gpointer data) {
+
+  OwrCryptoDataCallback callback = (OwrCryptoDataCallback) data;
+
+  g_return_val_if_fail(callback, NULL);
 
   X509 *cert;
 
@@ -185,14 +198,46 @@ void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback)
   pem_cert = g_strndup (buffer_cert, len_cert);
   pem_key = g_strndup (buffer_key, len_key);
 
+  CryptoData *report_data = g_new0(CryptoData, 1);
 
-    GValue params[3] = { G_VALUE_INIT, G_VALUE_INIT, G_VALUE_INIT };
+  report_data->callback = callback;
+  report_data->errorDetected = errorDetected;
+  report_data->pem_key = pem_key;
+  report_data->pem_cert = pem_cert;
+  report_data->char_fprint = char_fprint;
 
-    g_value_init(&params[0], G_TYPE_STRING);
-    g_value_init(&params[1], G_TYPE_STRING);
-    g_value_init(&params[2], G_TYPE_STRING);
+  g_idle_add(_create_crypto_worker_report, (gpointer)report_data);
 
-  if (errorDetected) {
+// some cleanup
+
+  //RSA_free(rsa);  -- gives segmentation fault about every second time
+
+  X509_free(cert);
+  BIO_free (bio_cert);
+  BIO_free (bio_key);
+  EVP_PKEY_free(key_pair);
+
+  return NULL;
+
+}
+
+gboolean _create_crypto_worker_report(gpointer data) {
+
+  CryptoData *report_data = (CryptoData *) data;
+
+  GClosure *closure;
+
+  closure = g_cclosure_new(G_CALLBACK(report_data->callback), NULL, NULL);
+  g_closure_set_marshal(closure, g_cclosure_marshal_generic);
+
+
+  GValue params[3] = { G_VALUE_INIT, G_VALUE_INIT, G_VALUE_INIT };
+
+  g_value_init(&params[0], G_TYPE_STRING);
+  g_value_init(&params[1], G_TYPE_STRING);
+  g_value_init(&params[2], G_TYPE_STRING);
+
+  if (report_data->errorDetected) {
     GST_ERROR("Returning with error");
     g_value_set_string(&params[0], "Failure");
     g_value_set_string(&params[1], "Failure");
@@ -201,9 +246,9 @@ void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback)
     g_closure_invoke(closure, NULL, 3, (const GValue *)&params, NULL);
   }
   else {
-    g_value_set_string(&params[0], pem_key);
-    g_value_set_string(&params[1], pem_cert);
-    g_value_set_string(&params[2], char_fprint);
+    g_value_set_string(&params[0], report_data->pem_key);
+    g_value_set_string(&params[1], report_data->pem_cert);
+    g_value_set_string(&params[2], report_data->char_fprint);
 
     g_closure_invoke(closure, NULL, 3, (const GValue *)&params, NULL);
 
@@ -215,16 +260,14 @@ void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback)
   g_value_unset(&params[0]);
   g_value_unset(&params[1]);
   g_value_unset(&params[2]);
-
-  //RSA_free(rsa);  -- gives segmentation fault about every second time
-
-  X509_free(cert);
   g_closure_unref(closure);
-  BIO_free (bio_cert);
-  BIO_free (bio_key);
-  EVP_PKEY_free(key_pair);
-  g_free(char_fprint);
 
+  g_free(report_data->pem_key);
+  g_free(report_data->pem_cert);
+  g_free(report_data->char_fprint);
+  g_free(report_data);
+
+  return FALSE;
 }
 
 
