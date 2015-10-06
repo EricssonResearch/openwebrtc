@@ -182,18 +182,54 @@ static void got_sources(GList *sources, gpointer user_data)
     }
 }
 
-static gboolean added = FALSE;
+static guint8 subflow_snd_id;
+static guint8 subflow_rcv_id;
+
+static gboolean join_subflows(gpointer *user_data)
+{
+  const GstStructure *s = NULL;
+  g_print(
+      "-----------------------------------------------------------------\n"
+      "---------------- JOIN SUBFLOW BEGIN -----------------------------\n"
+      "-----------------------------------------------------------------\n"
+  );
+  subflow_snd_id = owr_transport_agent_join_snd_subflow(send_transport_agent, "127.2.1.1", 5565);
+  subflow_rcv_id = owr_transport_agent_join_rcv_subflow(recv_transport_agent, 5565);
+  g_print(
+        "-----------------------------------------------------------------\n"
+        "---------------- JOIN SUBFLOW END -> snd:%d, rcv:%d <------------\n"
+        "-----------------------------------------------------------------\n",
+        subflow_snd_id, subflow_rcv_id
+        );
+//  s = owr_transport_agent_get_rcv_subflow_stats(recv_transport_agent);
+//  g_print("%s", gst_structure_to_string(s));
+  s = owr_transport_agent_get_snd_subflow_stats(recv_transport_agent);
+  g_print("%s", gst_structure_to_string(s));
+  return G_SOURCE_REMOVE;
+}
+
+static gboolean detach_subflows(gpointer *user_data)
+{
+  g_print(
+        "-----------------------------------------------------------------\n"
+        "---------------- DETACH SUBFLOW BEGIN -> snd:%d, rcv:%d <--------\n"
+        "-----------------------------------------------------------------\n",
+        subflow_snd_id, subflow_rcv_id
+        );
+  owr_transport_agent_detach_snd_subflow(send_transport_agent, subflow_snd_id);
+  owr_transport_agent_detach_rcv_subflow(recv_transport_agent, subflow_rcv_id);
+  g_print(
+      "-----------------------------------------------------------------\n"
+      "------------------ DETACH SUBFLOW END ---------------------------\n"
+      "-----------------------------------------------------------------\n"
+  );
+  return G_SOURCE_REMOVE;
+}
+
 static gboolean dump_cb(gpointer *user_data)
 {
     g_print("Dumping send transport agent pipeline!\n");
 
-    if(!added){
-        //owr_transport_agent_join_subflow(recv_transport_agent, 2, "127.1.0.2", 56780, 56790);
-        //owr_transport_agent_join_subflow(send_transport_agent, 2, "127.1.0.2", 56790, 56780);
-        owr_transport_agent_join_snd_subflow(send_transport_agent, 2, "127.2.1.1", 5565);
-        owr_transport_agent_join_rcv_subflow(recv_transport_agent, 2, 5565);
-        added = TRUE;
-    }
     if (video_source)
         write_dot_file("test_send-got_source-video-source", owr_media_source_get_dot_data(video_source), TRUE);
     if (video_renderer)
@@ -353,7 +389,8 @@ int main(int argc, char **argv)
         got_sources, NULL);
 
     g_timeout_add_seconds(10, (GSourceFunc)dump_cb, NULL);
-
+    g_timeout_add_seconds(2, (GSourceFunc)join_subflows, NULL);
+    g_timeout_add_seconds(20, (GSourceFunc)detach_subflows, NULL);
 
     owr_run();
 

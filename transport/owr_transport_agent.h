@@ -35,6 +35,7 @@
 #include "owr_session.h"
 
 #include <glib-object.h>
+#include <gstreamer-1.0/gst/gst.h>
 
 G_BEGIN_DECLS
 
@@ -73,18 +74,18 @@ OwrTransportAgent * owr_transport_agent_new(gboolean ice_controlling_mode);
 void owr_transport_agent_add_helper_server(OwrTransportAgent *transport_agent, OwrHelperServerType type,
     const gchar *address, guint port, const gchar *username, const gchar *password);
 void owr_transport_agent_add_local_address(OwrTransportAgent *transport_agent, const gchar *local_address);
-//void owr_transport_agent_join_subflow(OwrTransportAgent *transport_agent,
-//                                      guint8 subflow_id,
-//                                      const gchar *local_address,
-//                                      guint snd_port,
-//                                      guint rcv_port);
-void owr_transport_agent_join_rcv_subflow(OwrTransportAgent *transport_agent,
-                                      guint8 subflow_id,
-                                      guint port);
-void owr_transport_agent_join_snd_subflow(OwrTransportAgent *transport_agent,
-                                      guint8 subflow_id,
+guint8 owr_transport_agent_join_rcv_subflow(OwrTransportAgent *transport_agent, guint port);
+guint8 owr_transport_agent_join_snd_subflow(OwrTransportAgent *transport_agent,
                                       const gchar *remote_address,
                                       guint port);
+void owr_transport_agent_detach_snd_subflow(OwrTransportAgent *transport_agent,
+                                      guint8 subflow_id);
+void owr_transport_agent_detach_rcv_subflow(OwrTransportAgent *transport_agent,
+                                      guint8 subflow_id);
+
+GstStructure* owr_transport_agent_get_rcv_subflow_stats(OwrTransportAgent *transport_agent);
+GstStructure* owr_transport_agent_get_snd_subflow_stats(OwrTransportAgent *transport_agent);
+
 void owr_transport_agent_set_local_port_range(OwrTransportAgent *transport_agent, guint min_port, guint max_port);
 void owr_transport_agent_add_session(OwrTransportAgent *agent, OwrSession *session);
 gchar * owr_transport_agent_get_dot_data(OwrTransportAgent *transport_agent);
