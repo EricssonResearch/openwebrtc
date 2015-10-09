@@ -91,9 +91,9 @@ void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback)
 {
   GThread *crypto_worker;
 
-
   crypto_worker = g_thread_new("crypto_worker", _create_crypto_worker_run, (gpointer)callback);
 
+  g_thread_unref(crypto_worker);
 }
 
 gpointer _create_crypto_worker_run(gpointer data) {
