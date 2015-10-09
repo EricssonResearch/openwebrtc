@@ -36,6 +36,7 @@
 #endif
 #include "owr_transport_agent.h"
 
+#include "owr_arrival_time_meta.h"
 #include "owr_audio_payload.h"
 #include "owr_candidate_private.h"
 #include "owr_data_channel.h"
@@ -78,6 +79,7 @@ GST_DEBUG_CATEGORY_EXTERN(_owrsession_debug);
 #define GST_CAT_DEFAULT _owrtransportagent_debug
 
 #define DEFAULT_ICE_CONTROLLING_MODE TRUE
+#define GST_RTCP_RTPFB_TYPE_SCREAM 18
 
 enum {
     PROP_0,
@@ -134,6 +136,11 @@ struct _OwrTransportAgentPrivate {
     GHashTable *send_bins;
 
     gboolean local_address_added;
+
+    GHashTable *streams;
+    GList *rtcp_list;
+    GMutex rtcp_lock;
+
     guint local_min_port;
     guint local_max_port;
 
@@ -150,6 +157,21 @@ typedef struct {
     OwrTransportAgent *transport_agent;
     guint session_id;
 } AgentAndSessionIdPair;
+
+typedef struct {
+    OwrTransportAgent *transport_agent;
+    guint session_id;
+    gint rtx_pt;
+    gboolean adapt;
+
+    gushort highest_seq;
+    guint16 ack_vec;
+    guint8 n_loss;
+    guint8 n_ecn;
+    guint receive_wallclock;
+
+    guint32 last_feedback_wallclock;
+} ScreamRx;
 
 #define GEN_HASH_KEY(seq, ssrc) (seq ^ ssrc)
 
@@ -188,6 +210,9 @@ static GstElement * on_rtpbin_request_aux_receiver(GstElement *rtpbin, guint ses
 
 static gboolean on_sending_rtcp(GObject *session, GstBuffer *buffer, gboolean early, OwrTransportAgent *agent);
 static void on_receiving_rtcp(GObject *session, GstBuffer *buffer, OwrTransportAgent *agent);
+static void on_feedback_rtcp(GObject *session, guint type, guint fbtype, guint sender_ssrc, guint media_ssrc, GstBuffer *fci, OwrTransportAgent *transport_agent);
+static GstPadProbeReturn probe_save_ts(GstPad *srcpad, GstPadProbeInfo *info, OwrTransportAgent *agent);
+static GstPadProbeReturn probe_rtp_info(GstPad *srcpad, GstPadProbeInfo *info, ScreamRx *scream_rx);
 static void on_ssrc_active(GstElement *rtpbin, guint session_id, guint ssrc, OwrTransportAgent *transport_agent);
 static void on_new_jitterbuffer(GstElement *rtpbin, GstElement *jitterbuffer, guint session_id, guint ssrc, OwrTransportAgent *transport_agent);
 static void prepare_rtcp_stats(OwrMediaSession *media_session, GObject *rtp_source);
@@ -231,6 +256,9 @@ static void complete_data_channel_and_ack(OwrTransportAgent *transport_agent,
 static void on_datachannel_send(OwrTransportAgent *transport_agent, guint8 *data, guint len,
     gboolean is_binary, OwrDataChannel *data_channel);
 static void maybe_close_data_channel(OwrTransportAgent *transport_agent, DataChannel *data_channel_info);
+
+static gboolean on_payload_adaptation_request(GstElement *screamqueue, guint pt,
+    OwrMediaSession *media_session);
 
 static void owr_transport_agent_finalize(GObject *object)
 {
@@ -279,6 +307,8 @@ static void owr_transport_agent_finalize(GObject *object)
 
     owr_message_origin_bus_set_free(priv->message_origin_bus_set);
     priv->message_origin_bus_set = NULL;
+    g_list_free_full(priv->rtcp_list, (GDestroyNotify)g_hash_table_unref);
+    g_mutex_clear(&priv->rtcp_lock);
 
     G_OBJECT_CLASS(owr_transport_agent_parent_class)->finalize(object);
 }
@@ -392,6 +422,9 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
     priv->sessions = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, g_object_unref);
     g_mutex_init(&priv->sessions_lock);
 
+    priv->rtcp_list = NULL;
+    g_mutex_init(&transport_agent->priv->rtcp_lock);
+
     g_return_if_fail(_owr_is_initialized());
 
     priv->nice_agent = nice_agent_new(_owr_get_main_context(), NICE_COMPATIBILITY_RFC5245);
@@ -425,6 +458,10 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
     priv->transport_bin = gst_bin_new(priv->transport_bin_name);
     priv->rtpbin = gst_element_factory_make("rtpbin", "rtpbin");
     g_object_set(priv->rtpbin, "do-lost", TRUE, NULL);
+
+    /* NOTE: We hard-code the savpf here as it is required for WebRTC */
+    gst_util_set_object_arg(G_OBJECT(priv->rtpbin), "rtp-profile", "savpf");
+
     g_signal_connect(priv->rtpbin, "pad-added", G_CALLBACK(on_rtpbin_pad_added), transport_agent);
     g_signal_connect(priv->rtpbin, "request-pt-map", G_CALLBACK(on_rtpbin_request_pt_map), transport_agent);
     g_signal_connect(priv->rtpbin, "request-aux-sender", G_CALLBACK(on_rtpbin_request_aux_sender), transport_agent);
@@ -1020,8 +1057,13 @@ static gboolean add_session(GHashTable *args)
         /* stream_id is used as the rtpbin session id */
         g_signal_emit_by_name(priv->rtpbin, "get-internal-session", stream_id, &rtp_session);
         g_object_set(rtp_session, "rtcp-min-interval", GST_SECOND, "bandwidth", 0.0, "rtp-profile", GST_RTP_PROFILE_SAVPF, NULL);
+/*
+        g_object_set(rtp_session, "bandwidth", (gdouble)700000,
+            "rtcp-fraction", (gdouble)100000,
+            "rtcp-min-interval", (guint64)200000000, NULL);*/
         g_object_set_data(rtp_session, "session_id", GUINT_TO_POINTER(stream_id));
         g_signal_connect_after(rtp_session, "on-sending-rtcp", G_CALLBACK(on_sending_rtcp), transport_agent);
+        g_signal_connect(rtp_session, "on-feedback-rtcp", G_CALLBACK(on_feedback_rtcp), transport_agent);
         g_signal_connect_after(rtp_session, "on-receiving-rtcp", G_CALLBACK(on_receiving_rtcp), NULL);
         g_object_unref(rtp_session);
 
@@ -1064,8 +1106,16 @@ static GstElement *add_nice_element(OwrTransportAgent *transport_agent, guint st
 
     if (is_sink) {
         g_object_set(nice_element, "enable-last-sample", FALSE, "async", FALSE, NULL);
-        if (is_rtcp)
+        if (is_rtcp) {
             g_object_set(nice_element, "sync", FALSE, NULL);
+        }
+    } else if (!is_rtcp) {
+        GstPad *nice_src_pad = NULL;
+
+        nice_src_pad = gst_element_get_static_pad(nice_element, "src");
+        gst_pad_add_probe(nice_src_pad, GST_PAD_PROBE_TYPE_BUFFER,
+            (GstPadProbeCallback)probe_save_ts, transport_agent, NULL);
+        gst_object_unref(nice_src_pad);
     }
 
     added_ok = gst_bin_add(GST_BIN(bin), nice_element);
@@ -1231,6 +1281,21 @@ static void on_rtcp_mux_changed(OwrMediaSession *media_session, GParamSpec *pspe
     g_free(pad_name);
 }
 
+static void on_bitrate_change(GstElement *scream_queue, guint bitrate, guint ssrc, guint pt,
+    OwrMediaSession *session)
+{
+    OwrPayload *payload;
+    g_return_if_fail(session);
+    payload = _owr_media_session_get_send_payload(session);
+    if (payload) {
+        g_object_set(payload, "bitrate", bitrate, NULL);
+    } else
+        g_warning("No send payload set for media session");
+    OWR_UNUSED(scream_queue);
+    OWR_UNUSED(ssrc);
+    OWR_UNUSED(pt);
+}
+
 static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, guint stream_id, gboolean rtp, gboolean rtcp)
 {
     gchar *rtpbin_pad_name, *dtls_srtp_pad_name;
@@ -1243,6 +1308,7 @@ static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, g
     GstElement *send_output_bin;
     OwrMediaSession *media_session;
     SendBinInfo *send_bin_info;
+    GstElement *scream_queue;
 
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
 
@@ -1256,12 +1322,20 @@ static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, g
     g_return_if_fail(GST_IS_ELEMENT(dtls_srtp_bin_rtp));
     g_return_if_fail(!dtls_srtp_bin_rtcp || GST_IS_ELEMENT(dtls_srtp_bin_rtcp));
 
+    media_session = OWR_MEDIA_SESSION(get_session(transport_agent, stream_id));
+
+    scream_queue = gst_bin_get_by_name(GST_BIN(send_output_bin), "screamqueue");
+    g_assert(scream_queue);
+    g_signal_connect_object(scream_queue, "on-bitrate-change", G_CALLBACK(on_bitrate_change),
+        media_session, 0);
+        /* TODO: Move connect to prepare_transport_bin_send_elements */
+
     /* RTP */
     if (rtp) {
         rtpbin_pad_name = g_strdup_printf("send_rtp_src_%u", stream_id);
         dtls_srtp_pad_name = g_strdup_printf("rtp_sink_%u", stream_id);
 
-        sink_pad = gst_element_get_request_pad(dtls_srtp_bin_rtp, dtls_srtp_pad_name);
+        sink_pad = gst_element_get_static_pad(scream_queue, "sink");
         g_assert(GST_IS_PAD(sink_pad));
         ghost_pad_and_add_to_bin(sink_pad, send_output_bin, dtls_srtp_pad_name);
         gst_object_unref(sink_pad);
@@ -1308,11 +1382,8 @@ static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, g
             g_object_set(output_selector, "active-pad", src_pad, NULL);
             gst_object_unref(src_pad);
             gst_object_unref(sink_pad);
-
-            media_session = OWR_MEDIA_SESSION(get_session(transport_agent, stream_id));
             g_signal_connect_object(media_session, "notify::rtcp-mux", G_CALLBACK(on_rtcp_mux_changed),
                 output_selector, 0);
-            g_object_unref(media_session);
         }
 
         sink_pad = gst_element_get_static_pad(output_selector, "sink");
@@ -1325,6 +1396,7 @@ static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, g
 
         g_free(rtpbin_pad_name);
         g_free(dtls_srtp_pad_name);
+        g_object_unref(media_session);
 
         send_bin_info->linked_rtcp = TRUE;
     }
@@ -1334,10 +1406,12 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
     gboolean rtcp_mux)
 {
     GstElement *nice_element, *dtls_srtp_bin_rtp, *dtls_srtp_bin_rtcp = NULL;
+    GstElement *scream_queue = NULL;
     gboolean linked_ok, synced_ok;
     GstElement *send_output_bin;
     SendBinInfo *send_bin_info;
-    gchar *bin_name;
+    gchar *bin_name, *dtls_srtp_pad_name;
+    OwrMediaSession *media_session;
 
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
 
@@ -1354,13 +1428,29 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
         return;
     }
 
+    media_session = OWR_MEDIA_SESSION(get_session(transport_agent, stream_id));
+    scream_queue = gst_element_factory_make("screamqueue", "screamqueue");
+    g_assert(scream_queue);
+    g_object_set(scream_queue, "scream-controller-id", transport_agent->priv->agent_id, NULL);
+    g_signal_connect(scream_queue, "on-payload-adaptation-request",
+        (GCallback)on_payload_adaptation_request, media_session);
+    gst_bin_add(GST_BIN(send_output_bin), scream_queue);
+
     nice_element = add_nice_element(transport_agent, stream_id, TRUE, FALSE, send_output_bin);
     dtls_srtp_bin_rtp = add_dtls_srtp_bin(transport_agent, stream_id, TRUE, FALSE, send_output_bin);
     linked_ok = gst_element_link(dtls_srtp_bin_rtp, nice_element);
     g_warn_if_fail(linked_ok);
+
+    dtls_srtp_pad_name = g_strdup_printf("rtp_sink_%u", stream_id);
+    linked_ok = gst_element_link_pads(scream_queue, "src", dtls_srtp_bin_rtp, dtls_srtp_pad_name);
+    g_free(dtls_srtp_pad_name);
+    g_warn_if_fail(linked_ok);
+
     synced_ok = gst_element_sync_state_with_parent(nice_element);
     g_warn_if_fail(synced_ok);
     synced_ok = gst_element_sync_state_with_parent(dtls_srtp_bin_rtp);
+    g_warn_if_fail(synced_ok);
+    synced_ok = gst_element_sync_state_with_parent(scream_queue);
     g_warn_if_fail(synced_ok);
 
     if (!rtcp_mux) {
@@ -1388,10 +1478,11 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
     guint stream_id, gboolean rtcp_mux)
 {
     GstElement *nice_element, *dtls_srtp_bin, *funnel;
-    GstPad *rtp_src_pad, *rtcp_src_pad;
+    GstPad *rtp_src_pad, *rtcp_src_pad, *rtp_sink_pad;
     gchar *rtpbin_pad_name;
     gboolean linked_ok, synced_ok;
     GstElement *receive_input_bin;
+    ScreamRx *scream_rx;
 #ifdef TEST_RTX
     GstElement *identity;
 #endif
@@ -1420,6 +1511,7 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
     gst_object_unref(rtp_src_pad);
 
     rtpbin_pad_name = g_strdup_printf("recv_rtp_sink_%u", stream_id);
+
 #ifndef TEST_RTX
     linked_ok = gst_element_link_pads(receive_input_bin, "rtp_src", transport_agent->priv->rtpbin,
         rtpbin_pad_name);
@@ -1482,6 +1574,18 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
         g_warn_if_fail(linked_ok);
         g_free(rtpbin_pad_name);
     }
+
+    rtpbin_pad_name = g_strdup_printf("recv_rtp_sink_%u", stream_id);
+    rtp_sink_pad = gst_element_get_static_pad(transport_agent->priv->rtpbin, rtpbin_pad_name);
+    g_free(rtpbin_pad_name);
+    scream_rx = g_new0(ScreamRx, 1);
+    scream_rx->rtx_pt = -2; /* unknown */
+    scream_rx->transport_agent = transport_agent;
+    scream_rx->session_id = stream_id;
+    scream_rx->adapt = TRUE; /* Always initiates to TRUE. Sets to TRUE or FALSE in probe_rtp_info */
+    gst_pad_add_probe(rtp_sink_pad, GST_PAD_PROBE_TYPE_BUFFER, (GstPadProbeCallback)probe_rtp_info,
+        scream_rx, g_free);
+    gst_object_unref(rtp_sink_pad);
 }
 
 
@@ -2217,9 +2321,6 @@ static void setup_video_receive_elements(GstPad *new_pad, guint32 session_id, Ow
     GstPad *pad;
     SessionData *session_data;
 
-    g_object_set_data(G_OBJECT(new_pad), "transport-agent", (gpointer)transport_agent);
-    g_object_set_data(G_OBJECT(new_pad), "session-id", GUINT_TO_POINTER(session_id));
-
     g_snprintf(name, OWR_OBJECT_NAME_LENGTH_MAX, "receive-output-bin-%u", session_id);
     receive_output_bin = gst_bin_new(name);
 
@@ -2285,9 +2386,6 @@ static void setup_audio_receive_elements(GstPad *new_pad, guint32 session_id, Ow
     GstCaps *rtp_caps = NULL;
     gboolean link_ok = FALSE;
     gboolean sync_ok = TRUE;
-
-    g_object_set_data(G_OBJECT(new_pad), "transport-agent", (gpointer)transport_agent);
-    g_object_set_data(G_OBJECT(new_pad), "session-id", GUINT_TO_POINTER(session_id));
 
     pad_name = g_strdup_printf("receive-output-bin-%u", session_id);
     receive_output_bin = gst_bin_new(pad_name);
@@ -2563,6 +2661,7 @@ static void print_rtcp_feedback_type(GObject *session, guint session_id,
 static gboolean on_sending_rtcp(GObject *session, GstBuffer *buffer, gboolean early,
     OwrTransportAgent *agent)
 {
+    OwrTransportAgentPrivate *priv = agent->priv;
     GstRTCPBuffer rtcp_buffer = {NULL, {NULL, 0, NULL, 0, 0, {0}, {0}}};
     GstRTCPPacket rtcp_packet;
     GstRTCPType packet_type;
@@ -2572,13 +2671,17 @@ static gboolean on_sending_rtcp(GObject *session, GstBuffer *buffer, gboolean ea
     OwrMediaType media_type = -1;
     GValueArray *sources = NULL;
     GObject *source = NULL;
-    guint session_id = 0;
+    guint session_id = 0, rtcp_session_id = 0;
+    GList *it, *next;
+    GHashTable *rtcp_info;
 
     OWR_UNUSED(early);
 
     session_id = GPOINTER_TO_UINT(g_object_get_data(session, "session_id"));
 
-    if (gst_rtcp_buffer_map(buffer, GST_MAP_READ, &rtcp_buffer)) {
+    if (gst_rtcp_buffer_map(buffer, GST_MAP_READ | GST_MAP_WRITE, &rtcp_buffer)) {
+        guint pt, fmt, ssrc, last_fb_wc, highest_seq, n_loss, n_ecn;
+
         has_packet = gst_rtcp_buffer_get_first_packet(&rtcp_buffer, &rtcp_packet);
         for (; has_packet; has_packet = gst_rtcp_packet_move_to_next(&rtcp_packet)) {
             packet_type = gst_rtcp_packet_get_type(&rtcp_packet);
@@ -2591,6 +2694,63 @@ static gboolean on_sending_rtcp(GObject *session, GstBuffer *buffer, gboolean ea
                 break;
             }
         }
+
+        g_mutex_lock(&priv->rtcp_lock);
+        it = priv->rtcp_list;
+        while (it) {
+            rtcp_info = (GHashTable *)it->data;
+
+            pt = GPOINTER_TO_UINT(g_hash_table_lookup(rtcp_info, "pt"));
+            ssrc = GPOINTER_TO_UINT(g_hash_table_lookup(rtcp_info, "ssrc"));
+            rtcp_session_id = GPOINTER_TO_UINT(g_hash_table_lookup(rtcp_info, "session-id"));
+
+            if (pt == GST_RTCP_TYPE_RTPFB) {
+                if (session_id != rtcp_session_id) {
+                    it = g_list_next(it);
+                    continue;
+                }
+            }
+
+            if (!gst_rtcp_buffer_add_packet(&rtcp_buffer, pt, &rtcp_packet)) {
+                it = g_list_next(it);
+                continue;
+            }
+
+            fmt = GPOINTER_TO_UINT(g_hash_table_lookup(rtcp_info, "fmt"));
+            if (fmt == GST_RTCP_RTPFB_TYPE_SCREAM) {
+                guint8 *fci_buf;
+                last_fb_wc = GPOINTER_TO_UINT(g_hash_table_lookup(rtcp_info, "last-feedback-wallclock"));
+                highest_seq = GPOINTER_TO_UINT(g_hash_table_lookup(rtcp_info, "highest-seq"));
+                n_loss = GPOINTER_TO_UINT(g_hash_table_lookup(rtcp_info, "n-loss"));
+                n_ecn = GPOINTER_TO_UINT(g_hash_table_lookup(rtcp_info, "n-ecn"));
+
+                gst_rtcp_packet_fb_set_type(&rtcp_packet, fmt);
+                gst_rtcp_packet_fb_set_sender_ssrc(&rtcp_packet, 0);
+                gst_rtcp_packet_fb_set_media_ssrc(&rtcp_packet, ssrc);
+                if (!gst_rtcp_packet_fb_set_fci_length(&rtcp_packet, 3)) {
+                    /* Send next time instead.. */
+                    gst_rtcp_packet_remove(&rtcp_packet);
+                    it = g_list_next(it);
+                    continue;
+                }
+
+                fci_buf = gst_rtcp_packet_fb_get_fci(&rtcp_packet);
+                GST_WRITE_UINT16_BE(fci_buf, highest_seq);
+                GST_WRITE_UINT8(fci_buf + 2, n_loss);
+                GST_WRITE_UINT8(fci_buf + 3, n_ecn);
+                GST_WRITE_UINT32_BE(fci_buf + 4, last_fb_wc);
+                /* qbit not implemented yet  */
+                GST_WRITE_UINT32_BE(fci_buf + 8, 0);
+                do_not_suppress = TRUE;
+            }
+
+            next = g_list_next(it);
+            g_hash_table_unref(rtcp_info);
+            agent->priv->rtcp_list = g_list_delete_link(agent->priv->rtcp_list, it);
+            it = next;
+        }
+        g_mutex_unlock(&priv->rtcp_lock);
+
         gst_rtcp_buffer_unmap(&rtcp_buffer);
     }
 
@@ -2745,7 +2905,7 @@ static gboolean create_datachannel(OwrTransportAgent *transport_agent, guint32 s
     GstBuffer *gstbuf;
     gboolean result = FALSE;
     OwrDataChannelChannelType channel_type;
-    guint priority = 0; /* TODO: Support priority.. it is not really well defined yet.. */
+    guint priority = 0; /* Priority not implemented yet */
     DataChannel *data_channel_info;
     gboolean ordered, negotiated;
     gint max_packet_life_time, max_packet_retransmits, sctp_stream_id;
@@ -3731,4 +3891,246 @@ gchar * owr_transport_agent_get_dot_data(OwrTransportAgent *transport_agent)
 #else
     return g_strdup("");
 #endif
+}
+
+
+static void on_feedback_rtcp(GObject *session, guint type, guint fbtype, guint sender_ssrc,
+    guint media_ssrc, GstBuffer *fci, OwrTransportAgent *transport_agent)
+{
+    g_return_if_fail(session);
+    g_return_if_fail(transport_agent);
+
+    OWR_UNUSED(sender_ssrc);
+
+    if (type == GST_RTCP_TYPE_RTPFB && fbtype == GST_RTCP_RTPFB_TYPE_SCREAM) {
+        GstElement *send_output_bin, *scream_queue = NULL;
+        GstMapInfo info = {NULL, 0, NULL, 0, 0, {0}, {0}}; /*GST_MAP_INFO_INIT;*/
+        guint session_id = GPOINTER_TO_UINT(g_object_get_data(session, "session_id"));
+
+        gchar *name = g_strdup_printf("send-output-bin-%u", session_id);
+        send_output_bin = gst_bin_get_by_name(GST_BIN(transport_agent->priv->transport_bin), name);
+        g_free(name);
+        scream_queue = gst_bin_get_by_name(GST_BIN(send_output_bin), "screamqueue");
+        gst_object_unref(send_output_bin);
+
+        /* Read feedback from FCI */
+        if (gst_buffer_map(fci, &info, GST_MAP_READ)) {
+            guint32 timestamp;
+            guint16 highest_seq;
+            guint8 *fci_buf, n_loss, n_ecn;
+            gboolean qbit = FALSE;
+
+            fci_buf = info.data;
+            highest_seq = GST_READ_UINT16_BE(fci_buf);
+            n_loss = GST_READ_UINT8(fci_buf + 2);
+            n_ecn = GST_READ_UINT8(fci_buf + 3);
+            timestamp = GST_READ_UINT32_BE(fci_buf + 4);
+            /* TODO: Fix qbit */
+
+            gst_buffer_unmap(fci, &info);
+            g_signal_emit_by_name(scream_queue, "incoming-feedback", media_ssrc, timestamp, highest_seq, n_loss, n_ecn, qbit);
+        }
+        gst_object_unref(scream_queue);
+    }
+}
+
+
+static GstPadProbeReturn probe_save_ts(GstPad *srcpad, GstPadProbeInfo *info, OwrTransportAgent *agent)
+{
+    GstBuffer *buffer = NULL;
+
+    OWR_UNUSED(agent);
+    buffer = GST_PAD_PROBE_INFO_BUFFER(info);
+    _owr_buffer_add_arrival_time_meta(buffer, GST_BUFFER_DTS(buffer));
+
+    OWR_UNUSED(srcpad);
+    return GST_PAD_PROBE_OK;
+}
+
+
+
+static gint compare_rtcp_scream(GHashTable *a, GHashTable *b)
+{
+    guint session_id_a, session_id_b, ssrc_a, ssrc_b;
+
+    session_id_a = GPOINTER_TO_UINT(g_hash_table_lookup(a, "session-id"));
+    ssrc_a = GPOINTER_TO_UINT(g_hash_table_lookup(a, "ssrc"));
+    session_id_b = GPOINTER_TO_UINT(g_hash_table_lookup(b, "session-id"));
+    ssrc_b = GPOINTER_TO_UINT(g_hash_table_lookup(b, "ssrc"));
+
+    if (session_id_a == session_id_b && ssrc_a == ssrc_b)
+        return 0;
+    return -1;
+}
+
+
+static GstPadProbeReturn probe_rtp_info(GstPad *srcpad, GstPadProbeInfo *info, ScreamRx *scream_rx)
+{
+    GstBuffer *buffer = NULL;
+    guint64 arrival_time = 0;
+    OwrTransportAgent *transport_agent = NULL;
+    OwrTransportAgentPrivate *priv = NULL;
+    guint session_id = 0;
+
+    transport_agent = scream_rx->transport_agent;
+    session_id = scream_rx->session_id;
+
+    g_assert(transport_agent);
+    priv = transport_agent->priv;
+
+    if (G_UNLIKELY(scream_rx->rtx_pt == -2)) {
+        OwrMediaSession *media_session;
+        OwrPayload *send_payload;
+        OwrAdaptationType adapt_type;
+        media_session = OWR_MEDIA_SESSION(get_session(transport_agent, session_id));
+        send_payload = _owr_media_session_get_send_payload(media_session);
+        g_object_get(send_payload, "rtx-payload-type", &scream_rx->rtx_pt,
+            "adaptation", &adapt_type, NULL);
+        scream_rx->adapt = (adapt_type == OWR_ADAPTATION_TYPE_SCREAM);
+        g_object_unref(media_session);
+        g_object_unref(send_payload);
+    }
+
+    OWR_UNUSED(srcpad);
+
+    if (scream_rx->adapt) {
+        gpointer state = NULL;
+        GstMeta *meta;
+        const GstMetaInfo *meta_info = OWR_ARRIVAL_TIME_META_INFO;
+        GstRTPBuffer rtp_buf = {NULL, 0, {NULL}, {0}, {{NULL, 0, NULL, 0, 0, {0}, {0}}}};
+        GHashTable *rtcp_info;
+        guint8 pt = 0;
+        guint16 seq = 0;
+        guint ssrc = 0, timestamp = 0, length = 0;
+        gboolean marker = FALSE;
+        guint size = 0;
+        GList *it;
+        guint diff, tmp_highest_seq, tmp_seq;
+        buffer = GST_PAD_PROBE_INFO_BUFFER(info);
+        GObject *rtp_session;
+
+        while ((meta = gst_buffer_iterate_meta(buffer, &state))) {
+            if (meta->info->api == meta_info->api) {
+                OwrArrivalTimeMeta *atmeta = (OwrArrivalTimeMeta *) meta;
+                arrival_time = atmeta->arrival_time;
+                break;
+            }
+        }
+
+        if (!arrival_time) {
+            g_warning("No arraival time available for RTP packet");
+            goto end;
+        }
+
+        if (!gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp_buf)) {
+            /*g_warning("Failed to map RTP buffer");*/
+            goto end;
+        }
+
+        ssrc = gst_rtp_buffer_get_ssrc(&rtp_buf);
+        seq = gst_rtp_buffer_get_seq(&rtp_buf);
+        pt = gst_rtp_buffer_get_payload_type(&rtp_buf);
+        timestamp = gst_rtp_buffer_get_timestamp(&rtp_buf);
+        marker = gst_rtp_buffer_get_marker(&rtp_buf);
+        length = gst_rtp_buffer_get_packet_len(&rtp_buf);
+        gst_rtp_buffer_unmap(&rtp_buf);
+
+        if (pt == scream_rx->rtx_pt && scream_rx->adapt)
+            goto end;
+
+        OWR_UNUSED(timestamp);
+        OWR_UNUSED(length);
+        OWR_UNUSED(marker);
+        OWR_UNUSED(size);
+
+        tmp_seq = seq;
+        tmp_highest_seq = scream_rx->highest_seq;
+        if (!scream_rx->highest_seq && !scream_rx->ack_vec) { /* Initial condition */
+            scream_rx->highest_seq = seq;
+            tmp_highest_seq = scream_rx->highest_seq;
+        } else if ((seq < scream_rx->highest_seq) && (scream_rx->highest_seq - seq > 20000))
+            tmp_seq = (guint64)seq + 65536;
+        else if ((seq > scream_rx->highest_seq) && (seq - scream_rx->highest_seq > 20000))
+            tmp_highest_seq += 65536;
+
+        /* in order */
+        if (tmp_seq >= tmp_highest_seq) {
+            diff = tmp_seq - tmp_highest_seq;
+            if (diff) {
+                if (diff >= 16)
+                    scream_rx->ack_vec = 0x0000; /* ack_vec can be reduced to guint16, initialize with 0xffff */
+                else {
+                    // Fill with potential zeros
+                    scream_rx->ack_vec = scream_rx->ack_vec >> diff;
+                    // Add previous highest seq nr to ack vector
+                    scream_rx->ack_vec = scream_rx->ack_vec | (1 << (16 - diff));
+                }
+            }
+
+            scream_rx->highest_seq = seq;
+        } else { /* out of order */
+            diff = tmp_highest_seq - tmp_seq;
+            if (diff < 16)
+                scream_rx->ack_vec = scream_rx->ack_vec | (1 << (16 - diff));
+        }
+        if (!(scream_rx->ack_vec & (1 << (16-5)))) {
+            /*
+            * Detect lost packets with a little grace time to cater
+            * for out-of-order delivery
+            */
+            scream_rx->n_loss++; /* n_loss is a guint8 , initialize to 0 */
+        }
+
+        /*
+        * ECN is not implemented but we add this just to not forget it
+        * in case ECN flies some day
+        */
+        scream_rx->n_ecn = 0;
+        scream_rx->last_feedback_wallclock = (guint32)(arrival_time / 1000000);
+        rtcp_info = g_hash_table_new(g_str_hash, g_str_equal);
+        g_hash_table_insert(rtcp_info, "pt", GUINT_TO_POINTER(GST_RTCP_TYPE_RTPFB));
+        g_hash_table_insert(rtcp_info, "fmt", GUINT_TO_POINTER(GST_RTCP_RTPFB_TYPE_SCREAM));
+        g_hash_table_insert(rtcp_info, "ssrc", GUINT_TO_POINTER(ssrc));
+        g_hash_table_insert(rtcp_info, "last-feedback-wallclock",
+            GUINT_TO_POINTER(scream_rx->last_feedback_wallclock));
+        g_hash_table_insert(rtcp_info, "highest-seq",
+            GUINT_TO_POINTER(scream_rx->highest_seq));
+        g_hash_table_insert(rtcp_info, "n-loss", GUINT_TO_POINTER(scream_rx->n_loss));
+        g_hash_table_insert(rtcp_info, "n-ecn", GUINT_TO_POINTER(scream_rx->n_ecn));
+        g_hash_table_insert(rtcp_info, "session-id", GUINT_TO_POINTER(session_id));
+
+        g_mutex_lock(&priv->rtcp_lock);
+        it = g_list_find_custom(priv->rtcp_list, (gpointer)rtcp_info,
+            (GCompareFunc)compare_rtcp_scream);
+
+        if (it) {
+            g_hash_table_unref((GHashTable *)it->data);
+            priv->rtcp_list = g_list_delete_link(priv->rtcp_list, it);
+        }
+        priv->rtcp_list = g_list_append(priv->rtcp_list, rtcp_info);
+        OWR_UNUSED(it);
+        g_mutex_unlock(&priv->rtcp_lock);
+        g_signal_emit_by_name(priv->rtpbin, "get-internal-session", session_id, &rtp_session);
+        g_signal_emit_by_name(rtp_session, "send-rtcp", 20000000);
+        g_object_unref(rtp_session);
+    }
+
+end:
+    return GST_PAD_PROBE_OK;
+}
+
+
+static gboolean on_payload_adaptation_request(GstElement *screamqueue, guint pt,
+    OwrMediaSession *media_session)
+{
+    OwrPayload *payload;
+    guint pt_rtx;
+    OwrAdaptationType adapt_type;
+
+    OWR_UNUSED(screamqueue);
+    payload = _owr_media_session_get_send_payload(media_session);
+    g_assert(pt);
+    g_object_get(payload, "rtx-payload-type", &pt_rtx, "adaptation", &adapt_type, NULL);
+    /* Use adaptation for this payload if not retransmission */
+    return (adapt_type == OWR_ADAPTATION_TYPE_SCREAM) && (pt != pt_rtx);
 }

@@ -46,6 +46,7 @@ if (typeof(SDP) == "undefined")
         "nack": "^a=rtcp-fb:${type} nack$",
         "nackpli": "^a=rtcp-fb:${type} nack pli$",
         "ccmfir": "^a=rtcp-fb:${type} ccm fir$",
+        "ericscream": "^a=rtcp-fb:${type} ericscream$",
         "rtcp": "^a=rtcp:([\\d]+)( IN (IP[46]) ([\\d\\.a-f\\:]+))?.*$",
         "rtcpmux": "^a=rtcp-mux.*$",
         "cname": "^a=ssrc:(\\d+) cname:([\\w+/\\-@\\.\\{\\}]+).*$",
@@ -81,6 +82,7 @@ if (typeof(SDP) == "undefined")
             "${nackLines}" +
             "${nackpliLines}" +
             "${ccmfirLines}" +
+            "${ericScreamLines}" +
             "${cnameLines}" +
             "${msidLines}" +
             "${iceCredentialLines}" +
@@ -97,6 +99,7 @@ if (typeof(SDP) == "undefined")
         "nack": "a=rtcp-fb:${type} nack\r\n",
         "nackpli": "a=rtcp-fb:${type} nack pli\r\n",
         "ccmfir": "a=rtcp-fb:${type} ccm fir\r\n",
+        "ericscream": "a=rtcp-fb:${type} ericscream\r\n",
 
         "cname": "a=ssrc:${ssrc} cname:${cname}\r\n",
         "msid": "a=${[ssrc:]ssrc[ ]}msid:${mediaStreamId} ${mediaStreamTrackId}\r\n",
@@ -220,6 +223,8 @@ if (typeof(SDP) == "undefined")
                         payload.nackpli = !!match(mblock, nackpliLine, "m");
                         var ccmfirLine = fillTemplate(regexps.ccmfir, payload);
                         payload.ccmfir = !!match(mblock, ccmfirLine, "m");
+                        var ericScreamLine = fillTemplate(regexps.ericscream, payload);
+                        payload.ericscream = !!match(mblock, ericScreamLine, "m");
                     }
                 } else if (payloadType == 0 || payloadType == 8) {
                     payload.encodingName = payloadType == 8 ? "PCMA" : "PCMU";
@@ -401,7 +406,7 @@ if (typeof(SDP) == "undefined")
             var mblock = fillTemplate(templates.mblock, mediaDescription);
 
             var payloadInfo = {"rtpMapLines": "", "fmtpLines": "", "nackLines": "",
-                "nackpliLines": "", "ccmfirLines": ""};
+                "nackpliLines": "", "ccmfirLines": "", "ericScreamLines": ""};
             mediaDescription.payloads.forEach(function (payload) {
                 if (payloadInfo.fmt)
                     payloadInfo.fmt += " " + payload.type;
@@ -428,6 +433,8 @@ if (typeof(SDP) == "undefined")
                     payloadInfo.nackpliLines += fillTemplate(templates.nackpli, payload);
                 if (payload.ccmfir)
                     payloadInfo.ccmfirLines += fillTemplate(templates.ccmfir, payload);
+                if (payload.ericscream)
+                    payloadInfo.ericScreamLines += fillTemplate(templates.ericscream, payload);
             });
             mblock = fillTemplate(mblock, payloadInfo);
 
