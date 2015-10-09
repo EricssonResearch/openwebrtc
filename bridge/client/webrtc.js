@@ -64,7 +64,6 @@
                 "parameters": { "apt": 100, "rtxTime": 200 } }
         ]
     };
-
     var messageChannel = new function () {
         var _this = this;
         var ws;
@@ -1303,8 +1302,6 @@
 
             return client;
         }
-
-
     }
 
     RTCPeerConnection.toString = function () {

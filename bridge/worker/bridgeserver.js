@@ -128,11 +128,10 @@ server.onaccept = function (event) {
                     client.dtlsInfoGenerationDone();
                 }
                 else {
-                    client.dtlsInfoGenerationDone(
-                        {
-                            "certificate": certificate,
-                            "privatekey": privatekey,
-                            "fingerprint": fingerprint
+                    client.dtlsInfoGenerationDone({
+                        "certificate": certificate,
+                        "privatekey": privatekey,
+                        "fingerprint": fingerprint
                     });
                 }
             }

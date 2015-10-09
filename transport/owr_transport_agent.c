@@ -1201,6 +1201,7 @@ static GstElement *add_dtls_srtp_bin(OwrTransportAgent *transport_agent, guint s
     if (!is_encoder) {
         g_object_get(session, "dtls-certificate", &cert, NULL);
         g_object_get(session, "dtls-key", &key, NULL);
+
         if (!g_strcmp0(cert, "(auto)")) {
             g_object_get(dtls_srtp_bin, "pem", &cert, NULL);
             g_object_set(session, "dtls-certificate", cert, NULL);
