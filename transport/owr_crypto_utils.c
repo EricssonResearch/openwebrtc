@@ -79,195 +79,196 @@ GST_DEBUG_CATEGORY_EXTERN(_owrcrypto_debug);
  */
 
 typedef struct {
-  OwrCryptoDataCallback callback;
-  gboolean errorDetected;
-  gchar *pem_key;
-  gchar *pem_cert;
-  gchar *char_fprint;
+   OwrCryptoDataCallback callback;
+   gboolean errorDetected;
+   gchar *pem_key;
+   gchar *pem_cert;
+   gchar *char_fprint;
 } CryptoData;
 
 
 void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback)
 {
-  GThread *crypto_worker;
+   GThread *crypto_worker;
 
-  crypto_worker = g_thread_new("crypto_worker", _create_crypto_worker_run, (gpointer)callback);
+   crypto_worker = g_thread_new("crypto_worker", _create_crypto_worker_run, (gpointer)callback);
 
-  g_thread_unref(crypto_worker);
+   g_thread_unref(crypto_worker);
 }
 
 gpointer _create_crypto_worker_run(gpointer data) {
 
-  OwrCryptoDataCallback callback = (OwrCryptoDataCallback) data;
+   OwrCryptoDataCallback callback = (OwrCryptoDataCallback) data;
 
-  g_return_val_if_fail(callback, NULL);
+   g_return_val_if_fail(callback, NULL);
 
-  X509 *cert;
+   X509 *cert;
 
-  X509_NAME *name = NULL;
+   X509_NAME *name = NULL;
 
 
-  EVP_PKEY *key_pair;
- 
-  RSA *rsa;
+   EVP_PKEY *key_pair;
 
-  #define GST_DTLS_BIO_BUFFER_SIZE 4096
-  BIO *bio_cert;
-  gchar buffer_cert[GST_DTLS_BIO_BUFFER_SIZE] = { 0 };
-  gint len_cert;
-  gchar *pem_cert = NULL;
-  BIO *bio_key;
-  gchar buffer_key[GST_DTLS_BIO_BUFFER_SIZE] = { 0 };
-  gint len_key;
-  gchar *pem_key = NULL;
+   RSA *rsa;
 
-  gboolean errorDetected = FALSE;
+   #define GST_DTLS_BIO_BUFFER_SIZE 4096
+   BIO *bio_cert;
+   gchar buffer_cert[GST_DTLS_BIO_BUFFER_SIZE] = { 0 };
+   gint len_cert;
+   gchar *pem_cert = NULL;
+   BIO *bio_key;
+   gchar buffer_key[GST_DTLS_BIO_BUFFER_SIZE] = { 0 };
+   gint len_key;
+   gchar *pem_key = NULL;
 
-  bio_cert = BIO_new (BIO_s_mem ());
-  bio_key = BIO_new (BIO_s_mem ());
+   gboolean errorDetected = FALSE;
 
-  GString *string_fprint = NULL;
-  gchar *char_fprint = NULL;
-  guint j;
-  const EVP_MD *fprint_type = NULL;
-  fprint_type = EVP_sha256();
-  guchar fprint[EVP_MAX_MD_SIZE];
+   bio_cert = BIO_new (BIO_s_mem ());
+   bio_key = BIO_new (BIO_s_mem ());
 
-  guint fprint_size;
+   GString *string_fprint = NULL;
+   gchar *char_fprint = NULL;
+   guint j;
+   const EVP_MD *fprint_type = NULL;
+   fprint_type = EVP_sha256();
+   guchar fprint[EVP_MAX_MD_SIZE];
 
-  cert = X509_new ();
+   guint fprint_size;
 
-  key_pair = EVP_PKEY_new ();
+   cert = X509_new ();
 
-  rsa = RSA_generate_key (2048, RSA_F4, NULL, NULL);
+   key_pair = EVP_PKEY_new ();
 
-  EVP_PKEY_assign_RSA (key_pair, rsa);
+   rsa = RSA_generate_key (2048, RSA_F4, NULL, NULL);
 
-  X509_set_version (cert, 2);
-  ASN1_INTEGER_set (X509_get_serialNumber (cert), 0);
-  X509_gmtime_adj (X509_get_notBefore (cert), 0);
-  X509_gmtime_adj (X509_get_notAfter (cert), 31536000L);  /* A year */
-  X509_set_pubkey (cert, key_pair);
+   EVP_PKEY_assign_RSA (key_pair, rsa);
 
-  name = X509_get_subject_name (cert);
-  X509_NAME_add_entry_by_txt (name, "C", MBSTRING_ASC, (unsigned char *) "SE",
+   X509_set_version (cert, 2);
+   ASN1_INTEGER_set (X509_get_serialNumber (cert), 0);
+   X509_gmtime_adj (X509_get_notBefore (cert), 0);
+   X509_gmtime_adj (X509_get_notAfter (cert), 31536000L);  /* A year */
+   X509_set_pubkey (cert, key_pair);
+
+   name = X509_get_subject_name (cert);
+   X509_NAME_add_entry_by_txt (name, "C", MBSTRING_ASC, (unsigned char *) "SE",
       -1, -1, 0);
-  X509_NAME_add_entry_by_txt (name, "CN", MBSTRING_ASC,
+   X509_NAME_add_entry_by_txt (name, "CN", MBSTRING_ASC,
       (unsigned char *) "OpenWebRTC", -1, -1, 0);
-  X509_set_issuer_name (cert, name);
-  name = NULL;
+   X509_set_issuer_name (cert, name);
+   name = NULL;
 
-  X509_sign (cert, key_pair, EVP_sha256 ());
+   X509_sign (cert, key_pair, EVP_sha256 ());
 
-  if (!X509_digest(cert, fprint_type, fprint, &fprint_size)) {
-    GST_ERROR("Error, could not create certificate fingerprint");
-    errorDetected = TRUE;
-  }
+   if (!X509_digest(cert, fprint_type, fprint, &fprint_size)) {
+      GST_ERROR("Error, could not create certificate fingerprint");
+      errorDetected = TRUE;
+   }
 
-  string_fprint = g_string_new (NULL);
+   string_fprint = g_string_new (NULL);
 
-  for (j=0; j < fprint_size; j++) { 
-    g_string_append_printf(string_fprint, "%02X%c", fprint[j], (j+1 == fprint_size) ?'\n':':'); 
-  }
+   for (j=0; j < fprint_size; j++) { 
+      g_string_append_printf(string_fprint, "%02X", fprint[j]); 
+      if (j+1 != fprint_size) {
+         g_string_append_printf(string_fprint, "%c", ':'); 
+      }
+   }
 
-  char_fprint = g_string_free(string_fprint, FALSE);
+   char_fprint = g_string_free(string_fprint, FALSE);
 
-  if (!PEM_write_bio_X509 (bio_cert, (X509 *) cert)) {
-    GST_ERROR("Error, could not write certificate bio");
-    errorDetected = TRUE;
-  }
+   if (!PEM_write_bio_X509 (bio_cert, (X509 *) cert)) {
+      GST_ERROR("Error, could not write certificate bio");
+      errorDetected = TRUE;
+   }
 
 
-  if (!PEM_write_bio_PrivateKey (bio_key, (EVP_PKEY *) key_pair, NULL, NULL, 0, 0, NULL)) {
-    GST_ERROR("Error, could not write PrivateKey bio");
-    errorDetected = TRUE;
-  }
+   if (!PEM_write_bio_PrivateKey (bio_key, (EVP_PKEY *) key_pair, NULL, NULL, 0, 0, NULL)) {
+      GST_ERROR("Error, could not write PrivateKey bio");
+      errorDetected = TRUE;
+   }
 
-  len_cert = BIO_read (bio_cert, buffer_cert, GST_DTLS_BIO_BUFFER_SIZE);
-  if (!len_cert) {
-    GST_ERROR("Error, no certificate length");
-    errorDetected = TRUE;
-  }
+   len_cert = BIO_read (bio_cert, buffer_cert, GST_DTLS_BIO_BUFFER_SIZE);
+   if (!len_cert) {
+      GST_ERROR("Error, no certificate length");
+      errorDetected = TRUE;
+   }
 
-  len_key = BIO_read (bio_key, buffer_key, GST_DTLS_BIO_BUFFER_SIZE);
-  if (!len_key) {
-    GST_ERROR("Error, no key length");
-    errorDetected = TRUE;
-  }
+   len_key = BIO_read (bio_key, buffer_key, GST_DTLS_BIO_BUFFER_SIZE);
+   if (!len_key) {
+      GST_ERROR("Error, no key length");
+      errorDetected = TRUE;
+   }
 
-  pem_cert = g_strndup (buffer_cert, len_cert);
-  pem_key = g_strndup (buffer_key, len_key);
+   pem_cert = g_strndup (buffer_cert, len_cert);
+   pem_key = g_strndup (buffer_key, len_key);
 
-  CryptoData *report_data = g_new0(CryptoData, 1);
+   CryptoData *report_data = g_new0(CryptoData, 1);
 
-  report_data->callback = callback;
-  report_data->errorDetected = errorDetected;
-  report_data->pem_key = pem_key;
-  report_data->pem_cert = pem_cert;
-  report_data->char_fprint = char_fprint;
+   report_data->callback = callback;
+   report_data->errorDetected = errorDetected;
+   report_data->pem_key = pem_key;
+   report_data->pem_cert = pem_cert;
+   report_data->char_fprint = char_fprint;
 
-  g_idle_add(_create_crypto_worker_report, (gpointer)report_data);
+   g_idle_add(_create_crypto_worker_report, (gpointer)report_data);
 
-// some cleanup
+   // some cleanup
 
-  //RSA_free(rsa);  -- gives segmentation fault about every second time
+   //RSA_free(rsa);  -- gives segmentation fault about every second time
 
-  X509_free(cert);
-  BIO_free (bio_cert);
-  BIO_free (bio_key);
-  EVP_PKEY_free(key_pair);
+   X509_free(cert);
+   BIO_free (bio_cert);
+   BIO_free (bio_key);
+   EVP_PKEY_free(key_pair);
 
-  return NULL;
+   return NULL;
 
 }
 
 gboolean _create_crypto_worker_report(gpointer data) {
 
-  CryptoData *report_data = (CryptoData *) data;
+   CryptoData *report_data = (CryptoData *) data;
 
-  GClosure *closure;
+   GClosure *closure;
 
-  closure = g_cclosure_new(G_CALLBACK(report_data->callback), NULL, NULL);
-  g_closure_set_marshal(closure, g_cclosure_marshal_generic);
-
-
-  GValue params[3] = { G_VALUE_INIT, G_VALUE_INIT, G_VALUE_INIT };
-
-  g_value_init(&params[0], G_TYPE_STRING);
-  g_value_init(&params[1], G_TYPE_STRING);
-  g_value_init(&params[2], G_TYPE_STRING);
-
-  if (report_data->errorDetected) {
-    GST_ERROR("Returning with error");
-    g_value_set_string(&params[0], "Failure");
-    g_value_set_string(&params[1], "Failure");
-    g_value_set_string(&params[2], "Failure");
-
-    g_closure_invoke(closure, NULL, 3, (const GValue *)&params, NULL);
-  }
-  else {
-    g_value_set_string(&params[0], report_data->pem_key);
-    g_value_set_string(&params[1], report_data->pem_cert);
-    g_value_set_string(&params[2], report_data->char_fprint);
-
-    g_closure_invoke(closure, NULL, 3, (const GValue *)&params, NULL);
+   closure = g_cclosure_new(G_CALLBACK(report_data->callback), NULL, NULL);
+   g_closure_set_marshal(closure, g_cclosure_marshal_generic);
 
 
-  }
+   GValue params[3] = { G_VALUE_INIT, G_VALUE_INIT, G_VALUE_INIT };
 
-// some cleanup
+   g_value_init(&params[0], G_TYPE_STRING);
+   g_value_init(&params[1], G_TYPE_STRING);
+   g_value_init(&params[2], G_TYPE_STRING);
 
-  g_value_unset(&params[0]);
-  g_value_unset(&params[1]);
-  g_value_unset(&params[2]);
-  g_closure_unref(closure);
+   if (report_data->errorDetected) {
+      GST_ERROR("Returning with error");
+      g_value_set_string(&params[0], "Failure");
+      g_value_set_string(&params[1], "Failure");
+      g_value_set_string(&params[2], "Failure");
 
-  g_free(report_data->pem_key);
-  g_free(report_data->pem_cert);
-  g_free(report_data->char_fprint);
-  g_free(report_data);
+      g_closure_invoke(closure, NULL, 3, (const GValue *)&params, NULL);
+   }
+   else {
+      g_value_set_string(&params[0], report_data->pem_key);
+      g_value_set_string(&params[1], report_data->pem_cert);
+      g_value_set_string(&params[2], report_data->char_fprint);
 
-  return FALSE;
+      g_closure_invoke(closure, NULL, 3, (const GValue *)&params, NULL);
+   }
+
+   // some cleanup
+
+   g_value_unset(&params[0]);
+   g_value_unset(&params[1]);
+   g_value_unset(&params[2]);
+   g_closure_unref(closure);
+
+   g_free(report_data->pem_key);
+   g_free(report_data->pem_cert);
+   g_free(report_data->char_fprint);
+   g_free(report_data);
+
+   return FALSE;
 }
 
 
