@@ -1875,10 +1875,40 @@ static void on_new_candidate(NiceAgent *nice_agent, NiceCandidate *nice_candidat
 
 static gboolean emit_candidate_gathering_done(GHashTable *args)
 {
+    OwrTransportAgent *transport_agent;
     OwrSession *session;
+    OwrCandidate *local_candidate, *remote_candidate;
+    guint stream_id;
+    int i;
 
+    transport_agent = g_hash_table_lookup(args, "transport-agent");
     session = g_hash_table_lookup(args, "session");
     g_signal_emit_by_name(session, "on-candidate-gathering-done", NULL);
+
+    stream_id = get_stream_id(transport_agent, session);
+    g_return_val_if_fail(stream_id, FALSE);
+
+    for (i = 0; i < OWR_COMPONENT_MAX; i++) {
+        _owr_session_get_candidate_pair(session, i, &local_candidate, &remote_candidate);
+
+        if (local_candidate && remote_candidate) {
+            gchar *lfoundation = NULL, *rfoundation = NULL;
+
+            g_object_get(local_candidate, "foundation", &lfoundation, NULL);
+            g_object_get(remote_candidate, "foundation", &rfoundation, NULL);
+
+            if (lfoundation && rfoundation) {
+                GST_DEBUG_OBJECT(transport_agent, "Forcing pair %s:%s on stream %u",
+                        lfoundation, rfoundation, stream_id);
+                nice_agent_set_selected_pair(transport_agent->priv->nice_agent,
+                        stream_id, i, lfoundation, rfoundation);
+            } else
+                g_assert_not_reached();
+
+            g_free(lfoundation);
+            g_free(rfoundation);
+        }
+    }
 
     g_hash_table_destroy(args);
     g_object_unref(session);
@@ -1898,6 +1928,7 @@ static void on_candidate_gathering_done(NiceAgent *nice_agent, guint stream_id, 
     g_return_if_fail(OWR_IS_SESSION(session));
 
     args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(session));
+    g_hash_table_insert(args, "transport-agent", transport_agent);
     g_hash_table_insert(args, "session", session);
 
     _owr_schedule_with_hash_table((GSourceFunc)emit_candidate_gathering_done, args);
