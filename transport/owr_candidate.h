@@ -45,7 +45,8 @@ typedef enum {
 
 typedef enum {
     OWR_COMPONENT_TYPE_RTP = 1,
-    OWR_COMPONENT_TYPE_RTCP = 2
+    OWR_COMPONENT_TYPE_RTCP = 2,
+    OWR_COMPONENT_MAX
 } OwrComponentType;
 
 typedef enum {

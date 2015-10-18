@@ -74,6 +74,8 @@ struct _OwrSessionPrivate {
     GSList *local_candidates;
     GSList *remote_candidates;
     GSList *forced_remote_candidates;
+    OwrCandidate *local_candidate[OWR_COMPONENT_MAX],
+                 *remote_candidate[OWR_COMPONENT_MAX];
     gboolean gathering_done;
     GClosure *on_remote_candidate;
     GClosure *on_local_candidate_change;
@@ -127,6 +129,7 @@ GType owr_ice_state_get_type(void)
 }
 
 static gboolean add_remote_candidate(GHashTable *args);
+static gboolean add_candidate_pair(GHashTable *args);
 static void update_local_credentials(OwrCandidate *candidate, GParamSpec *pspec, OwrSession *session);
 
 
@@ -416,6 +419,36 @@ void owr_session_force_remote_candidate(OwrSession *session, OwrCandidate *candi
     _owr_schedule_with_hash_table((GSourceFunc)add_remote_candidate, args);
 }
 
+/**
+ * owr_session_force_candidate_pair:
+ * @session: The session on which the candidate will be forced.
+ * @local_candidate: (transfer none): the local candidate to forcibly set
+ * @remote_candidate: (transfer none): the remote candidate to forcibly set
+ *
+ * Forces the transport agent to use the given candidate pair. Calling this
+ * function will disable all further ICE processing. Keep-alives will continue
+ * to be sent.
+ */
+void owr_session_force_candidate_pair(OwrSession *session, OwrComponentType ctype,
+        OwrCandidate *local_candidate, OwrCandidate *remote_candidate)
+{
+    GHashTable *args;
+
+    g_return_if_fail(OWR_IS_SESSION(session));
+    g_return_if_fail(OWR_IS_CANDIDATE(local_candidate));
+    g_return_if_fail(OWR_IS_CANDIDATE(remote_candidate));
+
+    args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(session));
+    g_hash_table_insert(args, "session", session);
+    g_hash_table_insert(args, "component-type", GUINT_TO_POINTER(ctype));
+    g_hash_table_insert(args, "local-candidate", local_candidate);
+    g_hash_table_insert(args, "remote-candidate", remote_candidate);
+    g_object_ref(session);
+    g_object_ref(local_candidate);
+    g_object_ref(remote_candidate);
+
+    _owr_schedule_with_hash_table((GSourceFunc)add_candidate_pair, args);
+}
 
 /* Internal functions */
 
@@ -468,6 +501,68 @@ end:
     return FALSE;
 }
 
+static gboolean add_candidate_pair(GHashTable *args)
+{
+    OwrSession *session;
+    OwrSessionPrivate *priv;
+    OwrCandidate *local_candidate, *remote_candidate;
+    OwrComponentType ctype;
+
+    g_return_val_if_fail(args, FALSE);
+
+    session = g_hash_table_lookup(args, "session");
+    priv = session->priv;
+
+    local_candidate = g_hash_table_lookup(args, "local-candidate");
+    remote_candidate = g_hash_table_lookup(args, "remote-candidate");
+    g_return_val_if_fail(session && local_candidate && remote_candidate, FALSE);
+
+    ctype = GPOINTER_TO_UINT(g_hash_table_lookup(args, "component-type"));
+    g_return_val_if_fail(ctype < OWR_COMPONENT_MAX, FALSE);
+
+    if (priv->forced_remote_candidates) {
+        g_warning("Fail: forced remote candidate already.");
+        goto end;
+    }
+
+    if (!g_slist_find(priv->remote_candidates, remote_candidate)) {
+        g_warning("Fail: remote candidate not added.");
+        goto end;
+    }
+
+    if (g_slist_find(priv->local_candidates, remote_candidate)) {
+        g_warning("Fail: candidate is local.");
+        goto end;
+    }
+
+    if (!g_slist_find(priv->local_candidates, local_candidate)) {
+        g_warning("Fail: local candidate not added.");
+        goto end;
+    }
+
+    priv->local_candidate[ctype] = g_object_ref(local_candidate);
+    priv->remote_candidate[ctype] = g_object_ref(remote_candidate);
+
+end:
+    g_object_unref(local_candidate);
+    g_object_unref(remote_candidate);
+    g_object_unref(session);
+    g_hash_table_unref(args);
+    return FALSE;
+}
+
+void _owr_session_get_candidate_pair(OwrSession *session, OwrComponentType ctype,
+        OwrCandidate **local, OwrCandidate **remote)
+{
+    OwrSessionPrivate *priv;
+
+    g_return_if_fail(ctype < OWR_COMPONENT_MAX);
+
+    priv = session->priv;
+
+    *local = priv->local_candidate[ctype];
+    *remote = priv->remote_candidate[ctype];
+}
 static void update_local_credentials(OwrCandidate *candidate, GParamSpec *pspec, OwrSession *session)
 {
     OwrSessionPrivate *priv;
