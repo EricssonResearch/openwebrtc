@@ -388,9 +388,9 @@ int main(int argc, char **argv)
     owr_get_capture_sources((!disable_video ? OWR_MEDIA_TYPE_VIDEO : 0) | (!disable_audio ? OWR_MEDIA_TYPE_AUDIO : 0),
         got_sources, NULL);
 
-    g_timeout_add_seconds(10, (GSourceFunc)dump_cb, NULL);
+    g_timeout_add_seconds(5, (GSourceFunc)dump_cb, NULL);
     g_timeout_add_seconds(2, (GSourceFunc)join_subflows, NULL);
-    g_timeout_add_seconds(20, (GSourceFunc)detach_subflows, NULL);
+    g_timeout_add_seconds(60, (GSourceFunc)detach_subflows, NULL);
 
     owr_run();
 
