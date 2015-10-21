@@ -236,7 +236,7 @@ static void got_sources(GList *sources, gpointer user_data)
             owr_bus_add_message_origin(bus, OWR_MESSAGE_ORIGIN(source));
 
             payload = owr_video_payload_new(OWR_CODEC_TYPE_VP8, 103, 90000, TRUE, FALSE);
-            g_object_set(payload, "width", 1280, "height", 720, "framerate", 30.0, NULL);
+            g_object_set(payload, "width", 640, "height", 480, "framerate", 30.0, NULL);
             g_object_set(payload, "rtx-payload-type", 123, NULL);
             g_object_set(payload, "adaptation", TRUE, NULL);
 
@@ -253,7 +253,7 @@ static void got_sources(GList *sources, gpointer user_data)
             g_assert(renderer);
             owr_bus_add_message_origin(bus, OWR_MESSAGE_ORIGIN(renderer));
 
-            g_object_set(renderer, "width", 1280, "height", 720, "max-framerate", 30.0, NULL);
+            g_object_set(renderer, "width", 640, "height", 480, "max-framerate", 30.0, NULL);
             owr_media_renderer_set_source(OWR_MEDIA_RENDERER(renderer), source);
             video_renderer = OWR_MEDIA_RENDERER(renderer);
             video_source = g_object_ref(source);
