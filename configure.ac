@@ -31,6 +31,7 @@ PKG_CHECK_MODULES(GSTREAMER, [gstreamer-1.0 >= $GST_REQUIRED gstreamer-rtp-1.0 >
 PKG_CHECK_MODULES(NICE, [nice >= 0.1.7.1])
 PKG_CHECK_MODULES(GSTREAMER_SCTP, [gstreamer-sctp-1.0])
 PKG_CHECK_MODULES(ORC, [orc-0.4])
+PKG_CHECK_MODULES(OPENSSL, [openssl >= 0.9.5  libcrypto ])
 
 dnl build bridge or not
 AC_MSG_CHECKING([whether to build bridge or not])

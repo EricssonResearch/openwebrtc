@@ -48,8 +48,8 @@ if (typeof(SDP) == "undefined")
         "ccmfir": "^a=rtcp-fb:${type} ccm fir$",
         "rtcp": "^a=rtcp:([\\d]+)( IN (IP[46]) ([\\d\\.a-f\\:]+))?.*$",
         "rtcpmux": "^a=rtcp-mux.*$",
-        "cname": "^a=ssrc:(\\d+) cname:([\\w+/\\-@\\.]+).*$",
-        "msid": "^a=(ssrc:\\d+ )?msid:([\\w+/\\-=]+) +([\\w+/\\-=]+).*$",
+        "cname": "^a=ssrc:(\\d+) cname:([\\w+/\\-@\\.\\{\\}]+).*$",
+        "msid": "^a=msid:([\\w+/\\-=]+) +([\\w+/\\-=]+).*$",
         "ufrag": "^a=ice-ufrag:([\\w+/]*).*$",
         "pwd": "^a=ice-pwd:([\\w+/]*).*$",
         "candidate": "^a=candidate:(\\d+) (\\d) (UDP|TCP) ([\\d\\.]*) ([\\d\\.a-f\\:]*) (\\d*)" +
@@ -99,7 +99,7 @@ if (typeof(SDP) == "undefined")
         "ccmfir": "a=rtcp-fb:${type} ccm fir\r\n",
 
         "cname": "a=ssrc:${ssrc} cname:${cname}\r\n",
-        "msid": "a=${[ssrc:]ssrc[ ]}msid:${mediaStreamId} ${mediaStreamTrackId}\r\n",
+        "msid": "a=msid:${mediaStreamId} ${mediaStreamTrackId}\r\n",
 
         "iceCredentials":
             "a=ice-ufrag:${ufrag}\r\n" +
@@ -179,7 +179,7 @@ if (typeof(SDP) == "undefined")
         for (var i = 0; i < parts.length; i += 5) {
             var mediaDescription = {
                 "type": parts[i],
-                "port": parts[i + 1],
+                "port": parseInt(parts[i + 1]),
                 "protocol": parts[i + 2],
             };
             var fmt = parts[i + 3].replace(/^[\s\uFEFF\xA0]+/, '')
@@ -273,8 +273,8 @@ if (typeof(SDP) == "undefined")
             if (hasMediaStreamId) {
                 var msid = match(mblock, regexps.msid, "m");
                 if (msid) {
-                    mediaDescription.mediaStreamId = msid[2];
-                    mediaDescription.mediaStreamTrackId = msid[3];
+                    mediaDescription.mediaStreamId = msid[1];
+                    mediaDescription.mediaStreamTrackId = msid[2];
                 }
             }
 
@@ -389,7 +389,7 @@ if (typeof(SDP) == "undefined")
 
         sdpObj.mediaDescriptions.forEach(function (mediaDescription) {
             addDefaults(mediaDescription, {
-                "port": 1,
+                "port": 9,
                 "protocol": "RTP/SAVPF",
                 "netType": "IN",
                 "addressType": "IP4",

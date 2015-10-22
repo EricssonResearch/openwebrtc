@@ -13,6 +13,7 @@ owr_candidate_type_get_type
 owr_codec_type_get_type
 owr_component_type_get_type
 owr_get_capture_sources
+owr_crypto_create_crypto_data
 owr_ice_state_get_type
 owr_image_renderer_get_type
 owr_image_renderer_new

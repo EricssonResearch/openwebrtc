@@ -64,8 +64,6 @@
                 "parameters": { "apt": 100, "rtxTime": 200 } }
         ]
     };
-
-
     var messageChannel = new function () {
         var _this = this;
         var ws;
@@ -107,7 +105,28 @@
     var renderControllerMap = {};
 
     var bridge = new JsonRpc(messageChannel);
-    bridge.importFunctions("createPeerHandler", "requestSources", "renderSources");
+    bridge.importFunctions("createPeerHandler", "requestSources", "renderSources", "createKeys");
+
+    var dtlsInfo;
+    var deferredCreatePeerHandlers = [];
+
+    (function () {
+        var client = {}; 
+        client.dtlsInfoGenerationDone = function (generatedDtlsInfo) {
+            dtlsInfo = generatedDtlsInfo;
+            if (!dtlsInfo) 
+                console.log("createKeys returned without any dtlsInfo - anything involving use of PeerConnection won't work");
+            else {
+                var func;
+                while ((func = deferredCreatePeerHandlers.shift()))
+                    func();
+            }
+            bridge.removeObjectRef(client);
+        }
+    
+    
+        bridge.createKeys(bridge.createObjectRef(client, "dtlsInfoGenerationDone"));
+    })();
 
     function getUserMedia(options) {
         checkArguments("getUserMedia", "dictionary", 1, arguments);
@@ -357,13 +376,21 @@
             "dataChannelsEnabled", "dataChannelRequested");
         var deferredPeerHandlerCalls = [];
 
-        bridge.createPeerHandler(configuration, clientRef, function (ph) {
-            peerHandler = ph;
+        function createPeerHandler() {
+            bridge.createPeerHandler(configuration, {"key": dtlsInfo.privatekey, "certificate": dtlsInfo.certificate}, clientRef, function (ph) {
+                peerHandler = ph;
 
-            var func;
-            while ((func = deferredPeerHandlerCalls.shift()))
-                func();
-        });
+                var func;
+                while ((func = deferredPeerHandlerCalls.shift()))
+                    func();
+            });
+        }
+
+        if (dtlsInfo)
+            createPeerHandler()
+        else
+            deferredCreatePeerHandlers.push(createPeerHandler);
+
 
         function whenPeerHandler(func) {
             if (peerHandler)
@@ -499,7 +526,8 @@
                     "ssrcs": [ randomNumber(32) ],
                     "cname": cname,
                     "ice": { "ufrag": randomString(4), "password": randomString(22) },
-                    "dtls": { "setup": "actpass" }
+                    "dtls": { "setup": "actpass", "fingerprintHashFunction": "sha-256",
+                        "fingerprint": dtlsInfo.fingerprint.toUpperCase() }
                 });
             });
 
@@ -510,7 +538,8 @@
                         "type": kind,
                         "payloads": JSON.parse(JSON.stringify(defaultPayloads[kind])),
                         "rtcp": { "mux": true },
-                        "dtls": { "setup": "actpass" },
+                        "dtls": { "setup": "actpass", "fingerprintHashFunction": "sha-256",
+                            "fingerprint": fingerprint.toUpperCase() },
                         "mode": "recvonly"
                     });
                 }
@@ -523,7 +552,8 @@
                     "protocol": "DTLS/SCTP",
                     "fmt": 5000,
                     "ice": { "ufrag": randomString(4), "password": randomString(22) },
-                    "dtls": { "setup": "actpass" },
+                    "dtls": { "setup": "actpass", "fingerprintHashFunction": "sha-256",
+                        "fingerprint": fingerprint.toUpperCase() },
                     "sctp": {
                         "port": 5000,
                         "app": "webrtc-datachannel",
@@ -591,7 +621,8 @@
                     lmdesc = {
                         "type": rmdesc.type,
                         "ice": { "ufrag": randomString(4), "password": randomString(22) },
-                        "dtls": { "setup": rmdesc.dtls.setup == "active" ? "passive" : "active" }
+                        "dtls": { "setup": rmdesc.dtls.setup == "active" ? "passive" : "active",
+                            "fingerprintHashFunction": "sha-256", "fingerprint": dtlsInfo.fingerprint.toUpperCase() }
                     };
                     localSessionInfoSnapshot.mediaDescriptions.push(lmdesc);
                 }

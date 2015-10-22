@@ -109,8 +109,8 @@ server.onaccept = function (event) {
         ws = null;
     };
 
-    rpcScope.createPeerHandler = function (configuration, client) {
-        var peerHandler = new PeerHandler(configuration, client, jsonRpc);
+    rpcScope.createPeerHandler = function (configuration, keyCert, client) {
+        var peerHandler = new PeerHandler(configuration, keyCert, client, jsonRpc);
         peerHandlers.push(peerHandler);
         var exports = [ "prepareToReceive", "prepareToSend", "addRemoteCandidate",
             "createDataChannel" ];
@@ -118,6 +118,25 @@ server.onaccept = function (event) {
             jsonRpc.exportFunctions(peerHandler[exports[i]]);
         return jsonRpc.createObjectRef(peerHandler, exports);
     };
+
+    rpcScope.createKeys = function (client) {
+        var localcertificate, localprivatekey, localfingerprint;
+        owr.crypto_create_crypto_data(function (privatekey, certificate, fingerprint) {
+            if ((privatekey && certificate && fingerprint)) {
+                if (fingerprint == "Failure") {
+                    console.log("generation of crypto data has failed");
+                    client.dtlsInfoGenerationDone();
+                }
+                else {
+                    client.dtlsInfoGenerationDone({
+                        "certificate": certificate,
+                        "privatekey": privatekey,
+                        "fingerprint": fingerprint
+                    });
+                }
+            }
+        });
+    }
 
     rpcScope.requestSources = function (options, client) {
         var mediaTypes = 0;
@@ -210,7 +229,7 @@ server.onaccept = function (event) {
         return { "controller": controllerRef, "port": imageServerPort };
     };
 
-    jsonRpc.exportFunctions(rpcScope.createPeerHandler, rpcScope.requestSources, rpcScope.renderSources);
+    jsonRpc.exportFunctions(rpcScope.createPeerHandler, rpcScope.requestSources, rpcScope.renderSources, rpcScope.createKeys);
 
 };
 
