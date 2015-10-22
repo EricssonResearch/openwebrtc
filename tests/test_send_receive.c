@@ -182,50 +182,6 @@ static void got_sources(GList *sources, gpointer user_data)
     }
 }
 
-static guint8 subflow_snd_id;
-static guint8 subflow_rcv_id;
-
-static gboolean join_subflows(gpointer *user_data)
-{
-  const GstStructure *s = NULL;
-  g_print(
-      "-----------------------------------------------------------------\n"
-      "---------------- JOIN SUBFLOW BEGIN -----------------------------\n"
-      "-----------------------------------------------------------------\n"
-  );
-  subflow_snd_id = owr_transport_agent_join_snd_subflow(send_transport_agent, "127.2.1.1", 5565);
-  subflow_rcv_id = owr_transport_agent_join_rcv_subflow(recv_transport_agent, 5565);
-  g_print(
-        "-----------------------------------------------------------------\n"
-        "---------------- JOIN SUBFLOW END -> snd:%d, rcv:%d <------------\n"
-        "-----------------------------------------------------------------\n",
-        subflow_snd_id, subflow_rcv_id
-        );
-//  s = owr_transport_agent_get_rcv_subflow_stats(recv_transport_agent);
-//  g_print("%s", gst_structure_to_string(s));
-  s = owr_transport_agent_get_snd_subflow_stats(recv_transport_agent);
-  g_print("%s", gst_structure_to_string(s));
-  return G_SOURCE_REMOVE;
-}
-
-static gboolean detach_subflows(gpointer *user_data)
-{
-  g_print(
-        "-----------------------------------------------------------------\n"
-        "---------------- DETACH SUBFLOW BEGIN -> snd:%d, rcv:%d <--------\n"
-        "-----------------------------------------------------------------\n",
-        subflow_snd_id, subflow_rcv_id
-        );
-  owr_transport_agent_detach_snd_subflow(send_transport_agent, subflow_snd_id);
-  owr_transport_agent_detach_rcv_subflow(recv_transport_agent, subflow_rcv_id);
-  g_print(
-      "-----------------------------------------------------------------\n"
-      "------------------ DETACH SUBFLOW END ---------------------------\n"
-      "-----------------------------------------------------------------\n"
-  );
-  return G_SOURCE_REMOVE;
-}
-
 static gboolean dump_cb(gpointer *user_data)
 {
     g_print("Dumping send transport agent pipeline!\n");
@@ -338,7 +294,6 @@ int main(int argc, char **argv)
     owr_transport_agent_set_local_port_range(send_transport_agent, 5000, 5999);
     owr_transport_agent_add_local_address(send_transport_agent, "127.0.0.1");
 
-
     if (!disable_video) {
         recv_session_video = owr_media_session_new(FALSE);
         owr_bus_add_message_origin(bus, OWR_MESSAGE_ORIGIN(recv_session_video));
@@ -388,9 +343,7 @@ int main(int argc, char **argv)
     owr_get_capture_sources((!disable_video ? OWR_MEDIA_TYPE_VIDEO : 0) | (!disable_audio ? OWR_MEDIA_TYPE_AUDIO : 0),
         got_sources, NULL);
 
-    g_timeout_add_seconds(5, (GSourceFunc)dump_cb, NULL);
-    g_timeout_add_seconds(2, (GSourceFunc)join_subflows, NULL);
-    g_timeout_add_seconds(60, (GSourceFunc)detach_subflows, NULL);
+    g_timeout_add_seconds(10, (GSourceFunc)dump_cb, NULL);
 
     owr_run();
 
