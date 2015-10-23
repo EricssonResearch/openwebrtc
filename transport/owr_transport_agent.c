@@ -1206,8 +1206,7 @@ static GstElement *add_dtls_srtp_bin(OwrTransportAgent *transport_agent, guint s
             g_object_get(dtls_srtp_bin, "pem", &cert, NULL);
             g_object_set(session, "dtls-certificate", cert, NULL);
             g_object_set(session, "dtls-key", NULL, NULL);
-            GST_ERROR("used auto generated cert stuff.. THIS SHOULD NOT HAPPEN!!!!");
-            g_assert_not_reached();
+            GST_DEBUG("used auto generated cert stuff.. THIS SHOULD NOT HAPPEN!!!!");
         } else {
             cert_key = (cert && key) ? g_strdup_printf("%s%s", cert, key) : NULL;
             g_object_set(dtls_srtp_bin, "pem", cert_key, NULL);
