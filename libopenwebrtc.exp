@@ -1733,7 +1733,6 @@ g_loadable_icon_get_type
 g_loadable_icon_load
 g_loadable_icon_load_async
 g_loadable_icon_load_finish
-g_local_directory_monitor_get_type
 g_local_file_monitor_get_type
 g_locale_from_utf8
 g_locale_to_utf8
