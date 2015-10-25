@@ -27,6 +27,8 @@
 
 "use strict";
 
+var modernRemote = true;
+
 if (typeof(SDP) == "undefined")
     var SDP = {};
 
@@ -200,10 +202,16 @@ if (typeof(SDP) == "undefined")
                 mediaDescription.mode = mode[1];
 
             var payloadTypes = [];
-            if (match(mediaDescription.protocol, "RTP/S?AVPF?")) {
+            if (match(mediaDescription.protocol, "UDP/TLS/RTP/SAVPF")) {
                 mediaDescription.payloads = [];
                 payloadTypes = fmt;
             }
+            else
+                if (match(mediaDescription.protocol, "RTP/S?AVPF?")) {
+                    modernRemote = false;
+                    mediaDescription.payloads = [];
+                    payloadTypes = fmt;
+                }
             payloadTypes.forEach(function (payloadType) {
                 var payload = { "type": payloadType };
                 var rtpmapLine = fillTemplate(regexps.rtpmap, payload);
@@ -390,7 +398,7 @@ if (typeof(SDP) == "undefined")
         sdpObj.mediaDescriptions.forEach(function (mediaDescription) {
             addDefaults(mediaDescription, {
                 "port": 9,
-                "protocol": "RTP/SAVPF",
+                "protocol": (modernRemote ? "UDP/TLS/":"") + "RTP/SAVPF",
                 "netType": "IN",
                 "addressType": "IP4",
                 "address": "0.0.0.0",
