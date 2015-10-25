@@ -539,7 +539,7 @@
                         "payloads": JSON.parse(JSON.stringify(defaultPayloads[kind])),
                         "rtcp": { "mux": true },
                         "dtls": { "setup": "actpass", "fingerprintHashFunction": "sha-256",
-                            "fingerprint": fingerprint.toUpperCase() },
+                            "fingerprint": dtlsInfo.fingerprint.toUpperCase() },
                         "mode": "recvonly"
                     });
                 }
@@ -553,7 +553,7 @@
                     "fmt": 5000,
                     "ice": { "ufrag": randomString(4), "password": randomString(22) },
                     "dtls": { "setup": "actpass", "fingerprintHashFunction": "sha-256",
-                        "fingerprint": fingerprint.toUpperCase() },
+                        "fingerprint": dtlsInfo.fingerprint.toUpperCase() },
                     "sctp": {
                         "port": 5000,
                         "app": "webrtc-datachannel",
