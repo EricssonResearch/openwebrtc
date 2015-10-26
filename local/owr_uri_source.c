@@ -45,15 +45,41 @@
 
 #define OWR_URI_SOURCE_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_URI_SOURCE, OwrURISourcePrivate))
 
-G_DEFINE_TYPE(OwrURISource, owr_uri_source, OWR_TYPE_MEDIA_SOURCE)
+static void owr_message_origin_interface_init(OwrMessageOriginInterface *interface);
+
+G_DEFINE_TYPE_WITH_CODE(OwrURISource, owr_uri_source, OWR_TYPE_MEDIA_SOURCE,
+    G_IMPLEMENT_INTERFACE(OWR_TYPE_MESSAGE_ORIGIN, owr_message_origin_interface_init))
 
 struct _OwrURISourcePrivate {
     guint stream_id;
+    OwrMessageOriginBusSet *message_origin_bus_set;
 };
+
+static void owr_uri_source_finalize(GObject *object)
+{
+    OwrURISource *source = OWR_URI_SOURCE(object);
+
+    owr_message_origin_bus_set_free(source->priv->message_origin_bus_set);
+    source->priv->message_origin_bus_set = NULL;
+}
 
 static void owr_uri_source_class_init(OwrURISourceClass *klass)
 {
+    GObjectClass *gobject_class = G_OBJECT_CLASS(klass);
+
     g_type_class_add_private(klass, sizeof(OwrURISourcePrivate));
+
+    gobject_class->finalize = owr_uri_source_finalize;
+}
+
+static gpointer owr_uri_source_get_bus_set(OwrMessageOrigin *origin)
+{
+    return OWR_URI_SOURCE(origin)->priv->message_origin_bus_set;
+}
+
+static void owr_message_origin_interface_init(OwrMessageOriginInterface *interface)
+{
+    interface->get_bus_set = owr_uri_source_get_bus_set;
 }
 
 static void owr_uri_source_init(OwrURISource *source)
@@ -61,6 +87,7 @@ static void owr_uri_source_init(OwrURISource *source)
     source->priv = OWR_URI_SOURCE_GET_PRIVATE(source);
 
     source->priv->stream_id = 0;
+    source->priv->message_origin_bus_set = owr_message_origin_bus_set_new();
 }
 
 #define LINK_ELEMENTS(a, b) \
