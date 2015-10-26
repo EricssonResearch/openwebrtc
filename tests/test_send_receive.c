@@ -37,6 +37,8 @@
 #include "owr_payload.h"
 #include "owr_session.h"
 #include "owr_transport_agent.h"
+#include "owr_uri_source.h"
+#include "owr_uri_source_agent.h"
 #include "owr_video_payload.h"
 #include "owr_video_renderer.h"
 #include "owr_window_registry.h"
@@ -58,12 +60,15 @@ static OwrMediaSource *video_source = NULL;
 static OwrMediaSource *remote_audio_source = NULL;
 static OwrMediaSource *remote_video_source = NULL;
 static OwrBus *bus = NULL;
+static OwrURISourceAgent *uri_source_agent = NULL;
 
+static gchar *uri = NULL;
 static gboolean disable_video = FALSE, disable_audio = FALSE, print_messages = FALSE;
 
 static GOptionEntry entries[] = {
     { "disable-video", 0, 0, G_OPTION_ARG_NONE, &disable_video, "Disable video", NULL },
     { "disable-audio", 0, 0, G_OPTION_ARG_NONE, &disable_audio, "Disable audio", NULL },
+    { "uri", 'u', 0, G_OPTION_ARG_NONE, &uri, "URI to use as source", NULL },
     { "print-messages", 'p', 0, G_OPTION_ARG_NONE, &print_messages, "Prints all messages, instead of just errors", NULL },
     { NULL, }
 };
@@ -131,7 +136,7 @@ static void got_sources(GList *sources, gpointer user_data)
 
         g_object_get(source, "type", &source_type, "media-type", &media_type, NULL);
 
-        if (!disable_video && !have_video && media_type == OWR_MEDIA_TYPE_VIDEO && source_type == OWR_SOURCE_TYPE_CAPTURE) {
+        if (!disable_video && !have_video && media_type == OWR_MEDIA_TYPE_VIDEO) {
             OwrVideoRenderer *renderer;
             OwrPayload *payload;
 
@@ -159,7 +164,7 @@ static void got_sources(GList *sources, gpointer user_data)
             owr_media_renderer_set_source(OWR_MEDIA_RENDERER(renderer), source);
             video_renderer = OWR_MEDIA_RENDERER(renderer);
             video_source = g_object_ref(source);
-        } else if (!disable_audio && !have_audio && media_type == OWR_MEDIA_TYPE_AUDIO && source_type == OWR_SOURCE_TYPE_CAPTURE) {
+        } else if (!disable_audio && !have_audio && media_type == OWR_MEDIA_TYPE_AUDIO) {
             OwrPayload *payload;
 
             have_audio = TRUE;
@@ -181,6 +186,38 @@ static void got_sources(GList *sources, gpointer user_data)
         sources = sources->next;
     }
 }
+
+void on_new_source(gpointer *unused, OwrMediaSource *source)
+{
+    static gboolean have_video = FALSE, have_audio = FALSE;
+    static GList *sources = NULL;
+    gchar *name = NULL;
+    OwrMediaType media_type = OWR_MEDIA_TYPE_UNKNOWN;
+
+    (void)unused;
+    g_assert(OWR_IS_URI_SOURCE(source));
+
+    if (have_video && have_audio)
+        return;
+
+    g_object_get(source, "name", &name, "media-type", &media_type, NULL);
+
+    g_print("Got \"%s\" source!\n", name ? name : "");
+
+    sources = g_list_prepend(sources, g_object_ref(source));
+
+    if (!have_video && media_type == OWR_MEDIA_TYPE_VIDEO)
+        have_video = TRUE;
+
+    if (!have_audio && media_type == OWR_MEDIA_TYPE_AUDIO)
+        have_audio = TRUE;
+
+    if ((disable_video || have_video) && (disable_audio || have_audio)) {
+        got_sources(sources, NULL);
+        g_list_free_full(sources, g_object_unref);
+    }
+}
+
 
 static gboolean dump_cb(gpointer *user_data)
 {
@@ -340,8 +377,15 @@ int main(int argc, char **argv)
 
     /* PREPARE FOR SENDING */
 
-    owr_get_capture_sources((!disable_video ? OWR_MEDIA_TYPE_VIDEO : 0) | (!disable_audio ? OWR_MEDIA_TYPE_AUDIO : 0),
-        got_sources, NULL);
+    if (!uri) {
+        owr_get_capture_sources(
+                (!disable_video ? OWR_MEDIA_TYPE_VIDEO : 0) | (!disable_audio ? OWR_MEDIA_TYPE_AUDIO : 0),
+                got_sources, NULL);
+    } else {
+        uri_source_agent = owr_uri_source_agent_new(argv[1]);
+        g_signal_connect(uri_source_agent, "on-new-source", G_CALLBACK(on_new_source), NULL);
+        owr_uri_source_agent_play(uri_source_agent);
+    }
 
     g_timeout_add_seconds(10, (GSourceFunc)dump_cb, NULL);
 
