@@ -209,6 +209,7 @@ static void owr_uri_source_agent_init(OwrURISourceAgent *uri_source_agent)
 
     pipeline_name = g_strdup_printf("uri-source-agent-%u", priv->agent_id);
     priv->pipeline = gst_pipeline_new(pipeline_name);
+    gst_pipeline_use_clock(GST_PIPELINE(priv->pipeline), gst_system_clock_obtain());
     g_free(pipeline_name);
 
 #ifdef OWR_DEBUG
