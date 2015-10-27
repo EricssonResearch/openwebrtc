@@ -104,6 +104,7 @@ OwrMediaSource *_owr_uri_source_new(OwrMediaType media_type,
     GEnumValue *enum_value;
     gchar *name;
     GstElement *uri_pipeline;
+    GstElement *identity;
     GstElement *source_bin, *tee;
     GstElement *fakesink, *queue;
     GstPad *srcpad, *sinkpad, *ghostpad;
@@ -136,6 +137,8 @@ OwrMediaSource *_owr_uri_source_new(OwrMediaType media_type,
 
     source_bin = gst_bin_new(bin_name);
     _owr_media_source_set_source_bin(OWR_MEDIA_SOURCE(source), source_bin);
+    identity = gst_element_factory_make("identity", "identity");
+    g_object_set(identity, "sync", TRUE, NULL);
     tee = gst_element_factory_make("tee", "tee");
     _owr_media_source_set_source_tee(OWR_MEDIA_SOURCE(source), tee);
     fakesink = gst_element_factory_make("fakesink", "fakesink");
@@ -145,10 +148,11 @@ OwrMediaSource *_owr_uri_source_new(OwrMediaType media_type,
     g_free(bin_name);
 
     uri_pipeline = GST_ELEMENT(gst_element_get_parent(uridecodebin));
-    gst_bin_add_many(GST_BIN(source_bin), tee, queue, fakesink, NULL);
+    gst_bin_add_many(GST_BIN(source_bin), identity, tee, queue, fakesink, NULL);
+    LINK_ELEMENTS(identity, tee);
     LINK_ELEMENTS(tee, queue);
     LINK_ELEMENTS(queue, fakesink);
-    sinkpad = gst_element_get_static_pad(tee, "sink");
+    sinkpad = gst_element_get_static_pad(identity, "sink");
     ghostpad = gst_ghost_pad_new("sink", sinkpad);
     gst_object_unref(sinkpad);
     gst_element_add_pad(source_bin, ghostpad);
