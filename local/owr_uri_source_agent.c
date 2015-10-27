@@ -72,6 +72,7 @@ struct _OwrURISourceAgentPrivate {
     gchar *uri;
     guint agent_id;
     GstElement *pipeline, *uridecodebin;
+    GstClockTime offset;
 };
 
 static void owr_uri_source_agent_set_property(GObject *object, guint property_id,
@@ -204,6 +205,7 @@ static void owr_uri_source_agent_init(OwrURISourceAgent *uri_source_agent)
 
     priv->uri = DEFAULT_URI;
     priv->agent_id = next_uri_source_agent_id++;
+    priv->offset = GST_CLOCK_TIME_NONE;
 
     g_return_if_fail(_owr_is_initialized());
 
@@ -350,8 +352,24 @@ static void on_uridecodebin_pad_added(GstElement *uridecodebin, GstPad *new_pad,
     gst_caps_unref(audio_raw_caps);
     gst_caps_unref(video_raw_caps);
 
-    if (media_type != OWR_MEDIA_TYPE_UNKNOWN)
+    if (media_type != OWR_MEDIA_TYPE_UNKNOWN) {
+        if (uri_source_agent->priv->offset == GST_CLOCK_TIME_NONE) {
+            /* Offset our buffers by the running time so that the first buffer
+             * we push out corresponds to whatever the current running time is.
+             * This is useful to make sure no buffers are lost in general, but
+             * specifically required if the source is added some time after the
+             * pipeline is running. */
+            GstClock *clock;
+
+            clock = gst_pipeline_get_clock(GST_PIPELINE(uri_source_agent->priv->pipeline));
+            uri_source_agent->priv->offset = gst_clock_get_time(clock) - _owr_get_base_time();
+            gst_object_unref(clock);
+        }
+
+        gst_pad_set_offset(new_pad, uri_source_agent->priv->offset);
+
         signal_new_source(media_type, uri_source_agent, stream_id, OWR_CODEC_TYPE_NONE);
+    }
 
     g_free(new_pad_name);
     gst_caps_unref(caps);
