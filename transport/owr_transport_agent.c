@@ -4241,8 +4241,9 @@ static GstPadProbeReturn probe_rtp_info(GstPad *srcpad, GstPadProbeInfo *info, S
     OwrTransportAgent *transport_agent = NULL;
     OwrTransportAgentPrivate *priv = NULL;
     guint session_id = 0;
-    guint8 pt;
+    guint8 pt = 0;
     gboolean rtp_mapped = FALSE;
+    GObject *rtp_session = NULL;
 
     transport_agent = scream_rx->transport_agent;
     session_id = scream_rx->session_id;
@@ -4262,6 +4263,7 @@ static GstPadProbeReturn probe_rtp_info(GstPad *srcpad, GstPadProbeInfo *info, S
         pt = gst_rtp_buffer_get_payload_type(&rtp_buf);
     }
 
+    g_signal_emit_by_name(priv->rtpbin, "get-internal-session", session_id, &rtp_session);
 
     if (G_UNLIKELY(scream_rx->rtx_pt == -2)) {
         OwrMediaSession *media_session;
@@ -4274,6 +4276,8 @@ static GstPadProbeReturn probe_rtp_info(GstPad *srcpad, GstPadProbeInfo *info, S
         scream_rx->adapt = (adapt_type == OWR_ADAPTATION_TYPE_SCREAM);
         g_object_unref(media_session);
         g_object_unref(rx_payload);
+
+	g_object_set(rtp_session, "rtcp-reduced-size", TRUE, NULL);
     }
 
     OWR_UNUSED(srcpad);
@@ -4286,7 +4290,6 @@ static GstPadProbeReturn probe_rtp_info(GstPad *srcpad, GstPadProbeInfo *info, S
         guint ssrc = 0;
         GList *it;
         guint diff, tmp_highest_seq, tmp_seq;
-        GObject *rtp_session;
 
         if ((meta = gst_buffer_get_meta(buffer, meta_info->api))) {
             OwrArrivalTimeMeta *atmeta = (OwrArrivalTimeMeta *) meta;
@@ -4375,14 +4378,14 @@ static GstPadProbeReturn probe_rtp_info(GstPad *srcpad, GstPadProbeInfo *info, S
         priv->rtcp_list = g_list_append(priv->rtcp_list, rtcp_info);
         OWR_UNUSED(it);
         g_mutex_unlock(&priv->rtcp_lock);
-        g_signal_emit_by_name(priv->rtpbin, "get-internal-session", session_id, &rtp_session);
         g_signal_emit_by_name(rtp_session, "send-rtcp", 20000000);
-        g_object_unref(rtp_session);
     }
 
 end:
     if (rtp_mapped)
         gst_rtp_buffer_unmap(&rtp_buf);
+    if (rtp_session)
+        g_object_unref(rtp_session);
 
     return GST_PAD_PROBE_OK;
 }
