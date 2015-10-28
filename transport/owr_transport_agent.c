@@ -2412,7 +2412,7 @@ static void setup_video_receive_elements(GstPad *new_pad, guint32 session_id, Ow
     g_object_set_data(G_OBJECT(new_pad), "transport-agent", (gpointer)transport_agent);
     g_object_set_data(G_OBJECT(new_pad), "session-id", GUINT_TO_POINTER(session_id));
 
-    g_snprintf(name, OWR_OBJECT_NAME_LENGTH_MAX, "receive-output-bin-%u", session_id);
+    g_snprintf(name, OWR_OBJECT_NAME_LENGTH_MAX, "receive-output-bin-%u-video", session_id);
     receive_output_bin = gst_bin_new(name);
 
     gst_bin_add(GST_BIN(transport_agent->priv->transport_bin), receive_output_bin);
@@ -2481,7 +2481,7 @@ static void setup_audio_receive_elements(GstPad *new_pad, guint32 session_id, Ow
     g_object_set_data(G_OBJECT(new_pad), "transport-agent", (gpointer)transport_agent);
     g_object_set_data(G_OBJECT(new_pad), "session-id", GUINT_TO_POINTER(session_id));
 
-    pad_name = g_strdup_printf("receive-output-bin-%u", session_id);
+    pad_name = g_strdup_printf("receive-output-bin-%u-audio", session_id);
     receive_output_bin = gst_bin_new(pad_name);
     g_free(pad_name);
     pad_name = NULL;
