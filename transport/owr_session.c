@@ -81,6 +81,7 @@ struct _OwrSessionPrivate {
     GClosure *on_local_candidate_change;
     OwrIceState ice_state, rtp_ice_state, rtcp_ice_state;
     OwrMessageOriginBusSet *message_origin_bus_set;
+    guint rtp_port, rtcp_port;
 };
 
 enum {
@@ -563,6 +564,27 @@ void _owr_session_get_candidate_pair(OwrSession *session, OwrComponentType ctype
     *local = priv->local_candidate[ctype];
     *remote = priv->remote_candidate[ctype];
 }
+
+void owr_session_set_local_port(OwrSession *session, OwrComponentType ctype, guint port)
+{
+    g_return_if_fail(ctype < OWR_COMPONENT_MAX);
+
+    if (ctype == OWR_COMPONENT_TYPE_RTP)
+        session->priv->rtp_port = port;
+    else
+        session->priv->rtcp_port = port;
+}
+
+guint _owr_session_get_local_port(OwrSession *session, OwrComponentType ctype)
+{
+    g_return_val_if_fail(ctype < OWR_COMPONENT_MAX, 0);
+
+    if (ctype == OWR_COMPONENT_TYPE_RTP)
+        return session->priv->rtp_port;
+    else
+        return session->priv->rtcp_port;
+}
+
 static void update_local_credentials(OwrCandidate *candidate, GParamSpec *pspec, OwrSession *session)
 {
     OwrSessionPrivate *priv;

@@ -994,6 +994,7 @@ static gboolean add_session(GHashTable *args)
     GObject *rtp_session;
     GstStateChangeReturn state_change_status;
     PendingSessionInfo *pending_session_info;
+    guint port;
 
     g_return_val_if_fail(args, FALSE);
 
@@ -1072,6 +1073,15 @@ static gboolean add_session(GHashTable *args)
         }
     }
 
+    /* OwrSession port settings override OwrTransportAgent settings */
+    if ((port = _owr_session_get_local_port(session, OWR_COMPONENT_TYPE_RTP))) {
+        nice_agent_set_port_range(priv->nice_agent, stream_id, NICE_COMPONENT_TYPE_RTP,
+            port, port);
+    }
+    if ((port = _owr_session_get_local_port(session, OWR_COMPONENT_TYPE_RTCP))) {
+        nice_agent_set_port_range(priv->nice_agent, stream_id, NICE_COMPONENT_TYPE_RTCP,
+            port, port);
+    }
 
     if (!priv->local_address_added) {
         GList *item, *local_ips = nice_interfaces_get_local_ips(FALSE);
