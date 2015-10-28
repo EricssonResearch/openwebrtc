@@ -91,6 +91,7 @@ void owr_session_add_remote_candidate(OwrSession *session, OwrCandidate *candida
 void owr_session_force_remote_candidate(OwrSession *session, OwrCandidate *candidate);
 void owr_session_force_candidate_pair(OwrSession *session, OwrComponentType ctype,
         OwrCandidate *local_candidate, OwrCandidate *remote_candidate);
+void owr_session_set_local_port(OwrSession *session, OwrComponentType ctype, guint port);
 
 void _owr_session_get_candidate_pair(OwrSession *session, OwrComponentType ctype,
         OwrCandidate **local, OwrCandidate **remote);
