@@ -4236,7 +4236,7 @@ static gint compare_rtcp_scream(GHashTable *a, GHashTable *b)
 static GstPadProbeReturn probe_rtp_info(GstPad *srcpad, GstPadProbeInfo *info, ScreamRx *scream_rx)
 {
     GstBuffer *buffer = NULL;
-    GstRTPBuffer rtp_buf = { 0 };
+    GstRTPBuffer rtp_buf = GST_RTP_BUFFER_INIT;
     guint64 arrival_time = GST_CLOCK_TIME_NONE;
     OwrTransportAgent *transport_agent = NULL;
     OwrTransportAgentPrivate *priv = NULL;
