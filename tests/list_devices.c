@@ -34,11 +34,12 @@
 #include "owr_media_source.h"
 #include "owr_crypto_utils.h"
 
-static void got_crypto_data(gchar *privatekey, gchar *certificate)
+static void got_crypto_data(gchar *privatekey, gchar *certificate, gchar *fingerprint)
 {
     g_print("got got_crypto_data \n");
     g_print("privatekey %s \n", privatekey);
     g_print("certificate %s \n", certificate);
+    g_print("fingerprint %s \n", fingerprint);
 
 }
 static void got_sources(GList *sources, gpointer user_data)
