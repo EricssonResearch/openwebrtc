@@ -12,8 +12,7 @@ AM_CPPFLAGS = \
 AM_CFLAGS = \
     -Wall \
     -Wextra \
-    -Werror \
-    -pedantic
+    -Werror
 
 bin_PROGRAMS = \
     list-devices \
