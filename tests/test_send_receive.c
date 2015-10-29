@@ -70,7 +70,7 @@ static const char *stun_pass = "5f1f2614f722cd60fbae275193608d4e";
 static GOptionEntry entries[] = {
     { "disable-video", 0, 0, G_OPTION_ARG_NONE, &disable_video, "Disable video", NULL },
     { "disable-audio", 0, 0, G_OPTION_ARG_NONE, &disable_audio, "Disable audio", NULL },
-    { "uri", 'u', 0, G_OPTION_ARG_NONE, &uri, "URI to use as source", NULL },
+    { "uri", 'u', 0, G_OPTION_ARG_STRING, &uri, "URI to use as source", NULL },
     { "print-messages", 'p', 0, G_OPTION_ARG_NONE, &print_messages, "Prints all messages, instead of just errors", NULL },
     { "local-address", 'l', 0, G_OPTION_ARG_STRING, &local_addr, "Local candidate address", NULL },
     { "remote-address", 'r', 0, G_OPTION_ARG_STRING, &remote_addr, "Remote candidate address", NULL },
@@ -493,7 +493,7 @@ int main(int argc, char **argv)
                 (!disable_video ? OWR_MEDIA_TYPE_VIDEO : 0) | (!disable_audio ? OWR_MEDIA_TYPE_AUDIO : 0),
                 got_sources, NULL);
     } else {
-        uri_source_agent = owr_uri_source_agent_new(argv[1]);
+        uri_source_agent = owr_uri_source_agent_new(uri);
         g_signal_connect(uri_source_agent, "on-new-source", G_CALLBACK(on_new_source), NULL);
         owr_uri_source_agent_play(uri_source_agent);
     }
@@ -503,6 +503,7 @@ int main(int argc, char **argv)
     owr_run();
 
     g_free(remote_addr);
+    g_free(uri);
 
     return 0;
 }
