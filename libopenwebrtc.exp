@@ -1,3 +1,4 @@
+owr_adaptation_type_get_type
 owr_audio_payload_get_type
 owr_audio_payload_new
 owr_audio_renderer_get_type
@@ -56,8 +57,10 @@ owr_message_type_get_type
 owr_payload_get_type
 owr_remote_media_source_get_type
 owr_session_add_remote_candidate
+owr_session_force_candidate_pair
 owr_session_force_remote_candidate
 owr_session_get_type
+owr_session_set_local_port
 owr_source_type_get_type
 owr_transport_agent_add_helper_server
 owr_transport_agent_add_local_address
@@ -67,6 +70,12 @@ owr_transport_agent_get_type
 owr_transport_agent_new
 owr_transport_agent_set_local_port_range
 owr_transport_type_get_type
+owr_uri_source_agent_get_dot_data
+owr_uri_source_agent_get_type
+owr_uri_source_agent_new
+owr_uri_source_agent_pause
+owr_uri_source_agent_play
+owr_uri_source_get_type
 owr_video_payload_get_type
 owr_video_payload_new
 owr_video_renderer_get_type
