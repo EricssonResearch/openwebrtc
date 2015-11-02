@@ -63,7 +63,7 @@ static OwrBus *bus = NULL;
 static OwrURISourceAgent *uri_source_agent = NULL;
 
 static gchar *uri = NULL;
-static gboolean disable_video = FALSE, disable_audio = FALSE, print_messages = FALSE;
+static gboolean disable_video = FALSE, disable_audio = FALSE, print_messages = FALSE, adaptation = FALSE;
 static gchar *local_addr = NULL, *remote_addr = NULL;
 static const char *stun_pass = "5f1f2614f722cd60fbae275193608d4e";
 
@@ -74,6 +74,7 @@ static GOptionEntry entries[] = {
     { "print-messages", 'p', 0, G_OPTION_ARG_NONE, &print_messages, "Prints all messages, instead of just errors", NULL },
     { "local-address", 'l', 0, G_OPTION_ARG_STRING, &local_addr, "Local candidate address", NULL },
     { "remote-address", 'r', 0, G_OPTION_ARG_STRING, &remote_addr, "Remote candidate address", NULL },
+    { "adaptation", 'a', 0, G_OPTION_ARG_NONE, &adaptation, "Enable bitrate adaptation", NULL },
     { NULL, }
 };
 
@@ -238,7 +239,8 @@ static void got_sources(GList *sources, gpointer user_data)
             payload = owr_video_payload_new(OWR_CODEC_TYPE_VP8, 103, 90000, TRUE, FALSE);
             g_object_set(payload, "width", 640, "height", 480, "framerate", 30.0, NULL);
             g_object_set(payload, "rtx-payload-type", 123, NULL);
-            g_object_set(payload, "adaptation", TRUE, NULL);
+            if (adaptation)
+                g_object_set(payload, "adaptation", TRUE, NULL);
 
             owr_media_session_set_send_payload(send_session_video, payload);
 
@@ -473,7 +475,8 @@ int main(int argc, char **argv)
 
         receive_payload = owr_video_payload_new(OWR_CODEC_TYPE_VP8, 103, 90000, TRUE, FALSE);
         g_object_set(receive_payload, "rtx-payload-type", 123, NULL);
-        g_object_set(receive_payload, "adaptation", TRUE, NULL);
+        if (adaptation)
+            g_object_set(receive_payload, "adaptation", TRUE, NULL);
 
         owr_media_session_add_receive_payload(recv_session_video, receive_payload);
     }
