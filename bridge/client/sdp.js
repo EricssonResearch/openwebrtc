@@ -52,7 +52,7 @@ if (typeof(SDP) == "undefined")
         "rtcp": "^a=rtcp:([\\d]+)( IN (IP[46]) ([\\d\\.a-f\\:]+))?.*$",
         "rtcpmux": "^a=rtcp-mux.*$",
         "cname": "^a=ssrc:(\\d+) cname:([\\w+/\\-@\\.\\{\\}]+).*$",
-        "msid": "^a=msid:([\\w+/\\-=]+) +([\\w+/\\-=]+).*$",
+        "msid": "^a=(ssrc:\\d+ )?msid:([\\w+/\\-=]+) +([\\w+/\\-=]+).*$",
         "ufrag": "^a=ice-ufrag:([\\w+/]*).*$",
         "pwd": "^a=ice-pwd:([\\w+/]*).*$",
         "candidate": "^a=candidate:(\\d+) (\\d) (UDP|TCP) ([\\d\\.]*) ([\\d\\.a-f\\:]*) (\\d*)" +
@@ -286,8 +286,8 @@ if (typeof(SDP) == "undefined")
             if (hasMediaStreamId) {
                 var msid = match(mblock, regexps.msid, "m");
                 if (msid) {
-                    mediaDescription.mediaStreamId = msid[1];
-                    mediaDescription.mediaStreamTrackId = msid[2];
+                    mediaDescription.mediaStreamId = msid[2];
+                    mediaDescription.mediaStreamTrackId = msid[3];
                 }
             }
 
