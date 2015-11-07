@@ -357,7 +357,8 @@
             "remoteDescription": getRemoteDescription,
             "signalingState": "stable",
             "iceGatheringState": "new",
-            "iceConnectionState": "new"
+            "iceConnectionState": "new",
+            "canTrickleIceCandidates": null
         };
         domObject.addReadOnlyAttributes(this, a);
 
@@ -526,7 +527,8 @@
                     "rtcp": { "mux": true },
                     "ssrcs": [ randomNumber(32) ],
                     "cname": cname,
-                    "ice": { "ufrag": randomString(4), "password": randomString(22) },
+                    "ice": { "ufrag": randomString(4), "password": randomString(22),
+                        "iceOptions": { "trickle": true } },
                     "dtls": {
                         "setup": "actpass",
                         "fingerprintHashFunction": dtlsInfo.fingerprintHashFunction,
@@ -558,7 +560,8 @@
                     "type": "application",
                     "protocol": "DTLS/SCTP",
                     "fmt": 5000,
-                    "ice": { "ufrag": randomString(4), "password": randomString(22) },
+                    "ice": { "ufrag": randomString(4), "password": randomString(22),
+                        "iceOptions": { "trickle": true } },
                     "dtls": {
                         "setup": "actpass",
                         "fingerprintHashFunction": dtlsInfo.fingerprintHashFunction,
@@ -624,13 +627,20 @@
             var localSessionInfoSnapshot = localSessionInfo ?
                 JSON.parse(JSON.stringify(localSessionInfo)) : { "mediaDescriptions": [] };
 
+            var iceOptions = {};
+            for (var i = 0; i < remoteSessionInfo.mediaDescriptions.length; i++) {
+                if (remoteSessionInfo.mediaDescriptions[i].ice.iceOptions.trickle)
+                    iceOptions.trickle = true;
+            }
+
             for (var i = 0; i < remoteSessionInfo.mediaDescriptions.length; i++) {
                 var lmdesc = localSessionInfoSnapshot.mediaDescriptions[i];
                 var rmdesc = remoteSessionInfo.mediaDescriptions[i];
                 if (!lmdesc) {
                     lmdesc = {
                         "type": rmdesc.type,
-                        "ice": { "ufrag": randomString(4), "password": randomString(22) },
+                        "ice": { "ufrag": randomString(4), "password": randomString(22),
+                            "iceOptions": iceOptions },
                         "dtls": {
                             "setup": rmdesc.dtls.setup == "active" ? "passive" : "active",
                             "fingerprintHashFunction": dtlsInfo.fingerprintHashFunction,
@@ -786,6 +796,7 @@
             remoteSessionInfo = SDP.parse(description.sdp);
             lastSetRemoteDescriptionType = description.type;
 
+            var canTrickle = false;
             remoteSessionInfo.mediaDescriptions.forEach(function (mdesc, i) {
                 if (!remoteSourceStatus[i])
                     remoteSourceStatus[i] = {};
@@ -795,8 +806,12 @@
                 if (!mdesc.ice) {
                     console.warn("setRemoteDescription: m-line " + i +
                         " is missing ICE credentials");
-                    mdesc.ice = {};
+                    mdesc.ice = {
+                        "iceOptions": {}
+                    };
                 }
+                if (mdesc.ice.iceOptions.trickle)
+                    canTrickle = true;
             });
 
             var allTracks = getAllTracks(localStreams);
@@ -826,6 +841,7 @@
                 peerHandler.prepareToSend(remoteSessionInfo, isInitiator);
                 completeQueuedOperation(function () {
                     a.signalingState = targetState;
+                    a.canTrickleIceCandidates = canTrickle;
                     resolve();
                 });
             });
