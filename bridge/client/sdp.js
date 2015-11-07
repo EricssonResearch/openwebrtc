@@ -53,6 +53,8 @@ if (typeof(SDP) == "undefined")
         "msid": "^a=(ssrc:\\d+ )?msid:([\\w+/\\-=]+) +([\\w+/\\-=]+).*$",
         "ufrag": "^a=ice-ufrag:([\\w+/]*).*$",
         "pwd": "^a=ice-pwd:([\\w+/]*).*$",
+        "iceoptions": "^a=ice-options:(.*$)",
+        "trickle": "\\btrickle\\b.*$",
         "candidate": "^a=candidate:(\\d+) (\\d) (UDP|TCP) ([\\d\\.]*) ([\\d\\.a-f\\:]*) (\\d*)" +
             " typ ([a-z]*)( raddr ([\\d\\.a-f\\:]*) rport (\\d*))?" +
             "( tcptype (active|passive|so))?.*$",
@@ -86,6 +88,7 @@ if (typeof(SDP) == "undefined")
             "${cnameLines}" +
             "${msidLines}" +
             "${iceCredentialLines}" +
+            "${iceOptionLine}" +
             "${candidateLines}" +
             "${dtlsFingerprintLine}" +
             "${dtlsSetupLine}" +
@@ -107,6 +110,9 @@ if (typeof(SDP) == "undefined")
         "iceCredentials":
             "a=ice-ufrag:${ufrag}\r\n" +
             "a=ice-pwd:${password}\r\n",
+
+        "iceOptionsTrickle":
+            "a=ice-options:trickle\r\n",
 
         "candidate":
             "a=candidate:${foundation} ${componentId} ${transport} ${priority} ${address} ${port}" +
@@ -288,13 +294,30 @@ if (typeof(SDP) == "undefined")
             if (ufrag && pwd) {
                 mediaDescription.ice = {
                     "ufrag": ufrag[1],
-                    "password": pwd[1]
+                    "password": pwd[1],
+                    "iceOptions": {}
                 };
+            }
+            var iceOptions = match(mblock, regexps.iceoptions, "m", sblock);
+            if (iceOptions) {
+                var canTrickle = match(iceOptions[1], regexps.trickle);
+                if (canTrickle) {
+                    if (!mediaDescription.ice) {
+                        mediaDescription.ice = {
+                            "iceOptions": {}
+                        };
+                    }
+                    mediaDescription.ice.iceOptions = {
+                        "trickle": true
+                    };
+                }
             }
             var candidateLines = match(mblock, regexps.candidate, "mig");
             if (candidateLines) {
                 if (!mediaDescription.ice)
-                    mediaDescription.ice = {};
+                    mediaDescription.ice = {
+                        "iceOptions": {}
+                    };
                 mediaDescription.ice.candidates = [];
                 candidateLines.forEach(function (line) {
                     var candidateLine = match(line, regexps.candidate, "mi");
@@ -472,10 +495,12 @@ if (typeof(SDP) == "undefined")
             }
             mblock = fillTemplate(mblock, srcAttributeLines);
 
-            var iceInfo = {"iceCredentialLines": "", "candidateLines": ""};
+            var iceInfo = {"iceCredentialLines": "", "iceOptionLine": "", "candidateLines": ""};
             if (mediaDescription.ice) {
                 iceInfo.iceCredentialLines = fillTemplate(templates.iceCredentials,
                     mediaDescription.ice);
+                if (mediaDescription.ice.iceOptions.trickle)
+                    iceInfo.iceOptionLine = templates.iceOptionsTrickle;
                 if (mediaDescription.ice.candidates) {
                     mediaDescription.ice.candidates.forEach(function (candidate) {
                         addDefaults(candidate, {

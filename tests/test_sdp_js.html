@@ -26,6 +26,7 @@ a=ssrc:3106546916 cname:D7Ahze+H1eaqKeF5\r\n\
 a=msid:5iB/+D7nY9hWKLzUR9Rq1QaPvqhZL5bUkO6K 6zXTQAXDyrP5ERy/P5GIt5TwyWFoG+YCsEev\r\n\
 a=ice-ufrag:bwkr\r\n\
 a=ice-pwd:/BRdfFPr+jaNI6u2YNvdlh\r\n\
+a=ice-options:trickle\r\n\
 a=fingerprint:sha-256 CA:12:81:3D:CA:3C:6F:0D:5B:7C:85:EC:06:47:5A:7F:F0:10:5B:B7:2C:64:D6:82:53:05:14:07:11:CB:EF:30\r\n\
 a=setup:actpass\r\n\
 m=video 9 UDP/TLS/RTP/SAVPF 103 100 120\r\n\
@@ -48,6 +49,7 @@ a=ssrc:452035539 cname:D7Ahze+H1eaqKeF5\r\n\
 a=msid:5iB/+D7nY9hWKLzUR9Rq1QaPvqhZL5bUkO6K zj7ZHHykAnNHmR2NTQ5xzsyb7/EUXBtqu0VJ\r\n\
 a=ice-ufrag:GsgS\r\n\
 a=ice-pwd:q/588zvYXCUbyMiNC2G3hb\r\n\
+a=ice-options:trickle\r\n\
 a=fingerprint:sha-256 CA:12:81:3D:CA:3C:6F:0D:5B:7C:85:EC:06:47:5A:7F:F0:10:5B:B7:2C:64:D6:82:53:05:14:07:11:CB:EF:30\r\n\
 a=setup:actpass\r\n";
 
@@ -104,7 +106,10 @@ var originalJsonString = '{\n\
       "mediaStreamTrackId": "6zXTQAXDyrP5ERy/P5GIt5TwyWFoG+YCsEev",\n\
       "ice": {\n\
         "ufrag": "bwkr",\n\
-        "password": "/BRdfFPr+jaNI6u2YNvdlh"\n\
+        "password": "/BRdfFPr+jaNI6u2YNvdlh",\n\
+        "iceOptions": {\n\
+          "trickle": true\n\
+        }\n\
       },\n\
       "dtls": {\n\
         "fingerprintHashFunction": "sha-256",\n\
@@ -168,7 +173,10 @@ var originalJsonString = '{\n\
       "mediaStreamTrackId": "zj7ZHHykAnNHmR2NTQ5xzsyb7/EUXBtqu0VJ",\n\
       "ice": {\n\
         "ufrag": "GsgS",\n\
-        "password": "q/588zvYXCUbyMiNC2G3hb"\n\
+        "password": "q/588zvYXCUbyMiNC2G3hb",\n\
+        "iceOptions": {\n\
+          "trickle": true\n\
+        }\n\
       },\n\
       "dtls": {\n\
         "fingerprintHashFunction": "sha-256",\n\
