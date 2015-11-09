@@ -34,6 +34,8 @@
 
 #ifndef __GTK_DOC_IGNORE__
 
+#define OWR_COMPONENT_MAX (OWR_COMPONENT_TYPE_RTCP + 1)
+
 G_BEGIN_DECLS
 
 /*< private >*/
