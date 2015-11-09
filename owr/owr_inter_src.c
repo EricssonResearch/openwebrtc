@@ -103,11 +103,9 @@ static void owr_inter_src_dispose(GObject *object)
     OwrInterSrc *self = OWR_INTER_SRC(object);
 
     gst_object_unparent(GST_OBJECT(self->dummy_sinkpad));
-    gst_object_unref(self->dummy_sinkpad);
     self->dummy_sinkpad = NULL;
 
     gst_object_unparent(GST_OBJECT(self->internal_srcpad));
-    gst_object_unref(self->internal_srcpad);
     self->internal_srcpad = NULL;
 
     G_OBJECT_CLASS(owr_inter_src_parent_class)->dispose(object);
