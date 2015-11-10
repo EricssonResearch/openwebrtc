@@ -2002,7 +2002,7 @@ static void on_new_selected_pair(NiceAgent *nice_agent,
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
 
     session = get_session(transport_agent, stream_id);
-    g_return_if_fail(OWR_IS_MEDIA_SESSION(session));
+    g_return_if_fail(OWR_IS_SESSION(session));
 
     g_mutex_lock(&transport_agent->priv->sessions_lock);
     pending_session_info = g_hash_table_lookup(transport_agent->priv->pending_sessions, GUINT_TO_POINTER(stream_id));
