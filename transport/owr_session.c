@@ -66,7 +66,6 @@ G_DEFINE_TYPE_WITH_CODE(OwrSession, owr_session, G_TYPE_OBJECT,
     G_IMPLEMENT_INTERFACE(OWR_TYPE_MESSAGE_ORIGIN, owr_message_origin_interface_init))
 
 struct _OwrSessionPrivate {
-    gboolean rtcp_mux;
     gboolean dtls_client_mode;
     gchar *dtls_certificate;
     gchar *dtls_key;
@@ -90,8 +89,6 @@ enum {
 
     LAST_SIGNAL
 };
-
-#define DEFAULT_RTCP_MUX FALSE
 
 enum {
     PROP_0,
@@ -365,6 +362,41 @@ static gchar *owr_ice_state_get_name(OwrIceState state)
     return name;
 }
 
+static gboolean is_multiplexing_rtcp(OwrSession *session)
+{
+    GParamSpec *pspec;
+    gboolean rtcp_mux = TRUE;
+
+    pspec = g_object_class_find_property(G_OBJECT_GET_CLASS(session), "rtcp-mux");
+    if (pspec && G_PARAM_SPEC_VALUE_TYPE(pspec) == G_TYPE_BOOLEAN)
+        g_object_get(session, "rtcp-mux", &rtcp_mux, NULL);
+
+    return rtcp_mux;
+}
+
+static void schedule_add_remote_candidate(OwrSession *session, OwrCandidate *candidate, gboolean f)
+{
+    GHashTable *args;
+
+    g_return_if_fail(OWR_IS_SESSION(session));
+    g_return_if_fail(OWR_IS_CANDIDATE(candidate));
+
+    if (_owr_candidate_get_component_type(candidate) == OWR_COMPONENT_TYPE_RTCP
+        && is_multiplexing_rtcp(session)) {
+        g_warning("Trying to add an RTCP candidate to an RTP/RTCP multiplexing session. Aborting");
+        return;
+    }
+
+    args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(session));
+    g_hash_table_insert(args, "session", session);
+    g_hash_table_insert(args, "candidate", candidate);
+    g_hash_table_insert(args, "forced", GINT_TO_POINTER(f));
+    g_object_ref(session);
+    g_object_ref(candidate);
+
+    _owr_schedule_with_hash_table((GSourceFunc)add_remote_candidate, args);
+}
+
 /**
  * owr_session_add_remote_candidate:
  * @session: the session on which the candidate will be added.
@@ -375,25 +407,8 @@ static gchar *owr_ice_state_get_name(OwrIceState state)
  */
 void owr_session_add_remote_candidate(OwrSession *session, OwrCandidate *candidate)
 {
-    GHashTable *args;
-
-    g_return_if_fail(session);
-    g_return_if_fail(candidate);
-
-    if (session->priv->rtcp_mux && _owr_candidate_get_component_type(candidate) == OWR_COMPONENT_TYPE_RTCP) {
-        g_warning("Trying to adding RTCP component on an rtcp_muxing session. Aborting");
-        return;
-    }
-
-    args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(session));
-    g_hash_table_insert(args, "session", session);
-    g_hash_table_insert(args, "candidate", candidate);
-    g_object_ref(session);
-    g_object_ref(candidate);
-
-    _owr_schedule_with_hash_table((GSourceFunc)add_remote_candidate, args);
+    schedule_add_remote_candidate(session, candidate, FALSE);
 }
-
 
 /**
  * owr_session_force_remote_candidate:
@@ -405,19 +420,7 @@ void owr_session_add_remote_candidate(OwrSession *session, OwrCandidate *candida
  */
 void owr_session_force_remote_candidate(OwrSession *session, OwrCandidate *candidate)
 {
-    GHashTable *args;
-
-    g_return_if_fail(OWR_IS_SESSION(session));
-    g_return_if_fail(OWR_IS_CANDIDATE(candidate));
-
-    args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(session));
-    g_hash_table_insert(args, "session", session);
-    g_hash_table_insert(args, "candidate", candidate);
-    g_hash_table_insert(args, "forced", GINT_TO_POINTER(TRUE));
-    g_object_ref(session);
-    g_object_ref(candidate);
-
-    _owr_schedule_with_hash_table((GSourceFunc)add_remote_candidate, args);
+    schedule_add_remote_candidate(session, candidate, TRUE);
 }
 
 /**
@@ -729,12 +732,7 @@ void _owr_session_emit_ice_state_changed(OwrSession *session, guint session_id,
 {
     OwrIceState old_state, new_state;
     gchar *old_state_name, *new_state_name;
-    GParamSpec *pspec;
-    gboolean rtcp_mux = FALSE;
-
-    pspec = g_object_class_find_property(G_OBJECT_GET_CLASS(session), "rtcp-mux");
-    if (pspec && G_PARAM_SPEC_TYPE(pspec) == G_TYPE_BOOLEAN)
-        g_object_get(session, "rtcp-mux", &rtcp_mux, NULL);
+    gboolean rtcp_mux = is_multiplexing_rtcp(session);
 
     if (rtcp_mux) {
         old_state = session->priv->rtp_ice_state;
