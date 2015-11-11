@@ -387,7 +387,7 @@ if (typeof(SDP) == "undefined")
                 mediaStreamIds.push(mdesc.mediaStreamId);
         });
         if (mediaStreamIds.length) {
-            var msidsemanticLine = fillTemplate(templates.msidsemantic,
+            msidsemanticLine = fillTemplate(templates.msidsemantic,
                 { "mediaStreamIds": mediaStreamIds.join(" ") });
         }
         sdpText = fillTemplate(sdpText, { "msidsemanticLine": msidsemanticLine });
