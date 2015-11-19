@@ -437,9 +437,9 @@ GstElement * _owr_payload_create_encoder(OwrPayload *payload)
             "deadline", G_GINT64_CONSTANT(1), /* VPX_DL_REALTIME */
             "cpu-used", cpu_used,
             "min-quantizer", 2,
-            "buffer-initial-size", 200,
-            "buffer-optimal-size", 200,
-            "buffer-size", 200,
+            "buffer-initial-size", 300,
+            "buffer-optimal-size", 300,
+            "buffer-size", 400,
             "dropframe-threshold", 30,
             "lag-in-frames", 0,
             "timebase", 1, 90000,
