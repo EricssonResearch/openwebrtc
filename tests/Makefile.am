@@ -22,7 +22,8 @@ bin_PROGRAMS = \
     test-init \
     test-bus \
     test-uri \
-    test-client
+    test-client \
+    test-crypto-utils
 
 if OWR_GST
 AM_CPPFLAGS += \
@@ -141,6 +142,16 @@ test_uri_CFLAGS = \
 test_uri_LDADD = \
     $(JSON_GLIB_LIBS) \
     $(LIBSOUP_LIBS) \
+    $(GLIB_LIBS) \
+    $(top_builddir)/owr/libopenwebrtc.la
+
+test_crypto_utils_SOURCES = test_crypto_utils.c
+
+test_crypto_utils_CFLAGS = \
+    -I$(top_srcdir)/transport \
+    -I$(top_srcdir)/owr
+
+test_crypto_utils_LDADD = \
     $(GLIB_LIBS) \
     $(top_builddir)/owr/libopenwebrtc.la
 

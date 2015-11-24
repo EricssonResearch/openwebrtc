@@ -121,8 +121,8 @@ server.onaccept = function (event) {
 
     rpcScope.createKeys = function (client) {
         var localcertificate, localprivatekey, localfingerprint;
-        owr.crypto_create_crypto_data(function (privatekey, certificate, fingerprint) {
-            if ((privatekey && certificate && fingerprint)) {
+        owr.crypto_create_crypto_data(function (privatekey, certificate, fingerprint, fingerprintHashFunction) {
+            if ((privatekey && certificate && fingerprint && fingerprintHashFunction)) {
                 if (fingerprint == "Failure") {
                     console.log("generation of crypto data has failed");
                     client.dtlsInfoGenerationDone();
@@ -131,7 +131,8 @@ server.onaccept = function (event) {
                     client.dtlsInfoGenerationDone({
                         "certificate": certificate,
                         "privatekey": privatekey,
-                        "fingerprint": fingerprint
+                        "fingerprint": fingerprint,
+                        "fingerprintHashFunction": fingerprintHashFunction
                     });
                 }
             }
