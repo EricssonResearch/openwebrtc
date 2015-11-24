@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -23,33 +23,26 @@
  * OF SUCH DAMAGE.
  */
 
-#ifndef __OWR_CRYPTO_UTILS_H__
-#define __OWR_CRYPTO_UTILS_H__
+#include "owr.h"
+#include "owr_crypto_utils.h"
 
-#include "owr_types.h"
+static void got_crypto_data(gchar *privatekey, gchar *certificate, gchar *fingerprint,
+    gchar *fingerprint_function, gpointer data)
+{
+    g_print("got got_crypto_data \n");
+    g_print("privatekey %s \n", privatekey);
+    g_print("certificate %s \n", certificate);
+    g_print("fingerprint %s \n", fingerprint);
+    g_print("fingerprint_function %s \n", fingerprint_function);
 
-#include <glib.h>
+    owr_quit();
+}
 
-#include <openssl/ssl.h>
-#include <openssl/evp.h>
-#include <openssl/rsa.h>
+int main() {
+    owr_init(NULL);
 
-#ifndef __GTK_DOC_IGNORE__
+    owr_crypto_create_crypto_data(got_crypto_data, NULL);
+    owr_run();
 
-G_BEGIN_DECLS
-
-typedef void (*OwrCryptoDataCallback) (gchar *privatekey, gchar *certificate, gchar *fingerprint,
-    gchar *fingerprint_function, gpointer data);
-
-void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback, gpointer data);
-/*< private >*/
-
-gpointer _create_crypto_worker_run(gpointer data);
-
-gboolean _create_crypto_worker_report(gpointer data);
-
-G_END_DECLS
-
-#endif /* __GTK_DOC_IGNORE__ */
-
-#endif /* __OWR_CRYPTO_UTILS_H__ */
+    return 0;
+}

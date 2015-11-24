@@ -527,8 +527,11 @@
                     "ssrcs": [ randomNumber(32) ],
                     "cname": cname,
                     "ice": { "ufrag": randomString(4), "password": randomString(22) },
-                    "dtls": { "setup": "actpass", "fingerprintHashFunction": "sha-256",
-                        "fingerprint": dtlsInfo.fingerprint.toUpperCase() }
+                    "dtls": {
+                        "setup": "actpass",
+                        "fingerprintHashFunction": dtlsInfo.fingerprintHashFunction,
+                        "fingerprint": dtlsInfo.fingerprint.toUpperCase()
+                    }
                 });
             });
 
@@ -539,8 +542,11 @@
                         "type": kind,
                         "payloads": JSON.parse(JSON.stringify(defaultPayloads[kind])),
                         "rtcp": { "mux": true },
-                        "dtls": { "setup": "actpass", "fingerprintHashFunction": "sha-256",
-                            "fingerprint": dtlsInfo.fingerprint.toUpperCase() },
+                        "dtls": {
+                            "setup": "actpass",
+                            "fingerprintHashFunction": dtlsInfo.fingerprintHashFunction,
+                            "fingerprint": dtlsInfo.fingerprint.toUpperCase()
+                        },
                         "mode": "recvonly"
                     });
                 }
@@ -553,8 +559,11 @@
                     "protocol": "DTLS/SCTP",
                     "fmt": 5000,
                     "ice": { "ufrag": randomString(4), "password": randomString(22) },
-                    "dtls": { "setup": "actpass", "fingerprintHashFunction": "sha-256",
-                        "fingerprint": dtlsInfo.fingerprint.toUpperCase() },
+                    "dtls": {
+                        "setup": "actpass",
+                        "fingerprintHashFunction": dtlsInfo.fingerprintHashFunction,
+                        "fingerprint": dtlsInfo.fingerprint.toUpperCase()
+                    },
                     "sctp": {
                         "port": 5000,
                         "app": "webrtc-datachannel",
@@ -622,8 +631,11 @@
                     lmdesc = {
                         "type": rmdesc.type,
                         "ice": { "ufrag": randomString(4), "password": randomString(22) },
-                        "dtls": { "setup": rmdesc.dtls.setup == "active" ? "passive" : "active",
-                            "fingerprintHashFunction": "sha-256", "fingerprint": dtlsInfo.fingerprint.toUpperCase() }
+                        "dtls": {
+                            "setup": rmdesc.dtls.setup == "active" ? "passive" : "active",
+                            "fingerprintHashFunction": dtlsInfo.fingerprintHashFunction,
+                            "fingerprint": dtlsInfo.fingerprint.toUpperCase()
+                        }
                     };
                     localSessionInfoSnapshot.mediaDescriptions.push(lmdesc);
                 }
