@@ -115,7 +115,7 @@
         var client = {}; 
         client.dtlsInfoGenerationDone = function (generatedDtlsInfo) {
             dtlsInfo = generatedDtlsInfo;
-            if (!dtlsInfo) 
+            if (!dtlsInfo)
                 console.log("createKeys returned without any dtlsInfo - anything involving use of PeerConnection won't work");
             else {
                 var func;
@@ -124,8 +124,8 @@
             }
             bridge.removeObjectRef(client);
         }
-    
-    
+
+
         bridge.createKeys(bridge.createObjectRef(client, "dtlsInfoGenerationDone"));
     })();
 
@@ -1632,7 +1632,7 @@
 
             var tag = randomString(36);
             var useVideoOverlay = global.navigator.__owrVideoOverlaySupport
-                && video.className.indexOf("owr-overlay-video") != -1;
+                && video.className.indexOf("owr-no-overlay-video") == -1;
 
             bridge.renderSources(audioSources, videoSources, tag, useVideoOverlay, function (renderInfo) {
                 var count = Math.round(Math.random() * 100000);
