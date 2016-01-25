@@ -66,9 +66,9 @@ struct _OwrMediaRendererClass {
 };
 
 typedef enum {
-  OWR_MEIDA_RENDER_STOP       = 0,
-  OWR_MEIDA_RENDER_PLAY       = 1
-} MediaRenderState;
+  OWR_MEDIA_RENDERER_PAUSE      = 0,
+  OWR_MEDIA_RENDERER_PLAY       = 1
+} OwrMediaRendererState;
 
 
 GType owr_media_renderer_get_type(void) G_GNUC_CONST;
@@ -76,7 +76,7 @@ GType owr_media_renderer_get_type(void) G_GNUC_CONST;
 void owr_media_renderer_set_source(OwrMediaRenderer *renderer, OwrMediaSource *source);
 gchar * owr_media_renderer_get_dot_data(OwrMediaRenderer *renderer);
 
-void owr_media_renderer_set_state(OwrMediaRenderer *_renderer, MediaRenderState state);
+void owr_media_renderer_set_state(OwrMediaRenderer *_renderer, OwrMediaRendererState state);
 
 G_END_DECLS
 
