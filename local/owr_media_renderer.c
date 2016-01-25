@@ -308,7 +308,7 @@ static void on_caps(GstElement *sink, GParamSpec *pspec, OwrMediaRenderer *media
     }
 }
 
-void owr_media_renderer_set_state(OwrMediaRenderer *_renderer, MediaRenderState state)
+void owr_media_renderer_set_state(OwrMediaRenderer *_renderer, OwrMediaRendererState state)
 {
     OwrMediaRenderer* renderer;
     OwrMediaRendererPrivate *priv;
@@ -320,10 +320,10 @@ void owr_media_renderer_set_state(OwrMediaRenderer *_renderer, MediaRenderState 
     	return;
     
     switch (state) {
-	case OWR_MEIDA_RENDER_STOP:
+	case OWR_MEDIA_RENDERER_PAUSE:
 	    gst_element_set_state(priv->pipeline, GST_STATE_PAUSED);
 	    break;
-	case OWR_MEIDA_RENDER_PLAY:
+	case OWR_MEDIA_RENDERER_PLAY:
 	    gst_element_set_state(priv->pipeline, GST_STATE_PLAYING);
 	    break;
     }
