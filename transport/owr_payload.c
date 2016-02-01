@@ -681,6 +681,7 @@ GstCaps * _owr_payload_create_raw_caps(OwrPayload *payload)
                 NULL);
         }
         caps = gst_caps_new_empty_simple("video/x-raw");
+        gst_caps_set_features(caps, 0, gst_caps_features_new_any());
         gst_caps_set_simple(caps, "width", G_TYPE_INT, width > 0 ? width : LIMITED_WIDTH, NULL);
         gst_caps_set_simple(caps, "height", G_TYPE_INT, height > 0 ? height : LIMITED_HEIGHT, NULL);
 
