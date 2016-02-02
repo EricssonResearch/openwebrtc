@@ -42,6 +42,8 @@
 #include "owr_utils.h"
 
 #include <gst/gst.h>
+#define GST_USE_UNSTABLE_API
+#include <gst/gl/gl.h>
 #include <stdio.h>
 
 #ifdef __APPLE__
@@ -309,8 +311,9 @@ static GstElement *owr_media_source_request_source_default(OwrMediaSource *media
         }
     case OWR_MEDIA_TYPE_VIDEO:
         {
-        GstElement *videorate = NULL, *videoscale, *videoconvert;
+        GstElement *videorate = NULL, *videoscale = NULL, *videoconvert;
         GstStructure *s;
+        GstCapsFeatures *features;
 
         s = gst_caps_get_structure(caps, 0);
         if (gst_structure_has_field(s, "framerate")) {
@@ -325,23 +328,43 @@ static GstElement *owr_media_source_request_source_default(OwrMediaSource *media
             gst_structure_remove_field(s, "framerate");
             gst_bin_add(GST_BIN(source_bin), videorate);
         }
-
         g_object_set(capsfilter, "caps", caps, NULL);
 
-        CREATE_ELEMENT_WITH_ID(videoconvert, VIDEO_CONVERT, "source-video-convert", source_id);
-        CREATE_ELEMENT_WITH_ID(videoscale, "videoscale", "source-video-scale", source_id);
+        features = gst_caps_get_features(caps, 0);
+        if (gst_caps_features_contains(features, GST_CAPS_FEATURE_MEMORY_GL_MEMORY)) {
+            GstElement *glupload;
 
-        gst_bin_add_many(GST_BIN(source_bin),
-            queue_pre, videoscale, videoconvert, capsfilter, queue_post, NULL);
-        LINK_ELEMENTS(capsfilter, queue_post);
+            CREATE_ELEMENT_WITH_ID(glupload, "glupload", "source-glupload", source_id);
+            CREATE_ELEMENT_WITH_ID(videoconvert, "glcolorconvert", "source-glcolorconvert", source_id);
+            gst_bin_add_many(GST_BIN(source_bin),
+                    queue_pre, glupload, videoconvert, capsfilter, queue_post, NULL);
+
+            if (videorate) {
+                LINK_ELEMENTS(queue_pre, videorate);
+                LINK_ELEMENTS(videorate, glupload);
+            } else {
+                LINK_ELEMENTS(queue_pre, glupload);
+            }
+            LINK_ELEMENTS(glupload, videoconvert);
+        } else {
+            GstElement *gldownload;
+
+            CREATE_ELEMENT_WITH_ID(gldownload, "gldownload", "source-gldownload", source_id);
+            CREATE_ELEMENT_WITH_ID(videoscale,  "videoscale", "source-video-scale", source_id);
+            CREATE_ELEMENT_WITH_ID(videoconvert, VIDEO_CONVERT, "source-video-convert", source_id);
+            gst_bin_add_many(GST_BIN(source_bin),
+                    queue_pre, gldownload, videoscale, videoconvert, capsfilter, queue_post, NULL);
+            if (videorate) {
+                LINK_ELEMENTS(queue_pre, videorate);
+                LINK_ELEMENTS(videorate, gldownload);
+            } else {
+                LINK_ELEMENTS(queue_pre, gldownload);
+            }
+            LINK_ELEMENTS(gldownload, videoscale);
+            LINK_ELEMENTS(videoscale, videoconvert);
+        }
         LINK_ELEMENTS(videoconvert, capsfilter);
-        LINK_ELEMENTS(videoscale, videoconvert);
-
-        if (videorate) {
-            LINK_ELEMENTS(videorate, videoscale);
-            LINK_ELEMENTS(queue_pre, videorate);
-        } else
-            LINK_ELEMENTS(queue_pre, videoscale);
+        LINK_ELEMENTS(capsfilter, queue_post);
 
         break;
         }
