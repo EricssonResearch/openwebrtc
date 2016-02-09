@@ -499,7 +499,7 @@ if (typeof(SDP) == "undefined")
             if (mediaDescription.ice) {
                 iceInfo.iceCredentialLines = fillTemplate(templates.iceCredentials,
                     mediaDescription.ice);
-                if (mediaDescription.ice.iceOptions.trickle)
+                if (mediaDescription.ice.iceOptions && mediaDescription.ice.iceOptions.trickle)
                     iceInfo.iceOptionLine = templates.iceOptionsTrickle;
                 if (mediaDescription.ice.candidates) {
                     mediaDescription.ice.candidates.forEach(function (candidate) {
