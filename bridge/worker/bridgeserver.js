@@ -30,6 +30,7 @@
 var imageServers = {};
 var imageServerBasePort = 10000 + Math.floor(Math.random() * 40000);
 var nextImageServerPort = imageServerBasePort;
+var originTokens = {};
 var consentRequestQueue;
 
 var extensionServer = new WebSocketServer(10719, "127.0.0.1");
@@ -72,6 +73,11 @@ var server = new WebSocketServer(10717, "127.0.0.1");
 server.onaccept = function (event) {
     var ws = event.socket;
     var origin = event.origin;
+    if (!origin || origin == "null") {
+        origin = Object.keys(originTokens).find(function (origin) {
+            return originTokens[origin] == ws.protocol;
+        }) || null;
+    }
     var channel = {
         "postMessage": function (message) {
             ws.send(message);
@@ -255,7 +261,7 @@ function RenderController(audioRenderer, videoRenderer, imageServerPort, tag) {
     };
 }
 
-var owr_js = "(function () {\n" + wbjsonrpc_js + domutils_js + sdp_js + webrtc_js + "\n})();";
+var owr_js = wbjsonrpc_js + domutils_js + sdp_js + webrtc_js;
 
 server.onrequest = function (event) {
     var response = {"headers": {}};
@@ -263,7 +269,15 @@ server.onrequest = function (event) {
         response.status = 200;
         response.headers["Content-Type"] = "text/javascript";
         response.headers["Access-Control-Allow-Origin"] = "*";
-        response.body = owr_js;
+
+        var origin = event.request.headers["origin"] || null;
+        var token = originTokens[origin];
+        if (!token) {
+            token = Date.now().toString(16) + Math.random().toString(16).substr(2);
+            originTokens[origin] = token;
+        }
+        var body = "(function () {\nvar originToken = \"" + token + "\";\n" + owr_js + "\n})();";
+        response.body = body;
     } else {
         response.status = 404;
         response.headers["Content-Type"] = "text/html";
