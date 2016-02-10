@@ -39,6 +39,8 @@ G_BEGIN_DECLS
 GSList * _owr_session_get_remote_candidates(OwrSession *session);
 GSList * _owr_session_get_forced_remote_candidates(OwrSession *session);
 
+guint _owr_session_get_local_port(OwrSession *session, OwrComponentType ctype);
+
 void _owr_session_set_on_remote_candidate(OwrSession *session, GClosure *on_remote_candidate);
 void _owr_session_set_on_local_candidate_change(OwrSession *session, GClosure *on_local_candidate_change);
 void _owr_session_clear_closures(OwrSession *session);

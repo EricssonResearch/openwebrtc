@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2015, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014-2015, Ericsson AB. All rights reserved.
+ * Copyright (c) 2014, Centricular Ltd
+ *     Author: Sebastian Dröge <sebastian@centricular.com>
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -23,33 +25,25 @@
  * OF SUCH DAMAGE.
  */
 
-#ifndef __OWR_CRYPTO_UTILS_H__
-#define __OWR_CRYPTO_UTILS_H__
+/*/
+\*\ OwrURISource private
+/*/
 
+#ifndef __OWR_URI_SOURCE_PRIVATE_H__
+#define __OWR_URI_SOURCE_PRIVATE_H__
+
+#include "owr_media_source.h"
 #include "owr_types.h"
-
-#include <glib.h>
-
-#include <openssl/ssl.h>
-#include <openssl/evp.h>
-#include <openssl/rsa.h>
 
 #ifndef __GTK_DOC_IGNORE__
 
 G_BEGIN_DECLS
 
-typedef void (*OwrCryptoDataCallback) (gchar *privatekey, gchar *certificate, gchar *fingerprint,
-    gchar *fingerprint_function, gpointer data);
-
-void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback, gpointer data);
-/*< private >*/
-
-gpointer _create_crypto_worker_run(gpointer data);
-
-gboolean _create_crypto_worker_report(gpointer data);
+OwrMediaSource *_owr_uri_source_new(OwrMediaType media_type,
+    guint stream_id, OwrCodecType codec_type, gpointer uridecodebin);
 
 G_END_DECLS
 
 #endif /* __GTK_DOC_IGNORE__ */
 
-#endif /* __OWR_CRYPTO_UTILS_H__ */
+#endif /* __OWR_URI_SOURCE_PRIVATE_H__ */

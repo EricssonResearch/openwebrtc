@@ -13,15 +13,15 @@
 * Compressed video sources
 * ~~Releases~~
 * [Overlay video rendering](https://github.com/EricssonResearch/openwebrtc-examples/issues/38)
-* Mobile-optimized congestion control (based on [IETF contribution SCReAM](https://tools.ietf.org/html/draft-johansson-rmcat-scream-cc-00))
+* ~~Mobile-optimized congestion control (based on [IETF contribution SCReAM](https://tools.ietf.org/html/draft-johansson-rmcat-scream-cc-00))~~ [Blog post](http://www.openwebrtc.org/blog/2015/11/19/your-openwebrtc-calls-are-now-congestion-controlled)
 * [~~CocoaPods~~](https://github.com/EricssonResearch/openwebrtc-ios-sdk)
 * [HEVC/H.265 video](https://github.com/EricssonResearch/openwebrtc/issues/1)
 * [WebRTC Statistics API](https://github.com/EricssonResearch/openwebrtc/issues/5)
 * [~~Better handling of video rotation~~](https://github.com/EricssonResearch/openwebrtc/issues/150)
 * [~~Matrix.org native app integration~~](https://github.com/matrix-org/matrix-ios-sdk/issues/3)
-* [Move Bowser to WKWebView](https://github.com/EricssonResearch/bowser/issues/1)
-* Integrate OpenWebRTC in WebKit, starting with the Linux GTK+ port
-* [createOffer compliance](https://github.com/EricssonResearch/openwebrtc/issues/62)
+* [~~Move Bowser to WKWebView~~](https://github.com/EricssonResearch/bowser/issues/1) [Blog post](http://www.openwebrtc.org/blog/2015/12/1/bowser-06-our-biggest-release-yet)
+* Integrate OpenWebRTC in WebKit, starting with the Linux GTK+ port. See http://www.webrtcinwebkit.org
+* [~~createOffer compliance~~](https://github.com/EricssonResearch/openwebrtc/issues/62)
 * [Raspberry Pi support](https://github.com/EricssonResearch/openwebrtc/issues/172)
 
 ## Possible future additions

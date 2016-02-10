@@ -25,27 +25,43 @@
  * OF SUCH DAMAGE.
  */
 
-#ifndef __OWR_CANDIDATE_PRIVATE_H__
-#define __OWR_CANDIDATE_PRIVATE_H__
+/*/
+\*\ OwrURISource
+/*/
 
-#include "owr_candidate.h"
+#ifndef __OWR_URI_SOURCE_H__
+#define __OWR_URI_SOURCE_H__
 
-#include <agent.h>
+#include "owr_media_source.h"
 
-#ifndef __GTK_DOC_IGNORE__
-
-#define OWR_COMPONENT_MAX (OWR_COMPONENT_TYPE_RTCP + 1)
+#include <glib-object.h>
 
 G_BEGIN_DECLS
 
-/*< private >*/
-OwrCandidate * _owr_candidate_new_from_nice_candidate(NiceCandidate *nice_candidate);
+#define OWR_TYPE_URI_SOURCE            (owr_uri_source_get_type())
+#define OWR_URI_SOURCE(obj)            (G_TYPE_CHECK_INSTANCE_CAST((obj), OWR_TYPE_URI_SOURCE, OwrURISource))
+#define OWR_URI_SOURCE_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST((klass), OWR_TYPE_URI_SOURCE, OwrURISourceClass))
+#define OWR_IS_URI_SOURCE(obj)         (G_TYPE_CHECK_INSTANCE_TYPE((obj), OWR_TYPE_URI_SOURCE))
+#define OWR_IS_URI_SOURCE_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass), OWR_TYPE_URI_SOURCE))
+#define OWR_URI_SOURCE_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS((obj), OWR_TYPE_URI_SOURCE, OwrURISourceClass))
 
-NiceCandidate * _owr_candidate_to_nice_candidate(OwrCandidate *candidate);
-OwrComponentType _owr_candidate_get_component_type(OwrCandidate *candidate);
+typedef struct _OwrURISource        OwrURISource;
+typedef struct _OwrURISourceClass   OwrURISourceClass;
+typedef struct _OwrURISourcePrivate OwrURISourcePrivate;
+
+struct _OwrURISource {
+    OwrMediaSource parent_instance;
+
+    /*< private >*/
+    OwrURISourcePrivate *priv;
+};
+
+struct _OwrURISourceClass {
+    OwrMediaSourceClass parent_class;
+};
+
+GType owr_uri_source_get_type(void) G_GNUC_CONST;
 
 G_END_DECLS
 
-#endif /* __GTK_DOC_IGNORE__ */
-
-#endif /* __OWR_CANDIDATE_PRIVATE_H__ */
+#endif /* __OWR_URI_SOURCE_H__ */

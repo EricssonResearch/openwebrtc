@@ -115,6 +115,7 @@ HEADERS = [
     'owr_video_payload.h',
     'owr_video_renderer.h',
     'owr_window_registry.h',
+    'owr_crypto_utils.h',
 ]
 
 class WindowHandleType(ObjectMetaType(

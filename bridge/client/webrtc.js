@@ -53,48 +53,88 @@
         ],
         "video": [
             { "encodingName": "H264", "type": 103, "clockRate": 90000,
-                "ccmfir": true, "nackpli": true, /* "nack": true, */
+                "ccmfir": true, "nackpli": true, "ericscream": true, /* "nack": true, */
                 "parameters": { "levelAsymmetryAllowed": 1, "packetizationMode": 1 } },
 /* FIXME: Enable when Chrome can handle an offer with RTX for H264
             { "encodingName": "RTX", "type": 123, "clockRate": 90000,
                 "parameters": { "apt": 103, "rtxTime": 200 } },*/
             { "encodingName": "VP8", "type": 100, "clockRate": 90000,
-                "ccmfir": true, "nackpli": true, "nack": true },
+                "ccmfir": true, "nackpli": true, "nack": true, "ericscream": true },
             { "encodingName": "RTX", "type": 120, "clockRate": 90000,
                 "parameters": { "apt": 100, "rtxTime": 200 } }
         ]
     };
+
     var messageChannel = new function () {
         var _this = this;
-        var ws;
+        var iframe;
         var sendQueue = [];
 
-        function ensureWebSocket() {
-            if (ws && ws.readyState <= ws.OPEN)
+        function createIframe() {
+            if (window.location.protocol == "data:")
                 return;
-
-            ws = new WebSocket("ws://localhost:10717/bridge");
-            ws.onopen = processSendQueue;
-            ws.onmessage = function (event) {
-                if (_this.onmessage instanceof Function)
+            iframe = document.createElement("iframe");
+            iframe.style.height = iframe.style.width = "0px";
+            iframe.style.visibility = "hidden";
+            iframe.onload = function () {
+                iframe.onload = null;
+                processSendQueue();
+            };
+            window.addEventListener("message", function (event) {
+                if (event.source === iframe.contentWindow && _this.onmessage instanceof Function)
                     _this.onmessage(event);
-            };
-            ws.onclose = ws.onerror = function () {
-                ws = null;
-            };
+            });
+            iframe.src = "data:text/html;base64," + btoa("<script>\n" +
+                "var ws;\n" +
+                "var sendQueue = [];\n" +
+
+                "function ensureWebSocket() {\n" +
+                "    if (ws && ws.readyState <= ws.OPEN)\n" +
+                "        return;\n" +
+
+                "    ws = new WebSocket(\"ws://localhost:10717/bridge\",\n" +
+                "        \"" + originToken + "\");\n" +
+                "    ws.onopen = processSendQueue;\n" +
+                "    ws.onmessage = function (event) {\n" +
+                "        window.parent.postMessage(event.data, \"*\");\n" +
+                "    };\n" +
+                "    ws.onclose = ws.onerror = function () {\n" +
+                "        ws = null;\n" +
+                "    };\n" +
+                "}\n" +
+
+                "function processSendQueue() {\n" +
+                "    if (!ws || ws.readyState != ws.OPEN)\n" +
+                "        return;\n" +
+                "    for (var i = 0; i < sendQueue.length; i++)\n" +
+                "        ws.send(sendQueue[i]);\n" +
+                "    sendQueue = [];\n" +
+                "}\n" +
+
+                "window.onmessage = function (event) {\n" +
+                "    sendQueue.push(event.data);\n" +
+                "    ensureWebSocket();\n" +
+                "    processSendQueue();\n" +
+                "};\n" +
+                "</script>");
+            document.documentElement.appendChild(iframe);
         }
 
+        if (document.readyState == "loading")
+            document.addEventListener("DOMContentLoaded", createIframe);
+        else
+            createIframe();
+
         function processSendQueue() {
-            if (!ws || ws.readyState != ws.OPEN)
+            if (!iframe || iframe.onload)
                 return;
             for (var i = 0; i < sendQueue.length; i++)
-                ws.send(sendQueue[i]);
+                iframe.contentWindow.postMessage(sendQueue[i], "*");
             sendQueue = [];
         }
 
         this.postMessage = function (message) {
             sendQueue.push(message);
-            ensureWebSocket();
             processSendQueue();
         };
 
@@ -114,7 +154,7 @@
         var client = {}; 
         client.dtlsInfoGenerationDone = function (generatedDtlsInfo) {
             dtlsInfo = generatedDtlsInfo;
-            if (!dtlsInfo) 
+            if (!dtlsInfo)
                 console.log("createKeys returned without any dtlsInfo - anything involving use of PeerConnection won't work");
             else {
                 var func;
@@ -123,8 +163,8 @@
             }
             bridge.removeObjectRef(client);
         }
-    
-    
+
+
         bridge.createKeys(bridge.createObjectRef(client, "dtlsInfoGenerationDone"));
     })();
 
@@ -356,7 +396,8 @@
             "remoteDescription": getRemoteDescription,
             "signalingState": "stable",
             "iceGatheringState": "new",
-            "iceConnectionState": "new"
+            "iceConnectionState": "new",
+            "canTrickleIceCandidates": null
         };
         domObject.addReadOnlyAttributes(this, a);
 
@@ -525,9 +566,13 @@
                     "rtcp": { "mux": true },
                     "ssrcs": [ randomNumber(32) ],
                     "cname": cname,
-                    "ice": { "ufrag": randomString(4), "password": randomString(22) },
-                    "dtls": { "setup": "actpass", "fingerprintHashFunction": "sha-256",
-                        "fingerprint": dtlsInfo.fingerprint.toUpperCase() }
+                    "ice": { "ufrag": randomString(4), "password": randomString(22),
+                        "iceOptions": { "trickle": true } },
+                    "dtls": {
+                        "setup": "actpass",
+                        "fingerprintHashFunction": dtlsInfo.fingerprintHashFunction,
+                        "fingerprint": dtlsInfo.fingerprint.toUpperCase()
+                    }
                 });
             });
 
@@ -538,8 +583,11 @@
                         "type": kind,
                         "payloads": JSON.parse(JSON.stringify(defaultPayloads[kind])),
                         "rtcp": { "mux": true },
-                        "dtls": { "setup": "actpass", "fingerprintHashFunction": "sha-256",
-                            "fingerprint": fingerprint.toUpperCase() },
+                        "dtls": {
+                            "setup": "actpass",
+                            "fingerprintHashFunction": dtlsInfo.fingerprintHashFunction,
+                            "fingerprint": dtlsInfo.fingerprint.toUpperCase()
+                        },
                         "mode": "recvonly"
                     });
                 }
@@ -551,9 +599,13 @@
                     "type": "application",
                     "protocol": "DTLS/SCTP",
                     "fmt": 5000,
-                    "ice": { "ufrag": randomString(4), "password": randomString(22) },
-                    "dtls": { "setup": "actpass", "fingerprintHashFunction": "sha-256",
-                        "fingerprint": fingerprint.toUpperCase() },
+                    "ice": { "ufrag": randomString(4), "password": randomString(22),
+                        "iceOptions": { "trickle": true } },
+                    "dtls": {
+                        "setup": "actpass",
+                        "fingerprintHashFunction": dtlsInfo.fingerprintHashFunction,
+                        "fingerprint": dtlsInfo.fingerprint.toUpperCase()
+                    },
                     "sctp": {
                         "port": 5000,
                         "app": "webrtc-datachannel",
@@ -614,15 +666,25 @@
             var localSessionInfoSnapshot = localSessionInfo ?
                 JSON.parse(JSON.stringify(localSessionInfo)) : { "mediaDescriptions": [] };
 
+            var iceOptions = {};
+            for (var i = 0; i < remoteSessionInfo.mediaDescriptions.length; i++) {
+                if (remoteSessionInfo.mediaDescriptions[i].ice.iceOptions.trickle)
+                    iceOptions.trickle = true;
+            }
+
             for (var i = 0; i < remoteSessionInfo.mediaDescriptions.length; i++) {
                 var lmdesc = localSessionInfoSnapshot.mediaDescriptions[i];
                 var rmdesc = remoteSessionInfo.mediaDescriptions[i];
                 if (!lmdesc) {
                     lmdesc = {
                         "type": rmdesc.type,
-                        "ice": { "ufrag": randomString(4), "password": randomString(22) },
-                        "dtls": { "setup": rmdesc.dtls.setup == "active" ? "passive" : "active",
-                            "fingerprintHashFunction": "sha-256", "fingerprint": dtlsInfo.fingerprint.toUpperCase() }
+                        "ice": { "ufrag": randomString(4), "password": randomString(22),
+                            "iceOptions": iceOptions },
+                        "dtls": {
+                            "setup": rmdesc.dtls.setup == "active" ? "passive" : "active",
+                            "fingerprintHashFunction": dtlsInfo.fingerprintHashFunction,
+                            "fingerprint": dtlsInfo.fingerprint.toUpperCase()
+                        }
                     };
                     localSessionInfoSnapshot.mediaDescriptions.push(lmdesc);
                 }
@@ -773,6 +835,7 @@
             remoteSessionInfo = SDP.parse(description.sdp);
             lastSetRemoteDescriptionType = description.type;
 
+            var canTrickle = false;
             remoteSessionInfo.mediaDescriptions.forEach(function (mdesc, i) {
                 if (!remoteSourceStatus[i])
                     remoteSourceStatus[i] = {};
@@ -782,8 +845,12 @@
                 if (!mdesc.ice) {
                     console.warn("setRemoteDescription: m-line " + i +
                         " is missing ICE credentials");
-                    mdesc.ice = {};
+                    mdesc.ice = {
+                        "iceOptions": {}
+                    };
                 }
+                if (mdesc.ice.iceOptions.trickle)
+                    canTrickle = true;
             });
 
             var allTracks = getAllTracks(localStreams);
@@ -813,6 +880,7 @@
                 peerHandler.prepareToSend(remoteSessionInfo, isInitiator);
                 completeQueuedOperation(function () {
                     a.signalingState = targetState;
+                    a.canTrickleIceCandidates = canTrickle;
                     resolve();
                 });
             });
@@ -1603,7 +1671,7 @@
 
             var tag = randomString(36);
             var useVideoOverlay = global.navigator.__owrVideoOverlaySupport
-                && video.className.indexOf("owr-overlay-video") != -1;
+                && video.className.indexOf("owr-no-overlay-video") == -1;
 
             bridge.renderSources(audioSources, videoSources, tag, useVideoOverlay, function (renderInfo) {
                 var count = Math.round(Math.random() * 100000);

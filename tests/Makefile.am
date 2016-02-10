@@ -12,8 +12,7 @@ AM_CPPFLAGS = \
 AM_CFLAGS = \
     -Wall \
     -Wextra \
-    -Werror \
-    -pedantic
+    -Werror
 
 bin_PROGRAMS = \
     list-devices \
@@ -22,7 +21,9 @@ bin_PROGRAMS = \
     test-data-channel \
     test-init \
     test-bus \
-    test-client
+    test-uri \
+    test-client \
+    test-crypto-utils
 
 if OWR_GST
 AM_CPPFLAGS += \
@@ -125,6 +126,32 @@ test_client_CFLAGS = \
 test_client_LDADD = \
     $(JSON_GLIB_LIBS) \
     $(LIBSOUP_LIBS) \
+    $(GLIB_LIBS) \
+    $(top_builddir)/owr/libopenwebrtc.la
+
+test_uri_SOURCES = test_uri.c test_utils.c
+
+test_uri_CFLAGS = \
+    $(AM_CFLAGS) \
+    $(JSON_GLIB_CFLAGS) \
+    $(LIBSOUP_CFLAGS) \
+    -I$(top_srcdir)/local \
+    -I$(top_srcdir)/transport \
+    -I$(top_srcdir)/owr
+
+test_uri_LDADD = \
+    $(JSON_GLIB_LIBS) \
+    $(LIBSOUP_LIBS) \
+    $(GLIB_LIBS) \
+    $(top_builddir)/owr/libopenwebrtc.la
+
+test_crypto_utils_SOURCES = test_crypto_utils.c
+
+test_crypto_utils_CFLAGS = \
+    -I$(top_srcdir)/transport \
+    -I$(top_srcdir)/owr
+
+test_crypto_utils_LDADD = \
     $(GLIB_LIBS) \
     $(top_builddir)/owr/libopenwebrtc.la
 

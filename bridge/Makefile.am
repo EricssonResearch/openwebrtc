@@ -31,7 +31,7 @@ libopenwebrtc_bridge_la_LIBADD = \
 libopenwebrtc_bridge_la_DEPENDENCIES = \
     $(top_builddir)/owr/libopenwebrtc.la
 
-libopenwebrtc_bridge_la_CFLAGS = $(AM_CFLAGS) -ansi
+libopenwebrtc_bridge_la_CFLAGS = $(AM_CFLAGS)
 if OWR_STATIC
 libopenwebrtc_bridge_la_CFLAGS += -DOWR_GIR_FILE="\"Owr-@OWR_API_VERSION@.gir.h\"" -DOWR_GIR_VAR_PREFIX="Owr_@OWR_API_VERSION_UNDERSCORE@"
 endif

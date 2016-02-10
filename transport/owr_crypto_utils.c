@@ -66,6 +66,7 @@ GST_DEBUG_CATEGORY_EXTERN(_owrcrypto_debug);
  * owr_crypto_create_crypto_data:
  * @types:
  * @callback: (scope async):
+ * @data: User data
  */
 
 /**
@@ -73,34 +74,43 @@ GST_DEBUG_CATEGORY_EXTERN(_owrcrypto_debug);
  * @privatekey: (transfer none)
  * @certificate: (transfer none)
  * @fingerprint: (transfer none)
- * @user_data: (allow-none): 
+ * @fingerprint_function: (transfer none)
+ * @data:
  *
  * Prototype for the callback passed to owr_get_capture_sources()
  */
 
 typedef struct {
     OwrCryptoDataCallback callback;
+    gpointer user_data;
+} WorkerData;
+
+typedef struct {
+    WorkerData* worker_data;
     gboolean errorDetected;
     gchar* pem_key;
     gchar* pem_cert;
     gchar* char_fprint;
 } CryptoData;
 
-void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback)
+void owr_crypto_create_crypto_data(OwrCryptoDataCallback callback, gpointer data)
 {
     GThread* crypto_worker;
+    WorkerData* worker_data = g_new(WorkerData, 1);
 
-    crypto_worker = g_thread_new("crypto_worker", _create_crypto_worker_run, (gpointer)callback);
+    worker_data->callback = callback;
+    worker_data->user_data = data;
+
+    crypto_worker = g_thread_new("crypto_worker", _create_crypto_worker_run, (gpointer)worker_data);
 
     g_thread_unref(crypto_worker);
 }
 
 gpointer _create_crypto_worker_run(gpointer data)
 {
+    WorkerData* worker_data = (WorkerData*)data;
 
-    OwrCryptoDataCallback callback = (OwrCryptoDataCallback)data;
-
-    g_return_val_if_fail(callback, NULL);
+    g_return_val_if_fail(worker_data->callback, NULL);
 
     X509* cert;
 
@@ -201,7 +211,7 @@ gpointer _create_crypto_worker_run(gpointer data)
 
     CryptoData* report_data = g_new0(CryptoData, 1);
 
-    report_data->callback = callback;
+    report_data->worker_data = worker_data;
     report_data->errorDetected = errorDetected;
     report_data->pem_key = pem_key;
     report_data->pem_cert = pem_cert;
@@ -225,41 +235,43 @@ gboolean _create_crypto_worker_report(gpointer data)
 {
 
     CryptoData* report_data = (CryptoData*)data;
-
+    guint i;
     GClosure* closure;
 
-    closure = g_cclosure_new(G_CALLBACK(report_data->callback), NULL, NULL);
+    closure = g_cclosure_new(G_CALLBACK(report_data->worker_data->callback), NULL, NULL);
     g_closure_set_marshal(closure, g_cclosure_marshal_generic);
 
-    GValue params[3] = { G_VALUE_INIT, G_VALUE_INIT, G_VALUE_INIT };
+    GValue params[5] = { G_VALUE_INIT, G_VALUE_INIT, G_VALUE_INIT, G_VALUE_INIT, G_VALUE_INIT };
 
-    g_value_init(&params[0], G_TYPE_STRING);
-    g_value_init(&params[1], G_TYPE_STRING);
-    g_value_init(&params[2], G_TYPE_STRING);
+    for (i = 0; i < 4; i++)
+        g_value_init(&params[i], G_TYPE_STRING);
+    g_value_init(&params[i], G_TYPE_POINTER);
+
+    g_value_set_pointer(&params[4], report_data->worker_data->user_data);
 
     if (report_data->errorDetected) {
         GST_ERROR("Returning with error");
-        g_value_set_string(&params[0], "Failure");
-        g_value_set_string(&params[1], "Failure");
-        g_value_set_string(&params[2], "Failure");
+        for (i = 0; i < 4; i++)
+            g_value_set_string(&params[i], "Failure");
 
-        g_closure_invoke(closure, NULL, 3, (const GValue*)&params, NULL);
+        g_closure_invoke(closure, NULL, 5, (const GValue*)&params, NULL);
     }
     else {
         g_value_set_string(&params[0], report_data->pem_key);
         g_value_set_string(&params[1], report_data->pem_cert);
         g_value_set_string(&params[2], report_data->char_fprint);
+        g_value_set_string(&params[3], "sha-256");
 
-        g_closure_invoke(closure, NULL, 3, (const GValue*)&params, NULL);
+        g_closure_invoke(closure, NULL, 5, (const GValue*)&params, NULL);
     }
 
     // some cleanup
+    for (i = 0; i < 5; i++)
+        g_value_unset(&params[i]);
 
-    g_value_unset(&params[0]);
-    g_value_unset(&params[1]);
-    g_value_unset(&params[2]);
     g_closure_unref(closure);
 
+    g_free(report_data->worker_data);
     g_free(report_data->pem_key);
     g_free(report_data->pem_cert);
     g_free(report_data->char_fprint);

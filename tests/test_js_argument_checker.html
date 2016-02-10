@@ -4,10 +4,8 @@
     <title>Test JavaScript Argument Checker (domutils.js)</title>
 
 <script type="text/javascript" src="../bridge/client/domutils.js"></script>
+<script type="text/javascript" src="./test_utils.js"></script>
 <script type="text/javascript">
-
-var logDiv;
-var errorCount = 0;
 
 function CustomConstructor() {
 }
@@ -56,7 +54,7 @@ window.onload = function () {
     shouldNotThrow('checkDictionary("test", {"not-a-member": true}, { "b": "boolean", "n": "number", "o": "object"});');
     shouldNotThrow('checkDictionary("test", {"o": {}, "not-a-member": true}, { "b": "boolean", "n": "number", "o": "object"});');
 
-    log("Done with " + errorCount + " errors");
+    log("Done with " + getErrorCount() + " errors");
 }
 
 function runBasicTests(typeName, strValue) {
@@ -69,41 +67,9 @@ function runBasicTests(typeName, strValue) {
     shouldNotThrow('checkArguments("test", "' + typeName + ', ' + typeName + '", 1, [' + strValue + ', ' + strValue + ']);');
 }
 
-function shouldThrow(expression) {
-    try {
-        eval(expression);
-    } catch (e) {
-        log("PASS: '" + expression + "' did throw");
-        return;
-    }
-    reportError("FAIL: '" + expression + "' should have thrown");
-}
-
-function shouldNotThrow(expression) {
-    try {
-        eval(expression);
-    } catch (e) {
-        reportError("FAIL: '" + expression + "' should not have thrown");
-        return;
-    }
-    log("PASS: '" + expression + "' did not throw");
-}
-
-function reportError(message) {
-    log(message);
-    errorCount++;
-}
-
-function log(message) {
-    if (!logDiv)
-        logDiv = document.querySelector("#log_div");
-    logDiv.appendChild(document.createTextNode(message));
-    logDiv.appendChild(document.createElement("br"));
-}
 </script>
 
 </head>
 <body>
-<div id="log_div"></div>
 </body>
 </html>

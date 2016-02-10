@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test SDP parse/generate (sdp.js)</title>
+
+<script type="text/javascript" src="../bridge/client/sdp.js"></script>
+<script type="text/javascript" src="./test_utils.js"></script>
+<script type="text/javascript">
+
+// Extend this test by adding your new feautre to both originalSdpString
+// and originalJsonString.
+
+var originalSdpString = "v=0\r\n\
+o=- 1448533634388845800 1 IN IP4 127.0.0.1\r\n\
+s=-\r\n\
+t=0 0\r\n\
+a=msid-semantic:WMS 5iB/+D7nY9hWKLzUR9Rq1QaPvqhZL5bUkO6K\r\n\
+m=audio 9 UDP/TLS/RTP/SAVPF 111 8 0\r\n\
+c=IN IP4 0.0.0.0\r\n\
+a=rtcp-mux\r\n\
+a=sendrecv\r\n\
+a=rtpmap:111 OPUS/48000/2\r\n\
+a=rtpmap:8 PCMA/8000\r\n\
+a=rtpmap:0 PCMU/8000\r\n\
+a=ssrc:3106546916 cname:D7Ahze+H1eaqKeF5\r\n\
+a=msid:5iB/+D7nY9hWKLzUR9Rq1QaPvqhZL5bUkO6K 6zXTQAXDyrP5ERy/P5GIt5TwyWFoG+YCsEev\r\n\
+a=ice-ufrag:bwkr\r\n\
+a=ice-pwd:/BRdfFPr+jaNI6u2YNvdlh\r\n\
+a=ice-options:trickle\r\n\
+a=fingerprint:sha-256 CA:12:81:3D:CA:3C:6F:0D:5B:7C:85:EC:06:47:5A:7F:F0:10:5B:B7:2C:64:D6:82:53:05:14:07:11:CB:EF:30\r\n\
+a=setup:actpass\r\n\
+m=video 9 UDP/TLS/RTP/SAVPF 103 100 120\r\n\
+c=IN IP4 0.0.0.0\r\n\
+a=rtcp-mux\r\n\
+a=sendrecv\r\n\
+a=rtpmap:103 H264/90000\r\n\
+a=rtpmap:100 VP8/90000\r\n\
+a=rtpmap:120 RTX/90000\r\n\
+a=fmtp:103 level-asymmetry-allowed=1;packetization-mode=1\r\n\
+a=fmtp:120 apt=100;rtx-time=200\r\n\
+a=rtcp-fb:100 nack\r\n\
+a=rtcp-fb:103 nack pli\r\n\
+a=rtcp-fb:100 nack pli\r\n\
+a=rtcp-fb:103 ccm fir\r\n\
+a=rtcp-fb:100 ccm fir\r\n\
+a=rtcp-fb:103 ericscream\r\n\
+a=rtcp-fb:100 ericscream\r\n\
+a=ssrc:452035539 cname:D7Ahze+H1eaqKeF5\r\n\
+a=msid:5iB/+D7nY9hWKLzUR9Rq1QaPvqhZL5bUkO6K zj7ZHHykAnNHmR2NTQ5xzsyb7/EUXBtqu0VJ\r\n\
+a=ice-ufrag:GsgS\r\n\
+a=ice-pwd:q/588zvYXCUbyMiNC2G3hb\r\n\
+a=ice-options:trickle\r\n\
+a=fingerprint:sha-256 CA:12:81:3D:CA:3C:6F:0D:5B:7C:85:EC:06:47:5A:7F:F0:10:5B:B7:2C:64:D6:82:53:05:14:07:11:CB:EF:30\r\n\
+a=setup:actpass\r\n";
+
+var originalJsonString = '{\n\
+  "version": 0,\n\
+  "originator": {\n\
+    "username": "-",\n\
+    "sessionId": "1448533634388845800",\n\
+    "sessionVersion": 1,\n\
+    "netType": "IN",\n\
+    "addressType": "IP4",\n\
+    "address": "127.0.0.1"\n\
+  },\n\
+  "sessionName": "-",\n\
+  "startTime": 0,\n\
+  "stopTime": 0,\n\
+  "mediaDescriptions": [\n\
+    {\n\
+      "type": "audio",\n\
+      "port": 9,\n\
+      "protocol": "UDP/TLS/RTP/SAVPF",\n\
+      "netType": "IN",\n\
+      "addressType": "IP4",\n\
+      "address": "0.0.0.0",\n\
+      "mode": "sendrecv",\n\
+      "payloads": [\n\
+        {\n\
+          "type": 111,\n\
+          "encodingName": "OPUS",\n\
+          "clockRate": 48000,\n\
+          "channels": 2\n\
+        },\n\
+        {\n\
+          "type": 8,\n\
+          "encodingName": "PCMA",\n\
+          "clockRate": 8000,\n\
+          "channels": 1\n\
+        },\n\
+        {\n\
+          "type": 0,\n\
+          "encodingName": "PCMU",\n\
+          "clockRate": 8000,\n\
+          "channels": 1\n\
+        }\n\
+      ],\n\
+      "rtcp": {\n\
+        "mux": true\n\
+      },\n\
+      "ssrcs": [\n\
+        3106546916\n\
+      ],\n\
+      "cname": "D7Ahze+H1eaqKeF5",\n\
+      "mediaStreamId": "5iB/+D7nY9hWKLzUR9Rq1QaPvqhZL5bUkO6K",\n\
+      "mediaStreamTrackId": "6zXTQAXDyrP5ERy/P5GIt5TwyWFoG+YCsEev",\n\
+      "ice": {\n\
+        "ufrag": "bwkr",\n\
+        "password": "/BRdfFPr+jaNI6u2YNvdlh",\n\
+        "iceOptions": {\n\
+          "trickle": true\n\
+        }\n\
+      },\n\
+      "dtls": {\n\
+        "fingerprintHashFunction": "sha-256",\n\
+        "fingerprint": "CA:12:81:3D:CA:3C:6F:0D:5B:7C:85:EC:06:47:5A:7F:F0:10:5B:B7:2C:64:D6:82:53:05:14:07:11:CB:EF:30",\n\
+        "setup": "actpass"\n\
+      }\n\
+    },\n\
+    {\n\
+      "type": "video",\n\
+      "port": 9,\n\
+      "protocol": "UDP/TLS/RTP/SAVPF",\n\
+      "netType": "IN",\n\
+      "addressType": "IP4",\n\
+      "address": "0.0.0.0",\n\
+      "mode": "sendrecv",\n\
+      "payloads": [\n\
+        {\n\
+          "type": 103,\n\
+          "encodingName": "H264",\n\
+          "clockRate": 90000,\n\
+          "nack": false,\n\
+          "nackpli": true,\n\
+          "ccmfir": true,\n\
+          "ericscream": true,\n\
+          "parameters": {\n\
+            "levelAsymmetryAllowed": 1,\n\
+            "packetizationMode": 1\n\
+          }\n\
+        },\n\
+        {\n\
+          "type": 100,\n\
+          "encodingName": "VP8",\n\
+          "clockRate": 90000,\n\
+          "nack": true,\n\
+          "nackpli": true,\n\
+          "ccmfir": true,\n\
+          "ericscream": true\n\
+        },\n\
+        {\n\
+          "type": 120,\n\
+          "encodingName": "RTX",\n\
+          "clockRate": 90000,\n\
+          "nack": false,\n\
+          "nackpli": false,\n\
+          "ccmfir": false,\n\
+          "ericscream": false,\n\
+          "parameters": {\n\
+            "apt": 100,\n\
+            "rtxTime": 200\n\
+          }\n\
+        }\n\
+      ],\n\
+      "rtcp": {\n\
+        "mux": true\n\
+      },\n\
+      "ssrcs": [\n\
+        452035539\n\
+      ],\n\
+      "cname": "D7Ahze+H1eaqKeF5",\n\
+      "mediaStreamId": "5iB/+D7nY9hWKLzUR9Rq1QaPvqhZL5bUkO6K",\n\
+      "mediaStreamTrackId": "zj7ZHHykAnNHmR2NTQ5xzsyb7/EUXBtqu0VJ",\n\
+      "ice": {\n\
+        "ufrag": "GsgS",\n\
+        "password": "q/588zvYXCUbyMiNC2G3hb",\n\
+        "iceOptions": {\n\
+          "trickle": true\n\
+        }\n\
+      },\n\
+      "dtls": {\n\
+        "fingerprintHashFunction": "sha-256",\n\
+        "fingerprint": "CA:12:81:3D:CA:3C:6F:0D:5B:7C:85:EC:06:47:5A:7F:F0:10:5B:B7:2C:64:D6:82:53:05:14:07:11:CB:EF:30",\n\
+        "setup": "actpass"\n\
+      }\n\
+    }\n\
+  ]\n\
+}';
+
+
+window.onload = function () {
+    log("Test sdp.js");
+    log("");
+
+    var sdpObject = SDP.parse(originalSdpString);
+
+    var processedJsonString = JSON.stringify(sdpObject, null, 2);
+
+    log("Compare originalJsonString and processedJsonString");
+    lineByLineCompare(originalJsonString, processedJsonString);
+    log("");
+
+    var processedSdpString = SDP.generate(sdpObject);
+
+    log("Compare originalSdpString and processedSdpString");
+    lineByLineCompare(originalSdpString, processedSdpString);
+    log("");
+
+    log("Done with " + getErrorCount() + " errors");
+}
+
+function lineByLineCompare(str1, str2) {
+    lines1 = str1.split("\n");
+    lines2 = str2.split("\n");
+
+    var hadErrors = false;
+    var i;
+
+    for (i = 0; i < Math.max(lines1.length, lines2.length); i++) {
+        if (lines1[i] != lines2[i]) {
+            reportError("'" + lines1[i] + "' differs from '" + lines2[i] + "'");
+            hadErrors = true;
+        }
+    }
+    log("Line by line comparison " + (hadErrors ? "failed" : "successful") +
+        " (" + i + " lines compared)");
+}
+</script>
+
+</head>
+<body>
+</body>
+</html>

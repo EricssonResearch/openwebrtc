@@ -66,7 +66,6 @@ G_DEFINE_TYPE_WITH_CODE(OwrSession, owr_session, G_TYPE_OBJECT,
     G_IMPLEMENT_INTERFACE(OWR_TYPE_MESSAGE_ORIGIN, owr_message_origin_interface_init))
 
 struct _OwrSessionPrivate {
-    gboolean rtcp_mux;
     gboolean dtls_client_mode;
     gchar *dtls_certificate;
     gchar *dtls_key;
@@ -74,11 +73,14 @@ struct _OwrSessionPrivate {
     GSList *local_candidates;
     GSList *remote_candidates;
     GSList *forced_remote_candidates;
+    OwrCandidate *local_candidate[OWR_COMPONENT_MAX],
+                 *remote_candidate[OWR_COMPONENT_MAX];
     gboolean gathering_done;
     GClosure *on_remote_candidate;
     GClosure *on_local_candidate_change;
     OwrIceState ice_state, rtp_ice_state, rtcp_ice_state;
     OwrMessageOriginBusSet *message_origin_bus_set;
+    guint rtp_port, rtcp_port;
 };
 
 enum {
@@ -87,8 +89,6 @@ enum {
 
     LAST_SIGNAL
 };
-
-#define DEFAULT_RTCP_MUX FALSE
 
 enum {
     PROP_0,
@@ -127,6 +127,7 @@ GType owr_ice_state_get_type(void)
 }
 
 static gboolean add_remote_candidate(GHashTable *args);
+static gboolean add_candidate_pair(GHashTable *args);
 static void update_local_credentials(OwrCandidate *candidate, GParamSpec *pspec, OwrSession *session);
 
 
@@ -361,6 +362,41 @@ static gchar *owr_ice_state_get_name(OwrIceState state)
     return name;
 }
 
+static gboolean is_multiplexing_rtcp(OwrSession *session)
+{
+    GParamSpec *pspec;
+    gboolean rtcp_mux = TRUE;
+
+    pspec = g_object_class_find_property(G_OBJECT_GET_CLASS(session), "rtcp-mux");
+    if (pspec && G_PARAM_SPEC_VALUE_TYPE(pspec) == G_TYPE_BOOLEAN)
+        g_object_get(session, "rtcp-mux", &rtcp_mux, NULL);
+
+    return rtcp_mux;
+}
+
+static void schedule_add_remote_candidate(OwrSession *session, OwrCandidate *candidate, gboolean f)
+{
+    GHashTable *args;
+
+    g_return_if_fail(OWR_IS_SESSION(session));
+    g_return_if_fail(OWR_IS_CANDIDATE(candidate));
+
+    if (_owr_candidate_get_component_type(candidate) == OWR_COMPONENT_TYPE_RTCP
+        && is_multiplexing_rtcp(session)) {
+        g_warning("Trying to add an RTCP candidate to an RTP/RTCP multiplexing session. Aborting");
+        return;
+    }
+
+    args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(session));
+    g_hash_table_insert(args, "session", session);
+    g_hash_table_insert(args, "candidate", candidate);
+    g_hash_table_insert(args, "forced", GINT_TO_POINTER(f));
+    g_object_ref(session);
+    g_object_ref(candidate);
+
+    _owr_schedule_with_hash_table((GSourceFunc)add_remote_candidate, args);
+}
+
 /**
  * owr_session_add_remote_candidate:
  * @session: the session on which the candidate will be added.
@@ -371,25 +407,8 @@ static gchar *owr_ice_state_get_name(OwrIceState state)
  */
 void owr_session_add_remote_candidate(OwrSession *session, OwrCandidate *candidate)
 {
-    GHashTable *args;
-
-    g_return_if_fail(session);
-    g_return_if_fail(candidate);
-
-    if (session->priv->rtcp_mux && _owr_candidate_get_component_type(candidate) == OWR_COMPONENT_TYPE_RTCP) {
-        g_warning("Trying to adding RTCP component on an rtcp_muxing session. Aborting");
-        return;
-    }
-
-    args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(session));
-    g_hash_table_insert(args, "session", session);
-    g_hash_table_insert(args, "candidate", candidate);
-    g_object_ref(session);
-    g_object_ref(candidate);
-
-    _owr_schedule_with_hash_table((GSourceFunc)add_remote_candidate, args);
+    schedule_add_remote_candidate(session, candidate, FALSE);
 }
-
 
 /**
  * owr_session_force_remote_candidate:
@@ -401,21 +420,39 @@ void owr_session_add_remote_candidate(OwrSession *session, OwrCandidate *candida
  */
 void owr_session_force_remote_candidate(OwrSession *session, OwrCandidate *candidate)
 {
+    schedule_add_remote_candidate(session, candidate, TRUE);
+}
+
+/**
+ * owr_session_force_candidate_pair:
+ * @session: The session on which the candidate will be forced.
+ * @local_candidate: (transfer none): the local candidate to forcibly set
+ * @remote_candidate: (transfer none): the remote candidate to forcibly set
+ *
+ * Forces the transport agent to use the given candidate pair. Calling this
+ * function will disable all further ICE processing. Keep-alives will continue
+ * to be sent.
+ */
+void owr_session_force_candidate_pair(OwrSession *session, OwrComponentType ctype,
+        OwrCandidate *local_candidate, OwrCandidate *remote_candidate)
+{
     GHashTable *args;
 
     g_return_if_fail(OWR_IS_SESSION(session));
-    g_return_if_fail(OWR_IS_CANDIDATE(candidate));
+    g_return_if_fail(OWR_IS_CANDIDATE(local_candidate));
+    g_return_if_fail(OWR_IS_CANDIDATE(remote_candidate));
 
     args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(session));
     g_hash_table_insert(args, "session", session);
-    g_hash_table_insert(args, "candidate", candidate);
-    g_hash_table_insert(args, "forced", GINT_TO_POINTER(TRUE));
+    g_hash_table_insert(args, "component-type", GUINT_TO_POINTER(ctype));
+    g_hash_table_insert(args, "local-candidate", local_candidate);
+    g_hash_table_insert(args, "remote-candidate", remote_candidate);
     g_object_ref(session);
-    g_object_ref(candidate);
+    g_object_ref(local_candidate);
+    g_object_ref(remote_candidate);
 
-    _owr_schedule_with_hash_table((GSourceFunc)add_remote_candidate, args);
+    _owr_schedule_with_hash_table((GSourceFunc)add_candidate_pair, args);
 }
-
 
 /* Internal functions */
 
@@ -466,6 +503,89 @@ end:
     g_object_unref(session);
     g_hash_table_unref(args);
     return FALSE;
+}
+
+static gboolean add_candidate_pair(GHashTable *args)
+{
+    OwrSession *session;
+    OwrSessionPrivate *priv;
+    OwrCandidate *local_candidate, *remote_candidate;
+    OwrComponentType ctype;
+
+    g_return_val_if_fail(args, FALSE);
+
+    session = g_hash_table_lookup(args, "session");
+    priv = session->priv;
+
+    local_candidate = g_hash_table_lookup(args, "local-candidate");
+    remote_candidate = g_hash_table_lookup(args, "remote-candidate");
+    g_return_val_if_fail(session && local_candidate && remote_candidate, FALSE);
+
+    ctype = GPOINTER_TO_UINT(g_hash_table_lookup(args, "component-type"));
+    g_return_val_if_fail(ctype < OWR_COMPONENT_MAX, FALSE);
+
+    if (priv->forced_remote_candidates) {
+        g_warning("Fail: forced remote candidate already.");
+        goto end;
+    }
+
+    if (!g_slist_find(priv->remote_candidates, remote_candidate)) {
+        g_warning("Fail: remote candidate not added.");
+        goto end;
+    }
+
+    if (g_slist_find(priv->local_candidates, remote_candidate)) {
+        g_warning("Fail: candidate is local.");
+        goto end;
+    }
+
+    if (!g_slist_find(priv->local_candidates, local_candidate)) {
+        g_warning("Fail: local candidate not added.");
+        goto end;
+    }
+
+    priv->local_candidate[ctype] = g_object_ref(local_candidate);
+    priv->remote_candidate[ctype] = g_object_ref(remote_candidate);
+
+end:
+    g_object_unref(local_candidate);
+    g_object_unref(remote_candidate);
+    g_object_unref(session);
+    g_hash_table_unref(args);
+    return FALSE;
+}
+
+void _owr_session_get_candidate_pair(OwrSession *session, OwrComponentType ctype,
+        OwrCandidate **local, OwrCandidate **remote)
+{
+    OwrSessionPrivate *priv;
+
+    g_return_if_fail(ctype < OWR_COMPONENT_MAX);
+
+    priv = session->priv;
+
+    *local = priv->local_candidate[ctype];
+    *remote = priv->remote_candidate[ctype];
+}
+
+void owr_session_set_local_port(OwrSession *session, OwrComponentType ctype, guint port)
+{
+    g_return_if_fail(ctype < OWR_COMPONENT_MAX);
+
+    if (ctype == OWR_COMPONENT_TYPE_RTP)
+        session->priv->rtp_port = port;
+    else
+        session->priv->rtcp_port = port;
+}
+
+guint _owr_session_get_local_port(OwrSession *session, OwrComponentType ctype)
+{
+    g_return_val_if_fail(ctype < OWR_COMPONENT_MAX, 0);
+
+    if (ctype == OWR_COMPONENT_TYPE_RTP)
+        return session->priv->rtp_port;
+    else
+        return session->priv->rtcp_port;
 }
 
 static void update_local_credentials(OwrCandidate *candidate, GParamSpec *pspec, OwrSession *session)
@@ -612,12 +732,7 @@ void _owr_session_emit_ice_state_changed(OwrSession *session, guint session_id,
 {
     OwrIceState old_state, new_state;
     gchar *old_state_name, *new_state_name;
-    GParamSpec *pspec;
-    gboolean rtcp_mux = FALSE;
-
-    pspec = g_object_class_find_property(G_OBJECT_GET_CLASS(session), "rtcp-mux");
-    if (pspec && G_PARAM_SPEC_TYPE(pspec) == G_TYPE_BOOLEAN)
-        g_object_get(session, "rtcp-mux", &rtcp_mux, NULL);
+    gboolean rtcp_mux = is_multiplexing_rtcp(session);
 
     if (rtcp_mux) {
         old_state = session->priv->rtp_ice_state;
