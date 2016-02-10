@@ -353,7 +353,7 @@ fix_video_caps_framerate(GstCapsFeatures *f, GstStructure *s, gpointer user_data
     GstCaps *ret = GST_CAPS(user_data);
     gint fps_n, fps_d;
 
-    gst_caps_append_structure_full(ret, gst_structure_copy(s), gst_caps_features_copy(f));
+    gst_caps_append_structure_full(ret, gst_structure_copy(s), f ? gst_caps_features_copy(f) : NULL);
 
     /* Don't mess with non-raw structures */
     if (!gst_structure_has_name(s, "video/x-raw"))
@@ -363,7 +363,7 @@ fix_video_caps_framerate(GstCapsFeatures *f, GstStructure *s, gpointer user_data
     if (gst_structure_get_fraction(s, "framerate", &fps_n, &fps_d)) {
         GstStructure *tmp = gst_structure_copy(s);
         gst_structure_remove_field(tmp, "framerate");
-        gst_caps_append_structure_full(ret, tmp, gst_caps_features_copy(f));
+        gst_caps_append_structure_full(ret, tmp, f ? gst_caps_features_copy(f) : NULL);
     }
 
 done:
