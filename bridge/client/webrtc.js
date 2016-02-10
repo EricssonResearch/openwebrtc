@@ -67,35 +67,74 @@
 
     var messageChannel = new function () {
         var _this = this;
-        var ws;
+        var iframe;
         var sendQueue = [];
 
-        function ensureWebSocket() {
-            if (ws && ws.readyState <= ws.OPEN)
+        function createIframe() {
+            if (window.location.protocol == "data:")
                 return;
-
-            ws = new WebSocket("ws://localhost:10717/bridge");
-            ws.onopen = processSendQueue;
-            ws.onmessage = function (event) {
-                if (_this.onmessage instanceof Function)
+            iframe = document.createElement("iframe");
+            iframe.style.height = iframe.style.width = "0px";
+            iframe.style.visibility = "hidden";
+            iframe.onload = function () {
+                iframe.onload = null;
+                processSendQueue();
+            };
+            window.addEventListener("message", function (event) {
+                if (event.source === iframe.contentWindow && _this.onmessage instanceof Function)
                     _this.onmessage(event);
-            };
-            ws.onclose = ws.onerror = function () {
-                ws = null;
-            };
+            });
+            iframe.src = "data:text/html;base64," + btoa("<script>\n" +
+                "var ws;\n" +
+                "var sendQueue = [];\n" +
+
+                "function ensureWebSocket() {\n" +
+                "    if (ws && ws.readyState <= ws.OPEN)\n" +
+                "        return;\n" +
+
+                "    ws = new WebSocket(\"ws://localhost:10717/bridge\",\n" +
+                "        \"" + originToken + "\");\n" +
+                "    ws.onopen = processSendQueue;\n" +
+                "    ws.onmessage = function (event) {\n" +
+                "        window.parent.postMessage(event.data, \"*\");\n" +
+                "    };\n" +
+                "    ws.onclose = ws.onerror = function () {\n" +
+                "        ws = null;\n" +
+                "    };\n" +
+                "}\n" +
+
+                "function processSendQueue() {\n" +
+                "    if (!ws || ws.readyState != ws.OPEN)\n" +
+                "        return;\n" +
+                "    for (var i = 0; i < sendQueue.length; i++)\n" +
+                "        ws.send(sendQueue[i]);\n" +
+                "    sendQueue = [];\n" +
+                "}\n" +
+
+                "window.onmessage = function (event) {\n" +
+                "    sendQueue.push(event.data);\n" +
+                "    ensureWebSocket();\n" +
+                "    processSendQueue();\n" +
+                "};\n" +
+                "</script>");
+            document.documentElement.appendChild(iframe);
         }
 
+        if (document.readyState == "loading")
+            document.addEventListener("DOMContentLoaded", createIframe);
+        else
+            createIframe();
+
         function processSendQueue() {
-            if (!ws || ws.readyState != ws.OPEN)
+            if (!iframe || iframe.onload)
                 return;
             for (var i = 0; i < sendQueue.length; i++)
-                ws.send(sendQueue[i]);
+                iframe.contentWindow.postMessage(sendQueue[i], "*");
             sendQueue = [];
         }
 
         this.postMessage = function (message) {
             sendQueue.push(message);
-            ensureWebSocket();
             processSendQueue();
         };
 
