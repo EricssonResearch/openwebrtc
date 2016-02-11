@@ -77,6 +77,9 @@ void owr_transport_agent_set_local_port_range(OwrTransportAgent *transport_agent
 void owr_transport_agent_add_session(OwrTransportAgent *agent, OwrSession *session);
 gchar * owr_transport_agent_get_dot_data(OwrTransportAgent *transport_agent);
 
+//void owr_transport_join_subflow(OwrTransportAgent *transport_agent, guint subflow_id, const gchar *remote_address, guint port);
+//void owr_transport_detach_subflow(OwrTransportAgent *transport_agent, guint subflow_id);
+
 G_END_DECLS
 
 #endif /* __OWR_TRANSPORT_AGENT_H__ */
