@@ -97,10 +97,6 @@ static void owr_message_origin_interface_init(OwrMessageOriginInterface *interfa
 G_DEFINE_TYPE_WITH_CODE(OwrTransportAgent, owr_transport_agent, G_TYPE_OBJECT,
     G_IMPLEMENT_INTERFACE(OWR_TYPE_MESSAGE_ORIGIN, owr_message_origin_interface_init))
 
-typedef struct{
-  GstElement *scheduler, *receiver, *sender, *playouter;
-}MPRTPPlugin;
-
 typedef struct {
     OwrDataChannelState state;
     GstElement *data_sink, *data_src;
@@ -148,7 +144,6 @@ struct _OwrTransportAgentPrivate {
     GstElement *pipeline, *transport_bin;
     GstElement *rtpbin;
 
-    MPRTPPlugin mprtp;
     /* session_id -> struct SendBinInfo */
     GHashTable *send_bins;
 
@@ -365,7 +360,7 @@ static void owr_message_origin_interface_init(OwrMessageOriginInterface *interfa
     interface->get_bus_set = owr_transport_agent_get_bus_set;
 }
 
-/* _FIXME: Copy from owr/orw.c without any error handling whatsoever */
+/* FIXME: Copy from owr/orw.c without any error handling whatsoever */
 static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer user_data)
 {
     gboolean ret, is_warning = FALSE;
@@ -821,7 +816,7 @@ static void handle_new_send_source(OwrTransportAgent *transport_agent,
         return;
     }
 
-    /* _FIXME - communicate what codec types are supported by the source
+    /* FIXME - communicate what codec types are supported by the source
      * and if one is reusable, use it, else raw?
     g_object_get(send_payload, "codec-type", &codec_type, NULL);
     */
@@ -1418,7 +1413,7 @@ static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, g
     g_assert(scream_queue);
     g_signal_connect_object(scream_queue, "on-bitrate-change", G_CALLBACK(on_bitrate_change),
         media_session, 0);
-        /* _TODO: Move connect to prepare_transport_bin_send_elements */
+        /* TODO: Move connect to prepare_transport_bin_send_elements */
 
     /* RTP */
     if (rtp) {
@@ -1494,118 +1489,6 @@ static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, g
     }
 }
 
-static GstElement *add_mprtp_scheduler_element(
-    OwrTransportAgent *transport_agent,
-    guint stream_id,
-    gboolean for_datastream,
-    GstElement *bin)
-{
-    GstElement *mprtp_sch = NULL;
-    gchar *element_name;
-    gboolean added_ok;
-
-    g_return_val_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent), NULL);
-
-    element_name = g_strdup_printf("mprtp_sch_%s_%d",
-                                   for_datastream ? "datastr" : "rtcstr",
-                                   stream_id);
-
-    mprtp_sch = gst_element_factory_make("mprtpscheduler", element_name);
-
-    g_object_set(mprtp_sch, "join-subflow", 1, NULL);
-
-    added_ok = gst_bin_add(GST_BIN(bin), mprtp_sch);
-    g_warn_if_fail(added_ok);
-
-    g_free(element_name);
-
-    return mprtp_sch;
-}
-
-
-static GstElement *add_mprtp_plaoyouter_element(
-    OwrTransportAgent *transport_agent,
-    guint stream_id,
-    gboolean for_datastream,
-    GstElement *bin)
-{
-    GstElement *mprtp_sch = NULL;
-    gchar *element_name;
-    gboolean added_ok;
-
-    g_return_val_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent), NULL);
-
-    element_name = g_strdup_printf("mprtp_ply_%s_%d",
-                                   for_datastream ? "datastr" : "rtcstr",
-                                   stream_id);
-
-    mprtp_sch = gst_element_factory_make("mprtpplayouter", element_name);
-
-    g_object_set(mprtp_sch, "join-subflow", 1, NULL);
-
-    added_ok = gst_bin_add(GST_BIN(bin), mprtp_sch);
-    g_warn_if_fail(added_ok);
-
-    g_free(element_name);
-
-    return mprtp_sch;
-}
-
-
-static GstElement *add_mprtp_receiver_element(OwrTransportAgent *transport_agent,
-                                              guint stream_id,
-                                              gboolean for_datastream,
-                                              GstElement *bin)
-{
-    GstElement *mprtp_rcv = NULL;
-    gchar *element_name;
-    gboolean added_ok;
-
-    g_return_val_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent), NULL);
-
-    element_name = g_strdup_printf("mprtp_rcv_%s_%d",
-        for_datastream ? "datastr" : "rtcstr",
-        stream_id);
-
-    mprtp_rcv = gst_element_factory_make("mprtpreceiver", element_name);
-
-    added_ok = gst_bin_add(GST_BIN(bin), mprtp_rcv);
-    g_warn_if_fail(added_ok);
-
-    g_free(element_name);
-
-    return mprtp_rcv;
-}
-
-
-
-static GstElement *add_mprtp_sender_element(
-    OwrTransportAgent *transport_agent,
-    guint stream_id,
-    gboolean for_datastream,
-    GstElement *bin)
-{
-    GstElement *mprtp_snd = NULL;
-    gchar *element_name;
-    gboolean added_ok;
-
-    g_return_val_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent), NULL);
-
-    element_name = g_strdup_printf("mprtp_snd_%s_%d",
-                                   for_datastream ? "datastr" : "rtcstr",
-                                   stream_id);
-
-    mprtp_snd = gst_element_factory_make("mprtpsender", element_name);
-
-    added_ok = gst_bin_add(GST_BIN(bin), mprtp_snd);
-    g_warn_if_fail(added_ok);
-
-    g_free(element_name);
-
-    return mprtp_snd;
-}
-
-
 static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_agent,
     guint stream_id, gboolean rtcp_mux, PendingSessionInfo *pending_session_info)
 {
@@ -1613,8 +1496,6 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
     GstElement *scream_queue = NULL;
     gboolean linked_ok, synced_ok;
     GstElement *send_output_bin;
-    GstElement *mprtp_sch;
-    GstElement *mprtp_snd;
     SendBinInfo *send_bin_info;
     gchar *bin_name, *dtls_srtp_pad_name;
     OwrMediaSession *media_session;
@@ -1622,7 +1503,6 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
 
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
 
-    //ToDO: MPRTP Sender elements added here
     bin_name = g_strdup_printf("send-output-bin-%u", stream_id);
     send_output_bin = gst_bin_new(bin_name);
     g_free(bin_name);
@@ -1639,9 +1519,6 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
 
     media_session = OWR_MEDIA_SESSION(get_session(transport_agent, stream_id));
     scream_queue = gst_element_factory_make("screamqueue", "screamqueue");
-    mprtp_sch = add_mprtp_scheduler_element(transport_agent, stream_id, FALSE, send_output_bin);
-    mprtp_snd = add_mprtp_sender_element(transport_agent, stream_id, FALSE, send_output_bin);
-
     g_assert(scream_queue);
     g_object_set(scream_queue, "scream-controller-id", transport_agent->priv->agent_id, NULL);
     g_signal_connect(scream_queue, "on-payload-adaptation-request",
@@ -1650,9 +1527,7 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
 
     pending_session_info->nice_sink_rtp = nice_element = add_nice_element(transport_agent, stream_id, TRUE, FALSE, send_output_bin);
     pending_session_info->dtls_enc_rtp = dtls_srtp_bin_rtp = add_dtls_srtp_bin(transport_agent, stream_id, TRUE, FALSE, send_output_bin);
-    linked_ok = gst_element_link_pads(dtls_srtp_bin_rtp, "src", mprtp_snd, "mprtp_sink");
-    g_warn_if_fail(linked_ok);
-    linked_ok = gst_element_link_pads(mprtp_snd, "src_1", nice_element, "sink");
+    linked_ok = gst_element_link(dtls_srtp_bin_rtp, nice_element);
     g_warn_if_fail(linked_ok);
 
     agent_and_session_id_pair = g_new0(AgentAndSessionIdPair, 1);
@@ -1661,16 +1536,10 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
     g_signal_connect_data(dtls_srtp_bin_rtp, "on-key-set", G_CALLBACK(on_dtls_enc_key_set), agent_and_session_id_pair, (GClosureNotify) g_free, 0);
 
     dtls_srtp_pad_name = g_strdup_printf("rtp_sink_%u", stream_id);
-    linked_ok = gst_element_link_pads(scream_queue, "src", mprtp_sch, "mprtp_sink");
-    g_warn_if_fail(linked_ok);
-    linked_ok = gst_element_link_pads(mprtp_sch, "mprtp_sink", dtls_srtp_bin_rtp, dtls_srtp_pad_name);
+    linked_ok = gst_element_link_pads(scream_queue, "src", dtls_srtp_bin_rtp, dtls_srtp_pad_name);
     g_free(dtls_srtp_pad_name);
     g_warn_if_fail(linked_ok);
 
-    synced_ok = gst_element_sync_state_with_parent(mprtp_sch);
-    g_warn_if_fail(synced_ok);
-    synced_ok = gst_element_sync_state_with_parent(mprtp_snd);
-    g_warn_if_fail(synced_ok);
     synced_ok = gst_element_sync_state_with_parent(nice_element);
     g_warn_if_fail(synced_ok);
     synced_ok = gst_element_sync_state_with_parent(scream_queue);
@@ -1697,9 +1566,6 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
     send_bin_info->send_output_bin = send_output_bin;
     send_bin_info->linked_rtcp = FALSE;
 
-    transport_agent->priv->mprtp.scheduler = mprtp_sch;
-    transport_agent->priv->mprtp.sender = mprtp_snd;
-
     g_hash_table_insert(transport_agent->priv->send_bins, GINT_TO_POINTER(stream_id), send_bin_info);
 }
 
@@ -1716,7 +1582,6 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
     guint stream_id, gboolean rtcp_mux, PendingSessionInfo *pending_session_info)
 {
     GstElement *nice_element, *dtls_srtp_bin, *funnel;
-    GstElement *mprtp_ply, *mprtp_rcv;
     GstPad *rtp_src_pad, *rtcp_src_pad, *rtp_sink_pad;
     GstPad *nice_src_pad;
     gchar *rtpbin_pad_name;
@@ -1730,7 +1595,7 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
     AgentAndSessionIdPair *agent_and_session_id_pair;
 
     g_return_if_fail(OWR_IS_TRANSPORT_AGENT(transport_agent));
-    //ToDO: MPRTP Receiver elements added here
+
     bin_name = g_strdup_printf("receive-input-bin-%u", stream_id);
     receive_input_bin = gst_bin_new(bin_name);
     g_free(bin_name);
@@ -1745,9 +1610,7 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
         return;
     }
 
-    transport_agent->priv->mprtp.receiver  = mprtp_rcv  = add_mprtp_receiver_element(transport_agent, stream_id, FALSE, receive_input_bin);
-    transport_agent->priv->mprtp.playouter = mprtp_ply  = add_mprtp_plaoyouter_element(transport_agent, stream_id, FALSE, receive_input_bin);
-    pending_session_info->nice_src_rtp = nice_element  = add_nice_element(transport_agent, stream_id, FALSE, FALSE, receive_input_bin);
+    pending_session_info->nice_src_rtp = nice_element = add_nice_element(transport_agent, stream_id, FALSE, FALSE, receive_input_bin);
     pending_session_info->dtls_dec_rtp = dtls_srtp_bin = add_dtls_srtp_bin(transport_agent, stream_id, FALSE, FALSE, receive_input_bin);
 
     agent_and_session_id_pair = g_new0(AgentAndSessionIdPair, 1);
@@ -1760,8 +1623,7 @@ static void prepare_transport_bin_receive_elements(OwrTransportAgent *transport_
     synced_ok = gst_element_sync_state_with_parent(nice_element);
     g_warn_if_fail(synced_ok);
 
-    gst_element_link_pads(dtls_srtp_bin, "rtp_src", mprtp_ply, "mprtp_sink");
-    rtp_src_pad = gst_element_get_static_pad(mprtp_ply, "mprtp_src");
+    rtp_src_pad = gst_element_get_static_pad(dtls_srtp_bin, "rtp_src");
     ghost_pad_and_add_to_bin(rtp_src_pad, receive_input_bin, "rtp_src");
     gst_object_unref(rtp_src_pad);
 
@@ -2149,9 +2011,7 @@ static void on_new_selected_pair(NiceAgent *nice_agent,
             GstPad *pad;
             gboolean sync_ok, link_ok;
 
-            link_ok = gst_element_link_pads(pending_session_info->nice_src_rtp, "src", transport_agent->priv->mprtp.receiver, "sink_1");
-            g_warn_if_fail(link_ok);
-            link_ok = gst_element_link_pads(transport_agent->priv->mprtp.receiver, "mprtp_src", pending_session_info->dtls_dec_rtp, "sink");
+            link_ok = gst_element_link(pending_session_info->nice_src_rtp, pending_session_info->dtls_dec_rtp);
             g_warn_if_fail(link_ok);
 
             gst_element_set_locked_state(pending_session_info->dtls_dec_rtp, FALSE);
@@ -2229,7 +2089,7 @@ on_dtls_enc_key_set(GstElement *dtls_srtp_enc, AgentAndSessionIdPair *data)
      */
     g_mutex_lock(&transport_agent->priv->sessions_lock);
     pending_session_info = g_hash_table_lookup(transport_agent->priv->pending_sessions, GUINT_TO_POINTER(stream_id));
-    /* _FIXME: What to do about RTCP? It's not guaranteed to ever be enabled if
+    /* FIXME: What to do about RTCP? It's not guaranteed to ever be enabled if
      * RTCP muxing is used but the usage wasn't known beforehand
      */
     if (pending_session_info && dtls_srtp_enc == pending_session_info->dtls_enc_rtp) {
@@ -2969,7 +2829,7 @@ static GstElement * on_rtpbin_request_aux_receiver(G_GNUC_UNUSED GstElement *rtp
 
     g_object_set(rtxrecv, "payload-type-map", pt_map, NULL);
     gst_structure_free(pt_map);
-    /* _FIXME: how do we get rtx-time? */
+    /* FIXME: how do we get rtx-time? */
 
     return create_aux_bin("rtprtxrecv", rtxrecv, session_id);
 
@@ -3628,7 +3488,7 @@ static GstFlowReturn new_data_callback(GstAppSink *appsink, OwrTransportAgent *t
         break;
     case OWR_DATA_CHANNEL_PPID_BINARY_PARTIAL:
         g_warning("PPID: DATA_CHANNEL_PPID_BINARY_PARTIAL - Deprecated - Not supported");
-        /* _TODO: Seems like chrome is using this.. maybe it should be supported to at least receive
+        /* TODO: Seems like chrome is using this.. maybe it should be supported to at least receive
          * this kind of messages even if it is deprecated?. */
         break;
     case OWR_DATA_CHANNEL_PPID_BINARY:
@@ -3636,7 +3496,7 @@ static GstFlowReturn new_data_callback(GstAppSink *appsink, OwrTransportAgent *t
         break;
     case OWR_DATA_CHANNEL_PPID_STRING_PARTIAL:
         g_warning("PPID: DATA_CHANNEL_PPID_STRING_PARTIAL - Deprecated - Not supported");
-        /* _TODO: Seems like chrome is using this.. maybe it should be supported to at least receive
+        /* TODO: Seems like chrome is using this.. maybe it should be supported to at least receive
          * this kind of messages even if it is deprecated? */
         break;
     default:
@@ -4339,7 +4199,7 @@ static void on_feedback_rtcp(GObject *session, guint type, guint fbtype, guint s
             n_loss = GST_READ_UINT8(fci_buf + 2);
             n_ecn = GST_READ_UINT8(fci_buf + 3);
             timestamp = GST_READ_UINT32_BE(fci_buf + 4);
-            /* _TODO: Fix qbit */
+            /* TODO: Fix qbit */
 
             gst_buffer_unmap(fci, &info);
             g_signal_emit_by_name(scream_queue, "incoming-feedback", media_ssrc, timestamp, highest_seq, n_loss, n_ecn, qbit);
