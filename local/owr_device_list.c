@@ -354,8 +354,8 @@ static OwrLocalMediaSource *maybe_create_source_from_filename(const gchar *name)
         g_free(filename);
         filename = NULL;
 
-    if (!device_name)
-        return NULL;
+        if (!device_name)
+            return NULL;
 
         source = _owr_local_media_source_new_cached(index, device_name,
             OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE);
