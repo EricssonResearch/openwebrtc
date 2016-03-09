@@ -1710,11 +1710,11 @@
                         retryTime += 300;
                         if (shouldAbort())
                             return;
-                    }
 
-                    setTimeout(function () {
-                        img.src = imgUrl ? imgUrl + (++count % roll) : "";
-                    }, retryTime || 100);
+                        setTimeout(function () {
+                            img.src = imgUrl ? imgUrl + (++count % roll) : "";
+                        }, retryTime || 100);
+                    }
                 };
 
                 var muted = video.muted;
