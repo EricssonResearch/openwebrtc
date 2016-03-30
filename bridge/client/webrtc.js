@@ -1677,6 +1677,7 @@
                 var count = Math.round(Math.random() * 100000);
                 var roll = navigator.userAgent.indexOf("(iP") < 0 ? 100 : 1000000;
                 var retryTime;
+                var initialAttempts = 20;
                 var imgUrl;
 
                 if (renderControllerMap[imgDiv.__src]) {
@@ -1690,6 +1691,7 @@
                     imgUrl = "http://127.0.0.1:" + renderInfo.port + "/__" + tag + "-";
 
                 img.onload = function () {
+                    initialAttempts = 20;
                     if (img.oncomplete)
                         img.oncomplete();
                     imgDiv.videoWidth = img.naturalWidth;
@@ -1706,11 +1708,12 @@
                 };
 
                 img.onerror = function () {
-                    if (retryTime) {
-                        retryTime += 300;
-                        if (shouldAbort())
-                            return;
-                    }
+                    if (retryTime)
+                        retryTime += 300
+                    else
+                        initialAttempts--;
+                    if (shouldAbort())
+                        return;
 
                     setTimeout(function () {
                         img.src = imgUrl ? imgUrl + (++count % roll) : "";
@@ -1736,7 +1739,7 @@
                     imgDiv.play();
 
                 function shouldAbort() {
-                    return retryTime > 2000 || !imgDiv.parentNode;
+                    return retryTime > 2000 || !imgDiv.parentNode || initialAttempts < 0;
                 }
             });
 
