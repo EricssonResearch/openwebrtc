@@ -866,7 +866,10 @@
                         || payload.parameters.packetizationMode == dp.parameters.packetizationMode);
 
                 });
-                mdesc.payloads = filteredPayloads;
+                mdesc.payloads = filteredPayloads.filter(function (payload) {
+                    return !payload.parameters || !payload.parameters.apt ||
+                    indexOfByProperty(filteredPayloads, "type", payload.parameters.apt) != -1;
+                });
 
                 var trackIndex = indexOfByProperty(allTracks, "kind", mdesc.type);
                 if (trackIndex != -1) {
