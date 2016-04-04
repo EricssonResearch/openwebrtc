@@ -412,8 +412,8 @@
 
         var peerHandler;
         var peerHandlerClient = createPeerHandlerClient();
-        var clientRef = bridge.createObjectRef(peerHandlerClient, "gotSendSSRC",
-            "gotDtlsFingerprint", "gotIceCandidate", "candidateGatheringDone", "gotRemoteSource",
+        var clientRef = bridge.createObjectRef(peerHandlerClient,
+            "gotIceCandidate", "candidateGatheringDone", "gotRemoteSource",
             "dataChannelsEnabled", "dataChannelRequested");
         var deferredPeerHandlerCalls = [];
 
@@ -729,8 +729,6 @@
             });
         }
 
-        var latestLocalDescriptionCallback;
-
         this.setLocalDescription = function () {
             // backwards compatibility with callback based method
             var callbackArgsError = getArgumentsError("RTCSessionDescription, function, function", 3, arguments);
@@ -779,19 +777,16 @@
 
             var isInitiator = description.type == "offer";
             whenPeerHandler(function () {
-                latestLocalDescriptionCallback = function () {
-                    a.signalingState = targetState;
-                    resolve();
-                };
-
                 if (hasNewMediaDescriptions)
                     peerHandler.prepareToReceive(localSessionInfo, isInitiator);
 
                 if (remoteSessionInfo)
                     peerHandler.prepareToSend(remoteSessionInfo, isInitiator);
 
-                if (!hasNewMediaDescriptions)
-                    completeQueuedOperation(latestLocalDescriptionCallback);
+                completeQueuedOperation(function () {
+                    a.signalingState = targetState;
+                    resolve();
+                });
             });
         }
 
@@ -1146,7 +1141,7 @@
         }
 
         function maybeDispatchGatheringDone() {
-            if (isAllGatheringDone() && isLocalSessionInfoComplete()) {
+            if (isAllGatheringDone()) {
                 _this.dispatchEvent({ "type": "icecandidate", "candidate": null,
                     "target": _this });
             }
@@ -1201,19 +1196,6 @@
             return -1;
         }
 
-        function isLocalSessionInfoComplete() {
-            for (var i = 0; i < localSessionInfo.mediaDescriptions.length; i++) {
-                var mdesc = localSessionInfo.mediaDescriptions[i];
-                if (!mdesc.dtls.fingerprint || !mdesc.ice)
-                    return false;
-                if (mdesc.type == "audio" || mdesc.type == "video") {
-                    if (!mdesc.ssrcs || !mdesc.cname)
-                        return false;
-                }
-            }
-            return true;
-        }
-
         function dispatchIceCandidate(c, mdescIndex) {
             var candidateAttribute = "candidate:" + c.foundation + " " + c.componentId + " "
                 + c.transport + " " + c.priority + " " + c.address + " " + c.port
@@ -1244,31 +1226,6 @@
         function createPeerHandlerClient() {
             var client = {};
 
-            client.gotSendSSRC = function (mdescIndex, ssrc, cname) {
-                var mdesc = localSessionInfo.mediaDescriptions[mdescIndex];
-                if (!mdesc.ssrcs)
-                    mdesc.ssrcs = [];
-                mdesc.ssrcs.push(ssrc);
-                mdesc.cname = cname;
-
-                if (isLocalSessionInfoComplete() && latestLocalDescriptionCallback) {
-                    completeQueuedOperation(latestLocalDescriptionCallback);
-                    latestLocalDescriptionCallback = null;
-                }
-            };
-
-            client.gotDtlsFingerprint = function (mdescIndex, dtlsInfo) {
-                var mdesc = localSessionInfo.mediaDescriptions[mdescIndex];
-                mdesc.dtls.fingerprintHashFunction = dtlsInfo.fingerprintHashFunction;
-                mdesc.dtls.fingerprint = dtlsInfo.fingerprint;
-
-                if (isLocalSessionInfoComplete() && latestLocalDescriptionCallback) {
-                    completeQueuedOperation(latestLocalDescriptionCallback);
-                    latestLocalDescriptionCallback = null;
-                    maybeDispatchGatheringDone();
-                }
-            };
-
             client.gotIceCandidate = function (mdescIndex, candidate, ufrag, password) {
                 var mdesc = localSessionInfo.mediaDescriptions[mdescIndex];
                 if (!mdesc.ice) {
@@ -1295,14 +1252,8 @@
                     }
                 }
 
-                if (isLocalSessionInfoComplete()) {
-                    if (latestLocalDescriptionCallback) {
-                        completeQueuedOperation(latestLocalDescriptionCallback);
-                        latestLocalDescriptionCallback = null;
-                        maybeDispatchGatheringDone();
-                    } else
-                        dispatchIceCandidate(candidate, mdescIndex);
-                }
+                dispatchIceCandidate(candidate, mdescIndex);
+                maybeDispatchGatheringDone();
             };
 
             client.candidateGatheringDone = function (mdescIndex) {

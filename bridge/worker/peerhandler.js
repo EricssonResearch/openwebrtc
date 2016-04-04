@@ -65,30 +65,6 @@ function PeerHandler(configuration, keyCert, client, jsonRpc) {
         numberOfReceivePreparedSessions = sessions.length;
 
         function prepareSession(session, mdesc) {
-            session.signal.connect("notify::dtls-certificate", function () {
-                var der = atob(session.dtls_certificate.split(/\r?\n/).slice(1, -2).join(""));
-                var buf = new ArrayBuffer(der.length);
-                var bufView = new Uint8Array(buf);
-                for (var i = 0; i < der.length; i++)
-                    bufView[i] = der.charCodeAt(i);
-
-                crypto.subtle.digest("sha-256", buf).then(function (digest) {
-                    var fingerprint = "";
-                    var bufView = new Uint8Array(digest);
-                    for (var i = 0; i < bufView.length; i++) {
-                        if (fingerprint)
-                            fingerprint += ":";
-                        fingerprint += ("0" + bufView[i].toString(16)).substr(-2);
-                    }
-
-                    var dtlsInfo = {
-                        "fingerprintHashFunction": "sha-256",
-                        "fingerprint": fingerprint.toUpperCase()
-                    };
-                    var mdescIndex = localSessionInfo.mediaDescriptions.indexOf(mdesc);
-                    client.gotDtlsFingerprint(mdescIndex, dtlsInfo);
-                });
-            });
 
             session.dtls_certificate = keyCert.certificate;
 
@@ -157,11 +133,6 @@ function PeerHandler(configuration, keyCert, client, jsonRpc) {
                 mediaSession.cname = mdesc.cname;
                 mediaSession.send_ssrc = mdesc.ssrcs[0];
             }
-
-            mediaSession.signal.connect("notify::send-ssrc", function () {
-                var mdescIndex = localSessionInfo.mediaDescriptions.indexOf(mdesc);
-                client.gotSendSSRC(mdescIndex, mediaSession.send_ssrc, mediaSession.cname);
-            });
 
             mediaSession.signal.on_incoming_source.connect(function (m, remoteSource) {
                 var mdescIndex = localSessionInfo.mediaDescriptions.indexOf(mdesc);
