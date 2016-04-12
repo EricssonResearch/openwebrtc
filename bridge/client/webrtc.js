@@ -1692,7 +1692,12 @@
                 if (imgDiv.autoplay)
                     imgDiv.play();
 
-                function shouldAbort() {
+                imgDiv.stop = function () {
+                    renderControllerMap[imgDiv.__src].stop();
+                    delete renderControllerMap[imgDiv.__src];
+                }
+
+                 function shouldAbort() {
                     return retryTime > 2000 || !imgDiv.parentNode || initialAttempts < 0;
                 }
             });
