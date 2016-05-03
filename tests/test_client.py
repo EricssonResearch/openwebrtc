@@ -13,7 +13,7 @@ from gi.repository import Gio
 from gi.repository import Owr
 from gi.repository import Soup
 
-SERVER_URL = "http://demo.openwebrtc.org:38080"
+SERVER_URL = "http://demo.openwebrtc.org"
 
 ALL_SESSIONS = []
 LOCAL_SOURCES = []
