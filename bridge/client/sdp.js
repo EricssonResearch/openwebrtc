@@ -41,7 +41,7 @@ if (typeof(SDP) == "undefined")
         "mblock": "^m=(audio|video|application) ([\\d]+) ([A-Z/]+)([\\d ]*)$\\r?\\n",
         "mode": "^a=(sendrecv|sendonly|recvonly|inactive).*$",
         "rtpmap": "^a=rtpmap:${type} ([\\w\\-]+)/([\\d]+)/?([\\d]+)?.*$",
-        "fmtp": "^a=fmtp:${type} ([\\w\\-=;]+).*$",
+        "fmtp": "^a=fmtp:${type} ([\\w\\-=; ]+).*$",
         "param": "([\\w\\-]+)=([\\w\\-]+);?",
         "nack": "^a=rtcp-fb:${type} nack$",
         "nackpli": "^a=rtcp-fb:${type} nack pli$",

@@ -55,9 +55,10 @@
             { "encodingName": "H264", "type": 103, "clockRate": 90000,
                 "ccmfir": true, "nackpli": true, "ericscream": true, /* "nack": true, */
                 "parameters": { "levelAsymmetryAllowed": 1, "packetizationMode": 1 } },
-/* FIXME: Enable when Chrome can handle an offer with RTX for H264
+        /* It turns our Chrome still does not handle RTX for h264 correctly, so making
+        it not be negotiated
             { "encodingName": "RTX", "type": 123, "clockRate": 90000,
-                "parameters": { "apt": 103, "rtxTime": 200 } },*/
+                "parameters": { "apt": 103, "rtxTime": 200 } },  */
             { "encodingName": "VP8", "type": 100, "clockRate": 90000,
                 "ccmfir": true, "nackpli": true, "nack": true, "ericscream": true },
             { "encodingName": "RTX", "type": 120, "clockRate": 90000,
@@ -412,8 +413,8 @@
 
         var peerHandler;
         var peerHandlerClient = createPeerHandlerClient();
-        var clientRef = bridge.createObjectRef(peerHandlerClient, "gotSendSSRC",
-            "gotDtlsFingerprint", "gotIceCandidate", "candidateGatheringDone", "gotRemoteSource",
+        var clientRef = bridge.createObjectRef(peerHandlerClient,
+            "gotIceCandidate", "candidateGatheringDone", "gotRemoteSource",
             "dataChannelsEnabled", "dataChannelRequested");
         var deferredPeerHandlerCalls = [];
 
@@ -729,8 +730,6 @@
             });
         }
 
-        var latestLocalDescriptionCallback;
-
         this.setLocalDescription = function () {
             // backwards compatibility with callback based method
             var callbackArgsError = getArgumentsError("RTCSessionDescription, function, function", 3, arguments);
@@ -779,19 +778,16 @@
 
             var isInitiator = description.type == "offer";
             whenPeerHandler(function () {
-                latestLocalDescriptionCallback = function () {
-                    a.signalingState = targetState;
-                    resolve();
-                };
-
                 if (hasNewMediaDescriptions)
                     peerHandler.prepareToReceive(localSessionInfo, isInitiator);
 
                 if (remoteSessionInfo)
                     peerHandler.prepareToSend(remoteSessionInfo, isInitiator);
 
-                if (!hasNewMediaDescriptions)
-                    completeQueuedOperation(latestLocalDescriptionCallback);
+                completeQueuedOperation(function () {
+                    a.signalingState = targetState;
+                    resolve();
+                });
             });
         }
 
@@ -866,7 +862,10 @@
                         || payload.parameters.packetizationMode == dp.parameters.packetizationMode);
 
                 });
-                mdesc.payloads = filteredPayloads;
+                mdesc.payloads = filteredPayloads.filter(function (payload) {
+                    return !payload.parameters || !payload.parameters.apt ||
+                    indexOfByProperty(filteredPayloads, "type", payload.parameters.apt) != -1;
+                });
 
                 var trackIndex = indexOfByProperty(allTracks, "kind", mdesc.type);
                 if (trackIndex != -1) {
@@ -1143,7 +1142,7 @@
         }
 
         function maybeDispatchGatheringDone() {
-            if (isAllGatheringDone() && isLocalSessionInfoComplete()) {
+            if (isAllGatheringDone()) {
                 _this.dispatchEvent({ "type": "icecandidate", "candidate": null,
                     "target": _this });
             }
@@ -1198,19 +1197,6 @@
             return -1;
         }
 
-        function isLocalSessionInfoComplete() {
-            for (var i = 0; i < localSessionInfo.mediaDescriptions.length; i++) {
-                var mdesc = localSessionInfo.mediaDescriptions[i];
-                if (!mdesc.dtls.fingerprint || !mdesc.ice)
-                    return false;
-                if (mdesc.type == "audio" || mdesc.type == "video") {
-                    if (!mdesc.ssrcs || !mdesc.cname)
-                        return false;
-                }
-            }
-            return true;
-        }
-
         function dispatchIceCandidate(c, mdescIndex) {
             var candidateAttribute = "candidate:" + c.foundation + " " + c.componentId + " "
                 + c.transport + " " + c.priority + " " + c.address + " " + c.port
@@ -1241,31 +1227,6 @@
         function createPeerHandlerClient() {
             var client = {};
 
-            client.gotSendSSRC = function (mdescIndex, ssrc, cname) {
-                var mdesc = localSessionInfo.mediaDescriptions[mdescIndex];
-                if (!mdesc.ssrcs)
-                    mdesc.ssrcs = [];
-                mdesc.ssrcs.push(ssrc);
-                mdesc.cname = cname;
-
-                if (isLocalSessionInfoComplete() && latestLocalDescriptionCallback) {
-                    completeQueuedOperation(latestLocalDescriptionCallback);
-                    latestLocalDescriptionCallback = null;
-                }
-            };
-
-            client.gotDtlsFingerprint = function (mdescIndex, dtlsInfo) {
-                var mdesc = localSessionInfo.mediaDescriptions[mdescIndex];
-                mdesc.dtls.fingerprintHashFunction = dtlsInfo.fingerprintHashFunction;
-                mdesc.dtls.fingerprint = dtlsInfo.fingerprint;
-
-                if (isLocalSessionInfoComplete() && latestLocalDescriptionCallback) {
-                    completeQueuedOperation(latestLocalDescriptionCallback);
-                    latestLocalDescriptionCallback = null;
-                    maybeDispatchGatheringDone();
-                }
-            };
-
             client.gotIceCandidate = function (mdescIndex, candidate, ufrag, password) {
                 var mdesc = localSessionInfo.mediaDescriptions[mdescIndex];
                 if (!mdesc.ice) {
@@ -1292,14 +1253,8 @@
                     }
                 }
 
-                if (isLocalSessionInfoComplete()) {
-                    if (latestLocalDescriptionCallback) {
-                        completeQueuedOperation(latestLocalDescriptionCallback);
-                        latestLocalDescriptionCallback = null;
-                        maybeDispatchGatheringDone();
-                    } else
-                        dispatchIceCandidate(candidate, mdescIndex);
-                }
+                dispatchIceCandidate(candidate, mdescIndex);
+                maybeDispatchGatheringDone();
             };
 
             client.candidateGatheringDone = function (mdescIndex) {
@@ -1677,6 +1632,7 @@
                 var count = Math.round(Math.random() * 100000);
                 var roll = navigator.userAgent.indexOf("(iP") < 0 ? 100 : 1000000;
                 var retryTime;
+                var initialAttempts = 20;
                 var imgUrl;
 
                 if (renderControllerMap[imgDiv.__src]) {
@@ -1690,6 +1646,7 @@
                     imgUrl = "http://127.0.0.1:" + renderInfo.port + "/__" + tag + "-";
 
                 img.onload = function () {
+                    initialAttempts = 20;
                     if (img.oncomplete)
                         img.oncomplete();
                     imgDiv.videoWidth = img.naturalWidth;
@@ -1706,11 +1663,12 @@
                 };
 
                 img.onerror = function () {
-                    if (retryTime) {
-                        retryTime += 300;
-                        if (shouldAbort())
-                            return;
-                    }
+                    if (retryTime)
+                        retryTime += 300
+                    else
+                        initialAttempts--;
+                    if (shouldAbort())
+                        return;
 
                     setTimeout(function () {
                         img.src = imgUrl ? imgUrl + (++count % roll) : "";
@@ -1735,8 +1693,13 @@
                 if (imgDiv.autoplay)
                     imgDiv.play();
 
-                function shouldAbort() {
-                    return retryTime > 2000 || !imgDiv.parentNode;
+                imgDiv.stop = function () {
+                    renderControllerMap[imgDiv.__src].stop();
+                    delete renderControllerMap[imgDiv.__src];
+                }
+
+                 function shouldAbort() {
+                    return retryTime > 2000 || !imgDiv.parentNode || initialAttempts < 0;
                 }
             });
 
