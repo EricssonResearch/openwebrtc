@@ -676,25 +676,32 @@ static void reset()
 }
 
 static void eventstream_line_read(GDataInputStream *input_stream, GAsyncResult *result,
-    gpointer user_data)
+    GString *buffer)
 {
-    gchar *line;
+    gchar *line, *pos = NULL;
     gsize line_length;
-    gboolean peer_joined = GPOINTER_TO_UINT(user_data);
     JsonParser *parser;
     JsonReader *reader;
 
     line = g_data_input_stream_read_line_finish_utf8(input_stream, result, &line_length, NULL);
     if (line) {
-        if (g_strstr_len(line, MIN(line_length, 5), "data:")) {
-            if (peer_joined) {
-                peer_joined = FALSE;
-                g_free(peer_id);
-                peer_id = g_strndup(line + 5, line_length - 5);
-                g_message("Peer joined: %s", peer_id);
-            } else {
+        if (line_length) {
+            if (g_strstr_len(line, MIN(line_length, 6), "event:"))
+                pos = line;
+            else if (g_strstr_len(line, MIN(line_length, 5), "data:"))
+                pos = line + 5;
+            if (pos) {
+                if (!buffer)
+                    buffer = g_string_new_len(pos, line_length - (pos - line));
+                else
+                    g_string_append_len(buffer, pos, line_length - (pos - line));
+                g_string_append_c(buffer, '\n');
+            }
+        } else if (buffer) {
+            if (g_str_has_prefix(buffer->str, "event:user-")) {
+                pos = g_strstr_len(buffer->str, buffer->len, "\n");
                 parser = json_parser_new();
-                if (json_parser_load_from_data(parser, line + 5, line_length - 5, NULL)) {
+                if (json_parser_load_from_data(parser, pos, strlen(pos), NULL)) {
                     reader = json_reader_new(json_parser_get_root(parser));
                     if (json_reader_read_member(reader, "sessionDescription"))
                         handle_offer(reader);
@@ -705,18 +712,29 @@ static void eventstream_line_read(GDataInputStream *input_stream, GAsyncResult *
                     g_object_unref(reader);
                 }
                 g_object_unref(parser);
+            } else if (g_str_has_prefix(buffer->str, "event:join\n")) {
+                g_free(peer_id);
+                pos = g_strstr_len(buffer->str + 11, buffer->len - 11, "\n");
+                if (pos) {
+                    peer_id = g_strndup(buffer->str + 11, pos - buffer->str - 11);
+                    g_message("Peer joined: %s", peer_id);
+                } else
+                    peer_id = NULL;
+            } else if (g_str_has_prefix(buffer->str, "event:leave\n")) {
+                g_message("Peer left");
+                g_free(peer_id);
+                peer_id = NULL;
+                reset();
             }
-        } else if (g_strstr_len(line, MIN(line_length, 11), "event:leave")) {
-            g_message("Peer left");
-            peer_id = 0;
-            reset();
-        } else if (g_strstr_len(line, MIN(line_length, 10), "event:join"))
-            peer_joined = TRUE;
+
+            g_string_free(buffer, TRUE);
+            buffer = NULL;
+        }
 
         g_free(line);
     }
 
-    read_eventstream_line(input_stream, GUINT_TO_POINTER(peer_joined));
+    read_eventstream_line(input_stream, buffer);
 }
 
 static void read_eventstream_line(GDataInputStream *input_stream, gpointer user_data)
