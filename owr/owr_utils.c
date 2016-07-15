@@ -36,6 +36,25 @@
 
 #include "owr_types.h"
 
+/* To be extended once more codecs are supported */
+static GList *h264_decoders = NULL;
+static GList *h264_encoders = NULL;
+static GList *vp8_decoders = NULL;
+static GList *vp8_encoders = NULL;
+static GList *vp9_decoders = NULL;
+static GList *vp9_encoders = NULL;
+
+static const gchar *OwrCodecTypeEncoderElementName[] = { NULL, "mulawenc", "alawenc", "opusenc", "openh264enc", "vp8enc", "vp9enc" };
+static const gchar *OwrCodecTypeDecoderElementName[] = { NULL, "mulawdec", "alawdec", "opusdec", "openh264dec", "vp8dec", "vp9dec" };
+
+static const gchar *OwrCodecTypeParserElementName[] = { NULL, NULL, NULL, NULL, "h264parse", NULL, NULL };
+
+guint _owr_get_unique_uint_id()
+{
+    static guint id = 0;
+    return g_atomic_int_add(&id, 1);
+}
+
 OwrCodecType _owr_caps_to_codec_type(GstCaps *caps)
 {
     GstStructure *structure;
@@ -59,6 +78,227 @@ OwrCodecType _owr_caps_to_codec_type(GstCaps *caps)
 
     GST_ERROR("Unknown caps: %" GST_PTR_FORMAT, (gpointer)caps);
     return OWR_CODEC_TYPE_NONE;
+}
+
+const gchar* _owr_codec_type_to_caps_mime(OwrMediaType media_type, OwrCodecType codec_type)
+{
+    switch (codec_type)
+    {
+    case OWR_CODEC_TYPE_NONE:
+        switch (media_type)
+        {
+        case OWR_MEDIA_TYPE_AUDIO:
+            return "audio/x-raw";
+            break;
+        case OWR_MEDIA_TYPE_VIDEO:
+            return "video/x-raw";
+            break;
+        default:
+            g_return_val_if_reached("audio/x-raw");
+        }
+        break;
+    case OWR_CODEC_TYPE_PCMU:
+        return "audio/x-mulaw";
+        break;
+    case OWR_CODEC_TYPE_PCMA:
+        return "audio/x-alaw";
+        break;
+    case OWR_CODEC_TYPE_OPUS:
+        return "audio/x-opus";
+        break;
+    case OWR_CODEC_TYPE_H264:
+        return "video/x-h264";
+        break;
+    case OWR_CODEC_TYPE_VP8:
+        return "video/x-vp8";
+        break;
+    case OWR_CODEC_TYPE_VP9:
+      return "video/x-vp9";
+      break;
+    default:
+        break;
+    }
+    g_return_val_if_reached("audio/x-raw");
+}
+
+gpointer _owr_detect_codecs(gpointer data)
+{
+    GList *decoder_factories;
+    GList *encoder_factories;
+    GstCaps *caps;
+
+    OWR_UNUSED(data);
+
+    decoder_factories = gst_element_factory_list_get_elements(GST_ELEMENT_FACTORY_TYPE_DECODER |
+        GST_ELEMENT_FACTORY_TYPE_MEDIA_VIDEO,
+        GST_RANK_MARGINAL);
+    encoder_factories = gst_element_factory_list_get_elements(GST_ELEMENT_FACTORY_TYPE_ENCODER |
+        GST_ELEMENT_FACTORY_TYPE_MEDIA_VIDEO,
+        GST_RANK_MARGINAL);
+
+    caps = gst_caps_new_empty_simple("video/x-h264");
+    h264_decoders = gst_element_factory_list_filter(decoder_factories, caps, GST_PAD_SINK, FALSE);
+    h264_encoders = gst_element_factory_list_filter(encoder_factories, caps, GST_PAD_SRC, FALSE);
+    gst_caps_unref(caps);
+
+    caps = gst_caps_new_empty_simple("video/x-vp8");
+    vp8_decoders = gst_element_factory_list_filter(decoder_factories, caps, GST_PAD_SINK, FALSE);
+    vp8_encoders = gst_element_factory_list_filter(encoder_factories, caps, GST_PAD_SRC, FALSE);
+    gst_caps_unref(caps);
+
+    caps = gst_caps_new_empty_simple("video/x-vp9");
+    vp9_decoders = gst_element_factory_list_filter(decoder_factories, caps, GST_PAD_SINK, FALSE);
+    vp9_encoders = gst_element_factory_list_filter(encoder_factories, caps, GST_PAD_SRC, FALSE);
+    gst_caps_unref(caps);
+
+    gst_plugin_feature_list_free(decoder_factories);
+    gst_plugin_feature_list_free(encoder_factories);
+
+    h264_decoders = g_list_sort(h264_decoders, gst_plugin_feature_rank_compare_func);
+    h264_encoders = g_list_sort(h264_encoders, gst_plugin_feature_rank_compare_func);
+    vp8_decoders = g_list_sort(vp8_decoders, gst_plugin_feature_rank_compare_func);
+    vp8_encoders = g_list_sort(vp8_encoders, gst_plugin_feature_rank_compare_func);
+    vp9_decoders = g_list_sort(vp9_decoders, gst_plugin_feature_rank_compare_func);
+    vp9_encoders = g_list_sort(vp9_encoders, gst_plugin_feature_rank_compare_func);
+
+    return NULL;
+}
+
+const GList *_owr_get_detected_h264_encoders()
+{
+    return h264_encoders;
+}
+
+const GList *_owr_get_detected_vp8_encoders()
+{
+    return vp8_encoders;
+}
+
+const GList *_owr_get_detected_vp9_encoders()
+{
+    return vp9_encoders;
+}
+
+GstElement *_owr_try_codecs(const GList *codecs, const gchar *name_prefix)
+{
+    GList *l;
+    gchar *element_name;
+
+    for (l = (GList*) codecs; l; l = l->next) {
+        GstElementFactory *f = l->data;
+        GstElement *e;
+
+        element_name = g_strdup_printf("%s_%s_%u", name_prefix,
+            gst_plugin_feature_get_name(GST_PLUGIN_FEATURE(f)),
+                _owr_get_unique_uint_id());
+
+        e = gst_element_factory_create(f, element_name);
+        g_free(element_name);
+
+        if (!e)
+            continue;
+
+        /* Try setting to READY. If this fails the codec does not work, for
+         * example because the hardware codec is currently busy
+         */
+        if (gst_element_set_state(e, GST_STATE_READY) != GST_STATE_CHANGE_SUCCESS) {
+            gst_element_set_state(e, GST_STATE_NULL);
+            gst_object_unref(e);
+            continue;
+        }
+
+        return e;
+    }
+
+    return NULL;
+}
+
+GstElement * _owr_create_decoder(OwrCodecType codec_type)
+{
+    GstElement * decoder = NULL;
+    gchar *element_name = NULL;
+
+    switch (codec_type) {
+    case OWR_CODEC_TYPE_H264:
+        decoder = _owr_try_codecs(h264_decoders, "decoder");
+        g_return_val_if_fail(decoder, NULL);
+        break;
+    case OWR_CODEC_TYPE_VP8:
+        decoder = _owr_try_codecs(vp8_decoders, "decoder");
+        g_return_val_if_fail(decoder, NULL);
+        break;
+    case OWR_CODEC_TYPE_VP9:
+        decoder = _owr_try_codecs(vp9_decoders, "decoder");
+        g_return_val_if_fail(decoder, NULL);
+        break;
+    default:
+        element_name = g_strdup_printf("decoder_%s_%u", OwrCodecTypeDecoderElementName[codec_type], _owr_get_unique_uint_id());
+        decoder = gst_element_factory_make(OwrCodecTypeDecoderElementName[codec_type], element_name);
+        g_free(element_name);
+        g_return_val_if_fail(decoder, NULL);
+        break;
+    }
+
+    return decoder;
+}
+
+GstElement * _owr_create_parser(OwrCodecType codec_type)
+{
+    GstElement * parser = NULL;
+    gchar *element_name = NULL;
+
+    if (!OwrCodecTypeParserElementName[codec_type])
+        return NULL;
+
+    element_name = g_strdup_printf("parser_%s_%u", OwrCodecTypeParserElementName[codec_type], _owr_get_unique_uint_id());
+    parser = gst_element_factory_make(OwrCodecTypeParserElementName[codec_type], element_name);
+    g_free(element_name);
+
+    switch (codec_type) {
+    case OWR_CODEC_TYPE_H264:
+        g_object_set(parser, "disable-passthrough", TRUE, NULL);
+        break;
+    default:
+        break;
+    }
+    return parser;
+}
+
+const gchar* _owr_get_encoder_name(OwrCodecType codec_type)
+{
+    return OwrCodecTypeEncoderElementName[codec_type];
+}
+
+void _owr_bin_link_and_sync_elements(GstBin *bin, gboolean *out_link_ok, gboolean *out_sync_ok, GstElement **out_first, GstElement **out_last)
+{
+    GList *bin_elements, *current;
+    gboolean link_ok = TRUE, sync_ok = TRUE;
+
+    g_assert(bin);
+
+    bin_elements = g_list_last(bin->children);
+    g_assert(bin_elements);
+    for (current = bin_elements; current && current->prev && link_ok && sync_ok; current = g_list_previous(current)) {
+        if (out_link_ok)
+            link_ok &= gst_element_link(current->data, current->prev->data);
+        if (out_sync_ok)
+            sync_ok &= gst_element_sync_state_with_parent(current->data);
+    }
+    if (out_sync_ok && link_ok && sync_ok && current && !current->prev)
+        sync_ok &= gst_element_sync_state_with_parent(current->data);
+
+    if (out_link_ok)
+        *out_link_ok = link_ok;
+
+    if (out_sync_ok)
+        *out_sync_ok = sync_ok;
+
+    if (link_ok && sync_ok) {
+        if (out_first)
+            *out_first = bin_elements->data;
+        if (out_last)
+            *out_last = current->data;
+    }
 }
 
 typedef struct {
@@ -220,6 +460,19 @@ int _owr_rotation_and_mirror_to_video_flip_method(guint rotation, gboolean mirro
     } else {
         return method_table[rotation];
     }
+}
+
+void _owr_update_flip_method(GObject *source, GParamSpec *pspec, GstElement *flip)
+{
+    guint rotation = 0;
+    gboolean mirror = FALSE;
+    gint flip_method;
+
+    g_assert(GST_IS_ELEMENT(flip));
+
+    g_object_get(source, "rotation", &rotation, "mirror", &mirror, NULL);
+    flip_method = _owr_rotation_and_mirror_to_video_flip_method(rotation, mirror);
+    g_object_set(flip, pspec ? pspec->name : "method", flip_method, NULL);
 }
 
 static void value_slice_free(gpointer value)

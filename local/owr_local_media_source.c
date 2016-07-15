@@ -566,7 +566,9 @@ static void on_caps(GstElement *source, GParamSpec *pspec, OwrMediaSource *media
     if (GST_IS_CAPS(caps)) {
         GST_INFO_OBJECT(source, "%s - configured with caps: %" GST_PTR_FORMAT,
             media_source_name, caps);
+        gst_caps_unref(caps);
     }
+    g_free(media_source_name);
 }
 
 static void
@@ -748,17 +750,21 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
             switch (source_type) {
             case OWR_SOURCE_TYPE_CAPTURE:
                 CREATE_ELEMENT(source, VIDEO_SRC, "video-source");
+#if !defined(TARGET_RPI) || !TARGET_RPI
                 if (priv->device_index > -1) {
 #if defined(__APPLE__) && !TARGET_IPHONE_SIMULATOR
                     g_object_set(source, "device-index", priv->device_index, NULL);
 #elif defined(__ANDROID__)
                     g_object_set(source, "cam-index", priv->device_index, NULL);
-#elif defined(__linux__) && !TARGET_RPI
+#elif defined(__linux__)
                     tmp = g_strdup_printf("/dev/video%d", priv->device_index);
                     g_object_set(source, "device", tmp, NULL);
                     g_free(tmp);
 #endif
                 }
+#else
+                g_object_set(source, "preview", FALSE, "fullscreen", FALSE, "inline-headers", TRUE, NULL);
+#endif
                 break;
             case OWR_SOURCE_TYPE_TEST: {
                 GstElement *src, *time;
@@ -912,7 +918,8 @@ done:
 }
 
 static OwrLocalMediaSource *_owr_local_media_source_new(gint device_index, const gchar *name,
-    OwrMediaType media_type, OwrSourceType source_type)
+    OwrMediaType media_type, OwrSourceType source_type,
+    OwrMediaSourceSupportedInterfaces interfaces)
 {
     OwrLocalMediaSource *source;
 
@@ -923,12 +930,14 @@ static OwrLocalMediaSource *_owr_local_media_source_new(gint device_index, const
         NULL);
 
     _owr_media_source_set_type(OWR_MEDIA_SOURCE(source), source_type);
+    _owr_media_source_set_supported_interfaces(OWR_MEDIA_SOURCE(source), interfaces);
 
     return source;
 }
 
 OwrLocalMediaSource *_owr_local_media_source_new_cached(gint device_index, const gchar *name,
-    OwrMediaType media_type, OwrSourceType source_type)
+    OwrMediaType media_type, OwrSourceType source_type,
+    OwrMediaSourceSupportedInterfaces interfaces)
 {
     static OwrLocalMediaSource *test_sources[2] = { NULL, };
     static GHashTable *sources[2] = { NULL, };
@@ -949,7 +958,7 @@ OwrLocalMediaSource *_owr_local_media_source_new_cached(gint device_index, const
 
     if (source_type == OWR_SOURCE_TYPE_TEST) {
         if (!test_sources[i])
-            test_sources[i] = _owr_local_media_source_new(device_index, name, media_type, source_type);
+            test_sources[i] = _owr_local_media_source_new(device_index, name, media_type, source_type, interfaces);
 
         ret = test_sources[i];
 
@@ -969,7 +978,7 @@ OwrLocalMediaSource *_owr_local_media_source_new_cached(gint device_index, const
         }
 
         if (!ret) {
-            ret = _owr_local_media_source_new(device_index, name, media_type, source_type);
+            ret = _owr_local_media_source_new(device_index, name, media_type, source_type, interfaces);
             g_hash_table_insert(sources[i], GINT_TO_POINTER(device_index), ret);
         }
 

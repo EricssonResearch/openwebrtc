@@ -115,6 +115,10 @@ static void owr_media_renderer_finalize(GObject *object)
     G_OBJECT_CLASS(owr_media_renderer_parent_class)->finalize(object);
 }
 
+static void owr_media_renderer_reconfigure_element_default(G_GNUC_UNUSED OwrMediaRenderer *renderer)
+{
+}
+
 static void owr_media_renderer_class_init(OwrMediaRendererClass *klass)
 {
     GObjectClass *gobject_class = G_OBJECT_CLASS(klass);
@@ -135,6 +139,8 @@ static void owr_media_renderer_class_init(OwrMediaRendererClass *klass)
 
     gobject_class->finalize = owr_media_renderer_finalize;
     g_object_class_install_properties(gobject_class, N_PROPERTIES, obj_properties);
+
+    klass->reconfigure_element = owr_media_renderer_reconfigure_element_default;
 }
 
 static gpointer owr_media_renderer_get_bus_set(OwrMessageOrigin *origin)
@@ -305,6 +311,7 @@ static void on_caps(GstElement *sink, GParamSpec *pspec, OwrMediaRenderer *media
             media_renderer->priv->media_type == OWR_MEDIA_TYPE_AUDIO ? "Audio" :
             media_renderer->priv->media_type == OWR_MEDIA_TYPE_VIDEO ? "Video" :
             "Unknown", caps);
+        gst_caps_unref(caps);
     }
 }
 
@@ -389,6 +396,7 @@ static gboolean set_source(GHashTable *args)
 
     priv->source = g_object_ref(source);
 
+    _owr_media_renderer_reconfigure_element(renderer);
     maybe_start_renderer(renderer);
 
     g_mutex_unlock(&priv->media_renderer_lock);
@@ -467,6 +475,17 @@ void _owr_media_renderer_set_sink(OwrMediaRenderer *renderer, gpointer sink_ptr)
     maybe_start_renderer(renderer);
 
     g_mutex_unlock(&priv->media_renderer_lock);
+}
+
+OwrMediaSource* _owr_media_renderer_get_source(OwrMediaRenderer *renderer)
+{
+    return renderer->priv->source;
+}
+
+void _owr_media_renderer_reconfigure_element(OwrMediaRenderer *renderer)
+{
+    g_return_if_fail(OWR_IS_MEDIA_RENDERER(renderer));
+    OWR_MEDIA_RENDERER_GET_CLASS(renderer)->reconfigure_element(renderer);
 }
 
 gchar * owr_media_renderer_get_dot_data(OwrMediaRenderer *renderer)

@@ -236,7 +236,7 @@ static void got_sources(GList *sources, gpointer user_data)
 
             owr_bus_add_message_origin(bus, OWR_MESSAGE_ORIGIN(source));
 
-            payload = owr_video_payload_new(OWR_CODEC_TYPE_VP8, 103, 90000, TRUE, FALSE);
+            payload = owr_video_payload_new(OWR_CODEC_TYPE_H264, 103, 90000, TRUE, FALSE);
             g_object_set(payload, "width", 640, "height", 480, "framerate", 30.0, NULL);
             g_object_set(payload, "rtx-payload-type", 123, NULL);
             if (adaptation)

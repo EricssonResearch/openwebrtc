@@ -63,6 +63,7 @@ struct _OwrMediaRendererClass {
     /*< private >*/
     void *(*get_caps)(OwrMediaRenderer *renderer);
     void *(*get_sink)(OwrMediaRenderer *renderer);
+    void (*reconfigure_element)(OwrMediaRenderer *renderer);
 };
 
 GType owr_media_renderer_get_type(void) G_GNUC_CONST;

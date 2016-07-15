@@ -79,7 +79,9 @@ static void on_caps(GstElement *source, GParamSpec *pspec, OwrMediaSource *media
     if (GST_IS_CAPS(caps)) {
         GST_INFO_OBJECT(source, "%s - configured with caps: %" GST_PTR_FORMAT,
             media_source_name, caps);
+        gst_caps_unref(caps);
     }
+    g_free(media_source_name);
 }
 
 #define LINK_ELEMENTS(a, b) \

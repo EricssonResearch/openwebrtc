@@ -196,6 +196,8 @@ static void gst_log_android_handler(GstDebugCategory *category,
  */
 void owr_init(GMainContext *main_context)
 {
+    static GOnce g_once = G_ONCE_INIT;
+
     g_return_if_fail(!owr_initialized);
 
 #ifdef __ANDROID__
@@ -316,6 +318,8 @@ void owr_init(GMainContext *main_context)
         owr_main_context = g_main_context_ref_thread_default();
     else
         g_main_context_ref(owr_main_context);
+
+    g_once(&g_once, _owr_detect_codecs, NULL);
 }
 
 static gboolean owr_running_callback(GAsyncQueue *msg_queue)

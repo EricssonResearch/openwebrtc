@@ -69,10 +69,10 @@ static GList *get_test_sources(OwrMediaType types)
     if (g_once_init_enter(&cached_sources)) {
         GList *sources = NULL;
 
-        source = _owr_local_media_source_new_cached(-1, "Audio test source", OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_TEST);
+        source = _owr_local_media_source_new_cached(-1, "Audio test source", OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_TEST, OWR_MEDIA_SOURCE_SUPPORTS_NONE);
         sources = g_list_append(sources, OWR_MEDIA_SOURCE(source));
 
-        source = _owr_local_media_source_new_cached(-1, "Video test source", OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_TEST);
+        source = _owr_local_media_source_new_cached(-1, "Video test source", OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_TEST, OWR_MEDIA_SOURCE_SUPPORTS_NONE);
         sources = g_list_append(sources, OWR_MEDIA_SOURCE(source));
 
         g_once_init_leave(&cached_sources, sources);

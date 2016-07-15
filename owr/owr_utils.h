@@ -39,8 +39,21 @@ G_BEGIN_DECLS
 
 #define OWR_UNUSED(x) (void)x
 
+#define _owr_codec_type_is_raw(codec_type) (codec_type == OWR_CODEC_TYPE_NONE)
+
 void *_owr_require_symbols(void);
+guint _owr_get_unique_uint_id();
 OwrCodecType _owr_caps_to_codec_type(GstCaps *caps);
+const gchar* _owr_codec_type_to_caps_mime(OwrMediaType media_type, OwrCodecType codec_type);
+gpointer _owr_detect_codecs(gpointer data);
+const GList *_owr_get_detected_h264_encoders();
+const GList *_owr_get_detected_vp8_encoders();
+const GList *_owr_get_detected_vp9_encoders();
+GstElement *_owr_try_codecs(const GList *codecs, const gchar *name_prefix);
+GstElement *_owr_create_decoder(OwrCodecType codec_type);
+GstElement *_owr_create_parser(OwrCodecType codec_type);
+const gchar* _owr_get_encoder_name(OwrCodecType codec_type);
+void _owr_bin_link_and_sync_elements(GstBin *bin, gboolean *out_link_ok, gboolean *out_sync_ok, GstElement **out_first, GstElement **out_last);
 void _owr_utils_call_closure_with_list(GClosure *callback, GList *list);
 GClosure *_owr_utils_list_closure_merger_new(GClosure *final_callback,
     GCopyFunc list_item_copy,
@@ -59,6 +72,7 @@ gboolean _owr_gst_caps_foreach(const GstCaps *caps, OwrGstCapsForeachFunc func, 
 void _owr_deep_notify(GObject *object, GstObject *orig,
     GParamSpec *pspec, gpointer user_data);
 
+void _owr_update_flip_method(GObject *renderer, GParamSpec *pspec, GstElement *flip);
 int _owr_rotation_and_mirror_to_video_flip_method(guint rotation, gboolean mirror);
 
 GHashTable *_owr_value_table_new();

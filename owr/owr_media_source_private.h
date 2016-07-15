@@ -43,6 +43,12 @@
 
 G_BEGIN_DECLS
 
+typedef enum {
+    OWR_MEDIA_SOURCE_SUPPORTS_NONE = 0,
+    OWR_MEDIA_SOURCE_SUPPORTS_VIDEO_ORIENTATION = (1 << 0),
+    OWR_MEDIA_SOURCE_SUPPORTS_COLOR_BALANCE = (1 << 1),
+} OwrMediaSourceSupportedInterfaces;
+
 GstElement *_owr_media_source_get_source_bin(OwrMediaSource *media_source);
 void _owr_media_source_set_source_bin(OwrMediaSource *media_source, GstElement *bin);
 
@@ -52,10 +58,18 @@ void _owr_media_source_set_source_tee(OwrMediaSource *media_source, GstElement *
 GstElement *_owr_media_source_request_source(OwrMediaSource *media_source, GstCaps *caps);
 void _owr_media_source_release_source(OwrMediaSource *media_source, GstElement *source);
 
+/* FIXME: At some point we should rename this function to
+ * set_media_type because get_type could eventually conflict with
+ * GObject required function if this function becomes public. */
 void _owr_media_source_set_type(OwrMediaSource *source, OwrSourceType type);
+OwrSourceType _owr_media_source_get_media_type(OwrMediaSource *source);
 
 void _owr_media_source_set_codec(OwrMediaSource *source, OwrCodecType codec_type);
 OwrCodecType _owr_media_source_get_codec(OwrMediaSource *source);
+
+void _owr_media_source_set_supported_interfaces(OwrMediaSource *source, OwrMediaSourceSupportedInterfaces interfaces);
+
+gboolean _owr_media_source_supports_interfaces(OwrMediaSource *source, OwrMediaSourceSupportedInterfaces interfaces);
 
 G_END_DECLS
 
