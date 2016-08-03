@@ -52,7 +52,10 @@ GST_DEBUG_CATEGORY_EXTERN(_owrdatachannel_debug);
 
 #define OWR_DATA_CHANNEL_GET_PRIVATE(obj)    (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_DATA_CHANNEL, OwrDataChannelPrivate))
 
-G_DEFINE_TYPE(OwrDataChannel, owr_data_channel, G_TYPE_OBJECT)
+static void owr_message_origin_interface_init(OwrMessageOriginInterface *interface);
+
+G_DEFINE_TYPE_WITH_CODE(OwrDataChannel, owr_data_channel, G_TYPE_OBJECT,
+    G_IMPLEMENT_INTERFACE(OWR_TYPE_MESSAGE_ORIGIN, owr_message_origin_interface_init))
 
 GType owr_data_channel_ready_state_get_type(void)
 {
@@ -87,6 +90,7 @@ struct _OwrDataChannelPrivate {
     GClosure *on_datachannel_close;
     OwrDataChannelReadyState ready_state;
     guint64 bytes_sent;
+    OwrMessageOriginBusSet *message_origin_bus_set;
 };
 
 enum {
@@ -217,6 +221,9 @@ static void owr_data_channel_finalize(GObject *object)
     OwrDataChannel *data_channel = OWR_DATA_CHANNEL(object);
     OwrDataChannelPrivate *priv = data_channel->priv;
 
+    owr_message_origin_bus_set_free(priv->message_origin_bus_set);
+    priv->message_origin_bus_set = NULL;
+
     if (priv->label)
         g_free(priv->label);
     if (priv->protocol)
@@ -295,6 +302,16 @@ static void owr_data_channel_class_init(OwrDataChannelClass *klass)
     g_object_class_install_properties(gobject_class, N_PROPERTIES, obj_properties);
 }
 
+static gpointer owr_media_renderer_get_bus_set(OwrMessageOrigin *origin)
+{
+    return OWR_DATA_CHANNEL(origin)->priv->message_origin_bus_set;
+}
+
+static void owr_message_origin_interface_init(OwrMessageOriginInterface *interface)
+{
+    interface->get_bus_set = owr_media_renderer_get_bus_set;
+}
+
 static void owr_data_channel_init(OwrDataChannel *data_channel)
 {
     OwrDataChannelPrivate *priv = data_channel->priv = OWR_DATA_CHANNEL_GET_PRIVATE(data_channel);
@@ -307,6 +324,8 @@ static void owr_data_channel_init(OwrDataChannel *data_channel)
     priv->id = DEFAULT_ID;
     priv->label = g_strdup(DEFAULT_LABEL);
     priv->bytes_sent = 0;
+
+    priv->message_origin_bus_set = owr_message_origin_bus_set_new();
 }
 
 OwrDataChannel * owr_data_channel_new(gboolean ordered, gint max_packet_life_time,

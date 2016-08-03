@@ -438,10 +438,8 @@ static OwrCandidate * candidate_from_positioned_json_reader(JsonReader *reader)
     return remote_candidate;
 }
 
-static void handle_offer(gchar *message, gsize message_length)
+static void handle_offer(JsonReader *reader)
 {
-    JsonParser *parser;
-    JsonReader *reader;
     gint i, number_of_media_descriptions;
     const gchar *mtype;
     OwrMediaType media_type = OWR_MEDIA_TYPE_UNKNOWN;
@@ -462,10 +460,6 @@ static void handle_offer(gchar *message, gsize message_length)
     OwrMediaType source_media_type;
     GList *media_sessions;
 
-    parser = json_parser_new();
-    json_parser_load_from_data(parser, message, message_length, NULL);
-    reader = json_reader_new(json_parser_get_root(parser));
-    json_reader_read_member(reader, "sessionDescription");
     json_reader_read_member(reader, "mediaDescriptions");
     number_of_media_descriptions = json_reader_count_elements(reader);
     for (i = 0; i < number_of_media_descriptions; i++) {
@@ -617,15 +611,10 @@ end_payload:
         owr_transport_agent_add_session(transport_agent, OWR_SESSION(media_session));
     }
     json_reader_end_member(reader);
-    json_reader_end_member(reader);
-    g_object_unref(reader);
-    g_object_unref(parser);
 }
 
-static void handle_remote_candidate(gchar *message, gsize message_length)
+static void handle_remote_candidate(JsonReader *reader)
 {
-    JsonParser *parser;
-    JsonReader *reader;
     gint index;
     GList *media_sessions;
     OwrMediaSession *media_session;
@@ -634,18 +623,13 @@ static void handle_remote_candidate(gchar *message, gsize message_length)
     gboolean rtcp_mux;
     gchar *ice_ufrag, *ice_password;
 
-    parser = json_parser_new();
-    json_parser_load_from_data(parser, message, message_length, NULL);
-    reader = json_reader_new(json_parser_get_root(parser));
-    json_reader_read_member(reader, "candidate");
-
     json_reader_read_member(reader, "sdpMLineIndex");
     index = json_reader_get_int_value(reader);
     media_sessions = g_object_get_data(G_OBJECT(transport_agent), "media-sessions");
     media_session = OWR_MEDIA_SESSION(g_list_nth_data(media_sessions, index));
     json_reader_end_member(reader);
     if (!media_session)
-        goto out;
+        return;
 
     json_reader_read_member(reader, "candidateDescription");
     remote_candidate = candidate_from_positioned_json_reader(reader);
@@ -658,11 +642,6 @@ static void handle_remote_candidate(gchar *message, gsize message_length)
     g_object_get(remote_candidate, "component-type", &component_type, NULL);
     if (!rtcp_mux || component_type != OWR_COMPONENT_TYPE_RTCP)
         owr_session_add_remote_candidate(OWR_SESSION(media_session), remote_candidate);
-
-    json_reader_end_member(reader); /* candidate */
-out:
-    g_object_unref(reader);
-    g_object_unref(parser);
 }
 
 static void reset()
@@ -697,33 +676,65 @@ static void reset()
 }
 
 static void eventstream_line_read(GDataInputStream *input_stream, GAsyncResult *result,
-    gpointer user_data)
+    GString *buffer)
 {
-    gchar *line;
+    gchar *line, *pos = NULL;
     gsize line_length;
-    gboolean peer_joined = GPOINTER_TO_UINT(user_data);
+    JsonParser *parser;
+    JsonReader *reader;
 
     line = g_data_input_stream_read_line_finish_utf8(input_stream, result, &line_length, NULL);
     if (line) {
-        if (peer_joined && g_strstr_len(line, MIN(line_length, 5), "data:")) {
-            peer_joined = FALSE;
-            g_free(peer_id);
-            peer_id = g_strndup(line + 5, line_length - 5);
-            g_message("Peer joined: %s", peer_id);
-        } else if (g_strstr_len(line, MIN(line_length, 11), "event:leave")) {
-            g_message("Peer left");
-            peer_id = 0;
-            reset();
-        } else if (g_strstr_len(line, MIN(line_length, 10), "event:join"))
-            peer_joined = TRUE;
-        else if (g_strstr_len(line + 7, MIN(MAX(line_length - 7, 0), 3), "sdp"))
-            handle_offer(line + 5, line_length - 5);
-        else if (g_strstr_len(line + 7, MIN(MAX(line_length - 7, 0), 9), "candidate"))
-            handle_remote_candidate(line + 5, line_length - 5);
+        if (line_length) {
+            if (g_strstr_len(line, MIN(line_length, 6), "event:"))
+                pos = line;
+            else if (g_strstr_len(line, MIN(line_length, 5), "data:"))
+                pos = line + 5;
+            if (pos) {
+                if (!buffer)
+                    buffer = g_string_new_len(pos, line_length - (pos - line));
+                else
+                    g_string_append_len(buffer, pos, line_length - (pos - line));
+                g_string_append_c(buffer, '\n');
+            }
+        } else if (buffer) {
+            if (g_str_has_prefix(buffer->str, "event:user-")) {
+                pos = g_strstr_len(buffer->str, buffer->len, "\n");
+                parser = json_parser_new();
+                if (json_parser_load_from_data(parser, pos, strlen(pos), NULL)) {
+                    reader = json_reader_new(json_parser_get_root(parser));
+                    if (json_reader_read_member(reader, "sessionDescription"))
+                        handle_offer(reader);
+                    json_reader_end_member(reader);
+                    if (json_reader_read_member(reader, "candidate"))
+                        handle_remote_candidate(reader);
+                    json_reader_end_member(reader);
+                    g_object_unref(reader);
+                }
+                g_object_unref(parser);
+            } else if (g_str_has_prefix(buffer->str, "event:join\n")) {
+                g_free(peer_id);
+                pos = g_strstr_len(buffer->str + 11, buffer->len - 11, "\n");
+                if (pos) {
+                    peer_id = g_strndup(buffer->str + 11, pos - buffer->str - 11);
+                    g_message("Peer joined: %s", peer_id);
+                } else
+                    peer_id = NULL;
+            } else if (g_str_has_prefix(buffer->str, "event:leave\n")) {
+                g_message("Peer left");
+                g_free(peer_id);
+                peer_id = NULL;
+                reset();
+            }
+
+            g_string_free(buffer, TRUE);
+            buffer = NULL;
+        }
+
         g_free(line);
     }
 
-    read_eventstream_line(input_stream, GUINT_TO_POINTER(peer_joined));
+    read_eventstream_line(input_stream, buffer);
 }
 
 static void read_eventstream_line(GDataInputStream *input_stream, gpointer user_data)
