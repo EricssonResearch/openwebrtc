@@ -64,6 +64,7 @@
 #include <gst/app/gstappsink.h>
 #include <gst/app/gstappsrc.h>
 #include <gst/gst.h>
+#include <gst/video/video.h>
 #include <gst/rtp/gstrtcpbuffer.h>
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtpdefs.h>
@@ -2820,6 +2821,18 @@ static GstPadProbeReturn check_for_keyframe(GstPad *pad, GstPadProbeInfo *info,
     return GST_PAD_PROBE_OK;
 }
 
+#if TARGET_RPI
+static gboolean force_key_unit_event(gpointer data)
+{
+    GstElement* videorepair = (GstElement*) data;
+    GstPad* sink_pad = gst_element_get_static_pad(videorepair, "sink");
+    gst_pad_push_event(sink_pad, gst_video_event_new_upstream_force_key_unit(GST_CLOCK_TIME_NONE, FALSE, 0));
+    gst_object_unref(sink_pad);
+    gst_object_unref(videorepair);
+    return G_SOURCE_REMOVE;
+}
+#endif
+
 static void setup_video_receive_elements(GstPad *new_pad, guint32 session_id, guint32 stream_id, OwrPayload *payload, OwrTransportAgent *transport_agent)
 {
     GstPad *sink_pad = NULL, *ghost_pad = NULL;
@@ -2863,6 +2876,13 @@ static void setup_video_receive_elements(GstPad *new_pad, guint32 session_id, gu
         session_data, session_data_free);
     gst_object_unref(pad);
     pad = NULL;
+
+#if TARGET_RPI
+    // The OMX video decoder doesn't seem to handle very well the incoming
+    // streams from Chrome, not taking into account the first intra frame
+    // received. So for now, force a PLI request towards the sender after 250ms.
+    g_timeout_add(250, force_key_unit_event, gst_object_ref(videorepair1));
+#endif
 
     _owr_bin_link_and_sync_elements(GST_BIN(receive_output_bin), &link_ok, &sync_ok, &first, &last);
     g_warn_if_fail(link_ok && sync_ok);
