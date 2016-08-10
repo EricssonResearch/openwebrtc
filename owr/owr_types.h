@@ -62,6 +62,12 @@ typedef enum _OwrAdaptationType {
     OWR_ADAPTATION_TYPE_SCREAM
 } OwrAdaptationType;
 
+typedef enum _OwrBundlePolicyType {
+    OWR_BUNDLE_POLICY_TYPE_BALANCED,
+    OWR_BUNDLE_POLICY_TYPE_MAX_COMPAT,
+    OWR_BUNDLE_POLICY_TYPE_MAX_BUNDLE
+} OwrBundlePolicyType;
+
 #define OWR_TYPE_CODEC_TYPE (owr_codec_type_get_type())
 GType owr_codec_type_get_type(void);
 
@@ -73,6 +79,9 @@ GType owr_media_type_get_type(void);
 
 #define OWR_TYPE_ADAPTATION_TYPE (owr_adaptation_type_get_type())
 GType owr_adaptation_type_get_type(void);
+
+#define OWR_TYPE_BUNDLE_POLICY_TYPE (owr_bundle_policy_type_get_type())
+GType owr_bundle_policy_type_get_type(void);
 
 
 G_END_DECLS

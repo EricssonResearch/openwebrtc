@@ -412,7 +412,7 @@ int main(int argc, char **argv)
 
     owr_bus_add_message_origin(bus, OWR_MESSAGE_ORIGIN(owr_window_registry_get()));
 
-    recv_transport_agent = owr_transport_agent_new(FALSE);
+    recv_transport_agent = owr_transport_agent_new(FALSE, OWR_BUNDLE_POLICY_TYPE_BALANCED);
     g_assert(OWR_IS_TRANSPORT_AGENT(recv_transport_agent));
     owr_bus_add_message_origin(bus, OWR_MESSAGE_ORIGIN(recv_transport_agent));
 
@@ -423,7 +423,7 @@ int main(int argc, char **argv)
         owr_transport_agent_add_local_address(recv_transport_agent, local_addr);
 
     // SEND
-    send_transport_agent = owr_transport_agent_new(TRUE);
+    send_transport_agent = owr_transport_agent_new(TRUE, OWR_BUNDLE_POLICY_TYPE_BALANCED);
     g_assert(OWR_IS_TRANSPORT_AGENT(send_transport_agent));
     owr_bus_add_message_origin(bus, OWR_MESSAGE_ORIGIN(send_transport_agent));
 
