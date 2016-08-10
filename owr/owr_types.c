@@ -107,3 +107,21 @@ if (g_once_init_enter((gsize *)&id)) {
 
 return id;
 }
+
+GType owr_bundle_policy_type_get_type(void)
+{
+    static const GEnumValue types[] = {
+        {OWR_BUNDLE_POLICY_TYPE_BALANCED, "Pick two tracks to send, audio and video", "balanced"},
+        {OWR_BUNDLE_POLICY_TYPE_MAX_COMPAT, "Separate each track into its own connection", "max_compat"},
+        {OWR_BUNDLE_POLICY_TYPE_MAX_BUNDLE, "Pick one media track to negotiate and send just that one", "max_bundle"},
+        {0, NULL, NULL}
+    };
+static volatile GType id = 0;
+
+if (g_once_init_enter((gsize *)&id)) {
+    GType _id = g_enum_register_static("OwrBundlePolicyTypes", types);
+    g_once_init_leave((gsize *)&id, _id);
+}
+
+return id;
+}

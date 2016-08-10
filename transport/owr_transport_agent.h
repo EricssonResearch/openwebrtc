@@ -33,6 +33,7 @@
 #define __OWR_TRANSPORT_AGENT_H__
 
 #include "owr_session.h"
+#include "owr_types.h"
 
 #include <glib-object.h>
 
@@ -69,7 +70,7 @@ struct _OwrTransportAgentClass {
 
 GType owr_transport_agent_get_type(void) G_GNUC_CONST;
 
-OwrTransportAgent * owr_transport_agent_new(gboolean ice_controlling_mode);
+OwrTransportAgent * owr_transport_agent_new(gboolean ice_controlling_mode, OwrBundlePolicyType bundle_policy_type);
 void owr_transport_agent_add_helper_server(OwrTransportAgent *transport_agent, OwrHelperServerType type,
     const gchar *address, guint port, const gchar *username, const gchar *password);
 void owr_transport_agent_add_local_address(OwrTransportAgent *transport_agent, const gchar *local_address);

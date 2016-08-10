@@ -79,11 +79,13 @@ GST_DEBUG_CATEGORY_EXTERN(_owrsession_debug);
 #define GST_CAT_DEFAULT _owrtransportagent_debug
 
 #define DEFAULT_ICE_CONTROLLING_MODE TRUE
+#define DEFAULT_BUNDLE_POLICY OWR_BUNDLE_POLICY_TYPE_BALANCED
 #define GST_RTCP_RTPFB_TYPE_SCREAM 18
 
 enum {
     PROP_0,
     PROP_ICE_CONTROLLING_MODE,
+    PROP_BUNDLE_POLICY,
     N_PROPERTIES
 };
 
@@ -135,6 +137,7 @@ typedef struct {
 struct _OwrTransportAgentPrivate {
     NiceAgent *nice_agent;
     gboolean ice_controlling_mode;
+    gboolean bundle_policy;
 
     GMutex sessions_lock;
     GHashTable *sessions;
@@ -342,6 +345,10 @@ static void owr_transport_agent_class_init(OwrTransportAgentClass *klass)
         "Ice controlling mode", "Whether the ice agent is in controlling mode",
         DEFAULT_ICE_CONTROLLING_MODE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
+    obj_properties[PROP_BUNDLE_POLICY] = g_param_spec_enum("bundle-policy", "bundle-policy"
+        "Bundle policy of the data streams", "What kind of bundle policy we will use for the streams",
+        OWR_TYPE_BUNDLE_POLICY_TYPE, DEFAULT_BUNDLE_POLICY, G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+
     gobject_class->set_property = owr_transport_agent_set_property;
     gobject_class->get_property = owr_transport_agent_get_property;
     gobject_class->finalize = owr_transport_agent_finalize;
@@ -434,6 +441,7 @@ static void owr_transport_agent_init(OwrTransportAgent *transport_agent)
     transport_agent->priv = priv = OWR_TRANSPORT_AGENT_GET_PRIVATE(transport_agent);
 
     priv->ice_controlling_mode = DEFAULT_ICE_CONTROLLING_MODE;
+    priv->bundle_policy = DEFAULT_BUNDLE_POLICY;
     priv->agent_id = next_transport_agent_id++;
     priv->nice_agent = NULL;
 
@@ -527,6 +535,9 @@ static void owr_transport_agent_set_property(GObject *object, guint property_id,
     case PROP_ICE_CONTROLLING_MODE:
         priv->ice_controlling_mode = g_value_get_boolean(value);
         break;
+    case PROP_BUNDLE_POLICY:
+        priv->bundle_policy = g_value_get_enum(value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
         break;
@@ -548,16 +559,19 @@ static void owr_transport_agent_get_property(GObject *object, guint property_id,
     case PROP_ICE_CONTROLLING_MODE:
         g_value_set_boolean(value, priv->ice_controlling_mode);
         break;
+    case PROP_BUNDLE_POLICY:
+        g_value_set_enum(value, priv->bundle_policy);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
         break;
     }
 }
 
-OwrTransportAgent * owr_transport_agent_new(gboolean ice_controlling_mode)
+OwrTransportAgent * owr_transport_agent_new(gboolean ice_controlling_mode, OwrBundlePolicyType bundle_policy_type)
 {
     return g_object_new(OWR_TYPE_TRANSPORT_AGENT, "ice-controlling_mode", ice_controlling_mode,
-        NULL);
+        "bundle-policy", bundle_policy_type, NULL);
 }
 
 /**
