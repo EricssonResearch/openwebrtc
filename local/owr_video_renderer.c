@@ -311,10 +311,13 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer, gu
     renderer_disabled(renderer, NULL, balance);
 
     flip = gst_element_factory_make("glvideoflip", "video-renderer-flip");
-    g_assert(flip);
-    g_signal_connect_object(renderer, "notify::rotation", G_CALLBACK(update_flip_method), flip, 0);
-    g_signal_connect_object(renderer, "notify::mirror", G_CALLBACK(update_flip_method), flip, 0);
-    update_flip_method(renderer, NULL, flip);
+    if (!flip) {
+        g_warning("The glvideoflip GStreamer element isn't available. Video mirroring and rotation functionalities are thus disabled.");
+    } else {
+        g_signal_connect_object(renderer, "notify::rotation", G_CALLBACK(update_flip_method), flip, 0);
+        g_signal_connect_object(renderer, "notify::mirror", G_CALLBACK(update_flip_method), flip, 0);
+        update_flip_method(renderer, NULL, flip);
+    }
 
     sink = OWR_MEDIA_RENDERER_GET_CLASS(renderer)->get_sink(renderer);
     g_assert(sink);
@@ -330,12 +333,18 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer, gu
             g_object_unref(sink_element);
     }
 
-    gst_bin_add_many(GST_BIN(renderer_bin), upload, convert, balance, flip, sink, NULL);
+    gst_bin_add_many(GST_BIN(renderer_bin), upload, convert, balance, sink, NULL);
 
     LINK_ELEMENTS(upload, convert);
     LINK_ELEMENTS(convert, balance);
-    LINK_ELEMENTS(balance, flip);
-    LINK_ELEMENTS(flip, sink);
+
+    if (flip) {
+        gst_bin_add(GST_BIN(renderer_bin), flip);
+        LINK_ELEMENTS(balance, flip);
+        LINK_ELEMENTS(flip, sink);
+    } else {
+        LINK_ELEMENTS(balance, sink);
+    }
 
     sinkpad = gst_element_get_static_pad(upload, "sink");
     g_assert(sinkpad);
