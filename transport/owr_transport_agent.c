@@ -1038,8 +1038,6 @@ static gboolean add_session(GHashTable *args)
         guint send_ssrc = 0;
         gchar *cname = NULL;
 
-        pending_session_info = g_new0 (PendingSessionInfo, 1);
-
         _owr_media_session_set_on_send_source(OWR_MEDIA_SESSION(session),
             g_cclosure_new_object_swap(G_CALLBACK(on_new_send_source), G_OBJECT(transport_agent)));
 
