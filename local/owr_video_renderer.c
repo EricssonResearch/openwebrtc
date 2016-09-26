@@ -285,6 +285,19 @@ static void update_flip_method(OwrMediaRenderer *renderer, GParamSpec *pspec, Gs
     g_object_set(flip, "method", flip_method, NULL);
 }
 
+static void disable_last_sample_on_sink(const GValue *item, gpointer data)
+{
+    GstElement *element = GST_ELEMENT_CAST(g_value_get_object(item));
+    OWR_UNUSED(data);
+
+    if (GST_IS_BIN(element)) {
+        GstIterator *iterator = gst_bin_iterate_sinks(GST_BIN(element));
+        gst_iterator_foreach(iterator, (GstIteratorForeachFunction) disable_last_sample_on_sink, NULL);
+        gst_iterator_free(iterator);
+    } else
+        g_object_set(element, "enable-last-sample", FALSE, NULL);
+}
+
 static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer, guintptr window_handle)
 {
     OwrVideoRenderer *video_renderer;
@@ -293,6 +306,7 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer, gu
     GstElement *upload, *convert, *balance, *flip, *sink;
     GstPad *ghostpad, *sinkpad;
     gchar *bin_name;
+    GValue value = G_VALUE_INIT;
 
     g_assert(renderer);
     video_renderer = OWR_VIDEO_RENDERER(renderer);
@@ -321,7 +335,12 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer, gu
 
     sink = OWR_MEDIA_RENDERER_GET_CLASS(renderer)->get_sink(renderer);
     g_assert(sink);
-    g_object_set(sink, "enable-last-sample", FALSE, NULL);
+
+    g_value_init(&value, GST_TYPE_OBJECT);
+    g_value_set_object(&value, gst_object_ref(sink));
+    disable_last_sample_on_sink(&value, NULL);
+    g_value_unset(&value);
+
     if (priv->tag) {
         GstElement *sink_element = GST_IS_BIN(sink) ?
             gst_bin_get_by_interface(GST_BIN(sink), GST_TYPE_VIDEO_OVERLAY) : sink;
