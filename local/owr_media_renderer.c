@@ -480,3 +480,11 @@ gchar * owr_media_renderer_get_dot_data(OwrMediaRenderer *renderer)
     return g_strdup("");
 #endif
 }
+
+GstPipeline * _owr_media_renderer_get_pipeline(OwrMediaRenderer *renderer)
+{
+    g_return_val_if_fail(OWR_IS_MEDIA_RENDERER(renderer), NULL);
+    g_return_val_if_fail(renderer->priv->pipeline, NULL);
+
+    return gst_object_ref(GST_PIPELINE(renderer->priv->pipeline));
+}

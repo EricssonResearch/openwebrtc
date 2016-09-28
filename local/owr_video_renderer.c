@@ -97,6 +97,8 @@ struct _OwrVideoRendererPrivate {
     gint rotation;
     gboolean mirror;
     gchar *tag;
+    GMutex closure_mutex;
+    GClosure *request_context;
 };
 
 static void owr_video_renderer_finalize(GObject *object)
@@ -108,6 +110,13 @@ static void owr_video_renderer_finalize(GObject *object)
         _owr_window_registry_unregister_renderer(owr_window_registry_get(), priv->tag, renderer);
         g_free(priv->tag);
         priv->tag = NULL;
+    }
+
+    g_mutex_clear(&priv->closure_mutex);
+
+    if (priv->request_context) {
+        g_closure_unref(priv->request_context);
+        priv->request_context = NULL;
     }
 
     G_OBJECT_CLASS(owr_video_renderer_parent_class)->finalize(object);
@@ -167,6 +176,8 @@ static void owr_video_renderer_init(OwrVideoRenderer *renderer)
     priv->tag = DEFAULT_TAG;
     priv->rotation = DEFAULT_ROTATION;
     priv->mirror = DEFAULT_MIRROR;
+    g_mutex_init(&priv->closure_mutex);
+    priv->request_context = NULL;
 }
 
 static void owr_video_renderer_set_property(GObject *object, guint property_id,
@@ -375,10 +386,66 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer, gu
     return renderer_bin;
 }
 
+/**
+ * owr_video_renderer_set_request_context_callback: Configure the GClosure to
+ * invoke when a GL context is required by the GStreamer pipeline running the
+ * renderer.
+ *
+ * @renderer:
+ * @callback: function providing the GstContext as return value. The parameters passed are a const gchar* representing the context type and the @user_data gpointer.
+ * @user_data: extra data passed as first argument of the @callback.
+ * @destroy_data: function invoked when disposing the user_data of the GClosure.
+ */
+void owr_video_renderer_set_request_context_callback(OwrVideoRenderer *renderer, OwrVideoRendererRequestContextCallback callback, gpointer user_data, GDestroyNotify destroy_data)
+{
+    g_mutex_lock(&renderer->priv->closure_mutex);
+    if (renderer->priv->request_context)
+        g_closure_unref(renderer->priv->request_context);
+
+    renderer->priv->request_context = g_cclosure_new(G_CALLBACK(callback), user_data, (GClosureNotify) destroy_data);
+    g_closure_set_marshal(renderer->priv->request_context, g_cclosure_marshal_generic);
+    g_mutex_unlock(&renderer->priv->closure_mutex);
+}
+
+static GstBusSyncReply _owr_handle_gst_sync_message(GstBus *bus, GstMessage *message, gpointer user_data)
+{
+    OwrVideoRenderer *renderer = OWR_VIDEO_RENDERER(user_data);
+
+    OWR_UNUSED(bus);
+
+    if (renderer->priv->request_context == NULL)
+        return GST_BUS_PASS;
+
+    if (GST_MESSAGE_TYPE(message) == GST_MESSAGE_NEED_CONTEXT) {
+        GstContext* context;
+        const gchar *context_type;
+        GValue result = G_VALUE_INIT;
+        GValue params[1] = { G_VALUE_INIT };
+
+        gst_message_parse_context_type(message, &context_type);
+        g_value_init(&result, G_TYPE_POINTER);
+        g_value_init(&params[0], G_TYPE_STRING);
+        g_value_set_string(&params[0], context_type);
+
+        g_mutex_lock(&renderer->priv->closure_mutex);
+        g_closure_invoke(renderer->priv->request_context, &result, 1, (const GValue*) &params, NULL);
+        g_mutex_unlock(&renderer->priv->closure_mutex);
+
+        context = (GstContext*) g_value_get_pointer(&result);
+        if (context) {
+            gst_element_set_context(GST_ELEMENT_CAST(GST_MESSAGE_SRC(message)), context);
+            return GST_BUS_DROP;
+        }
+    }
+    return GST_BUS_PASS;
+}
+
 static void owr_video_renderer_constructed(GObject *object)
 {
     OwrVideoRenderer *video_renderer;
     OwrVideoRendererPrivate *priv;
+    GstBus *bus;
+    GstPipeline *pipeline;
 
     video_renderer = OWR_VIDEO_RENDERER(object);
     priv = video_renderer->priv;
@@ -386,6 +453,13 @@ static void owr_video_renderer_constructed(GObject *object)
     /* If we have no tag, just directly create the sink */
     if (!priv->tag)
         _owr_media_renderer_set_sink(OWR_MEDIA_RENDERER(video_renderer), owr_video_renderer_get_element(OWR_MEDIA_RENDERER(video_renderer), 0));
+
+    pipeline = _owr_media_renderer_get_pipeline(OWR_MEDIA_RENDERER(video_renderer));
+    g_assert(pipeline);
+    bus = gst_pipeline_get_bus(pipeline);
+    gst_bus_set_sync_handler(bus, (GstBusSyncHandler) _owr_handle_gst_sync_message, video_renderer, NULL);
+    gst_object_unref(bus);
+    gst_object_unref(pipeline);
 
     G_OBJECT_CLASS(owr_video_renderer_parent_class)->constructed(object);
 }
