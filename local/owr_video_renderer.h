@@ -62,6 +62,10 @@ GType owr_video_renderer_get_type(void) G_GNUC_CONST;
 
 OwrVideoRenderer *owr_video_renderer_new(const gchar *tag);
 
+typedef struct _GstContext GstContext;
+typedef GstContext* (* OwrVideoRendererRequestContextCallback) (const gchar* context_type, gpointer user_data);
+void owr_video_renderer_set_request_context_callback(OwrVideoRenderer *renderer, OwrVideoRendererRequestContextCallback callback, gpointer user_data, GDestroyNotify destroy_data);
+
 G_END_DECLS
 
 #endif /* __OWR_VIDEO_RENDERER_H__ */
