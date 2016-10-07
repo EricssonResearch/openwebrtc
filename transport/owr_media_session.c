@@ -66,6 +66,8 @@ struct _OwrMediaSessionPrivate {
     gchar *incoming_srtp_key;
     gchar *outgoing_srtp_key;
     guint send_ssrc;
+    guint receive_ssrc;
+    guint receive_rtx_ssrc;
     gchar *cname;
     GRWLock rw_lock;
     OwrPayload *send_payload;
@@ -94,6 +96,8 @@ enum {
     PROP_INCOMING_SRTP_KEY,
     PROP_OUTGOING_SRTP_KEY,
     PROP_SEND_SSRC,
+    PROP_RECEIVE_SSRC,
+    PROP_RECEIVE_RTX_SSRC,
     PROP_CNAME,
     PROP_JITTER_BUFFER_LATENCY,
 
@@ -138,6 +142,14 @@ static void owr_media_session_set_property(GObject *object, guint property_id, c
         priv->send_ssrc = g_value_get_uint(value);
         break;
 
+    case PROP_RECEIVE_SSRC:
+        priv->receive_ssrc = g_value_get_uint(value);
+        break;
+
+    case PROP_RECEIVE_RTX_SSRC:
+        priv->receive_rtx_ssrc = g_value_get_uint(value);
+        break;
+
     case PROP_CNAME:
         priv->cname = g_value_dup_string(value);
         break;
@@ -171,6 +183,14 @@ static void owr_media_session_get_property(GObject *object, guint property_id, G
 
     case PROP_SEND_SSRC:
         g_value_set_uint(value, priv->send_ssrc);
+        break;
+
+    case PROP_RECEIVE_SSRC:
+        g_value_set_uint(value, priv->receive_ssrc);
+        break;
+
+   case PROP_RECEIVE_RTX_SSRC:
+        g_value_set_uint(value, priv->receive_rtx_ssrc);
         break;
 
     case PROP_CNAME:
@@ -294,6 +314,14 @@ static void owr_media_session_class_init(OwrMediaSessionClass *klass)
         "The ssrc (to be) used for the outgoing RTP media stream",
         0, G_MAXUINT, 0, G_PARAM_STATIC_STRINGS | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
+    obj_properties[PROP_RECEIVE_SSRC] = g_param_spec_uint("receive-ssrc", "Receive ssrc",
+        "The ssrc (to be) used for the incoming RTP media stream",
+        0, G_MAXUINT, 0, G_PARAM_STATIC_STRINGS | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+
+    obj_properties[PROP_RECEIVE_RTX_SSRC] = g_param_spec_uint("receive-rtx-ssrc", "Receive RTX ssrc",
+        "The ssrc (to be) used for the incoming RTP RTX media stream",
+        0, G_MAXUINT, 0, G_PARAM_STATIC_STRINGS | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+
     obj_properties[PROP_CNAME] = g_param_spec_string("cname", "CNAME",
         "The canonical name identifying this endpoint",
         NULL, G_PARAM_STATIC_STRINGS | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
@@ -317,6 +345,8 @@ static void owr_media_session_init(OwrMediaSession *media_session)
     priv->incoming_srtp_key = NULL;
     priv->outgoing_srtp_key = NULL;
     priv->send_ssrc = 0;
+    priv->receive_ssrc = 0;
+    priv->receive_rtx_ssrc = 0;
     priv->cname = NULL;
     priv->send_payload = NULL;
     priv->send_source = NULL;
