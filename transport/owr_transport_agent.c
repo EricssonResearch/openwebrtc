@@ -166,6 +166,8 @@ struct _OwrTransportAgentPrivate {
     GRWLock data_channels_rw_mutex;
     gboolean data_session_added, data_session_established;
     OwrMessageOriginBusSet *message_origin_bus_set;
+
+    GSList* unstarted_sessions;
 };
 
 typedef struct {
@@ -294,6 +296,11 @@ static void owr_transport_agent_finalize(GObject *object)
 
     gst_element_set_state(priv->pipeline, GST_STATE_NULL);
     gst_object_unref(priv->pipeline);
+
+    if (priv->unstarted_sessions) {
+        g_slist_free_full(priv->unstarted_sessions, g_object_unref);
+        priv->unstarted_sessions = NULL;
+    }
 
     sessions_list = g_hash_table_get_values(priv->sessions);
     for (item = sessions_list; item; item = item->next) {
@@ -645,19 +652,19 @@ void owr_transport_agent_set_local_port_range(OwrTransportAgent *transport_agent
  */
 void owr_transport_agent_add_session(OwrTransportAgent *agent, OwrSession *session)
 {
-    GHashTable *args;
-
     g_return_if_fail(agent);
     g_return_if_fail(OWR_IS_MEDIA_SESSION(session) || OWR_IS_DATA_SESSION(session));
 
-    args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(agent));
-    g_hash_table_insert(args, "transport_agent", agent);
-    g_hash_table_insert(args, "session", session);
+    if (GST_STATE(agent->priv->pipeline) >= GST_STATE_READY) {
+        GHashTable *args;
+        args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(agent));
+        g_hash_table_insert(args, "transport_agent", agent);
+        g_hash_table_insert(args, "session", g_object_ref(session));
 
-    g_object_ref(agent);
-
-    _owr_schedule_with_hash_table((GSourceFunc)add_session, args);
-
+        g_object_ref(agent);
+        _owr_schedule_with_hash_table((GSourceFunc) add_session, args);
+    } else
+        agent->priv->unstarted_sessions = g_slist_append(agent->priv->unstarted_sessions, g_object_ref(session));
 }
 
 
@@ -1136,8 +1143,6 @@ static gboolean add_session(GHashTable *args)
     if (_owr_session_get_forced_remote_candidates(session))
         on_new_remote_candidate(transport_agent, TRUE, session);
 
-    state_change_status = gst_element_set_state(transport_agent->priv->pipeline, GST_STATE_PLAYING);
-    g_warn_if_fail(state_change_status != GST_STATE_CHANGE_FAILURE);
 
 end:
     g_object_unref(session);
@@ -4183,6 +4188,39 @@ gchar * owr_transport_agent_get_dot_data(OwrTransportAgent *transport_agent)
 #endif
 }
 
+static gboolean dump_bin(gpointer data)
+{
+    GstPipeline* pipeline = GST_PIPELINE(data);
+
+    GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(pipeline), GST_DEBUG_GRAPH_SHOW_ALL, GST_OBJECT_NAME(GST_OBJECT(pipeline)));
+    gst_object_unref(pipeline);
+    return G_SOURCE_REMOVE;
+}
+
+void owr_transport_agent_start(OwrTransportAgent *agent)
+{
+    if (!agent->priv->unstarted_sessions)
+        return;
+    for (GSList *walk = agent->priv->unstarted_sessions; walk; walk = g_slist_next(walk)) {
+        GHashTable *args;
+        args = _owr_create_schedule_table(OWR_MESSAGE_ORIGIN(agent));
+        g_hash_table_insert(args, "transport_agent", agent);
+        g_hash_table_insert(args, "session", g_object_ref(OWR_SESSION(walk->data)));
+
+        g_object_ref(agent);
+
+        add_session(args);
+        g_hash_table_unref(args);
+    }
+    g_slist_free_full(agent->priv->unstarted_sessions, g_object_unref);
+    agent->priv->unstarted_sessions = NULL;
+
+    GstStateChangeReturn state_change_status;
+    state_change_status = gst_element_set_state(agent->priv->pipeline, GST_STATE_PLAYING);
+    g_warn_if_fail(state_change_status != GST_STATE_CHANGE_FAILURE);
+
+    g_timeout_add_seconds(5, dump_bin, gst_object_ref(agent->priv->pipeline));
+}
 
 static void on_feedback_rtcp(GObject *session, guint type, guint fbtype, guint sender_ssrc,
     guint media_ssrc, GstBuffer *fci, OwrTransportAgent *transport_agent)

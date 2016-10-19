@@ -78,6 +78,8 @@ void owr_transport_agent_set_local_port_range(OwrTransportAgent *transport_agent
 void owr_transport_agent_add_session(OwrTransportAgent *agent, OwrSession *session);
 gchar * owr_transport_agent_get_dot_data(OwrTransportAgent *transport_agent);
 
+void owr_transport_agent_start(OwrTransportAgent *agent);
+
 G_END_DECLS
 
 #endif /* __OWR_TRANSPORT_AGENT_H__ */
