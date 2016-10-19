@@ -247,7 +247,9 @@ static gboolean setup_transport_agents()
 
     owr_transport_agent_add_session(left_transport_agent, OWR_SESSION(left_session));
     owr_transport_agent_add_session(right_transport_agent, OWR_SESSION(right_session));
-
+    owr_transport_agent_start(left_transport_agent);
+    owr_transport_agent_start(right_transport_agent);
+    
     if (wait_for_dtls) {
         gboolean peer_certificate_received;
         GAsyncQueue *msg_queue = g_async_queue_new();

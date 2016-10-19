@@ -62,6 +62,7 @@ function PeerHandler(configuration, keyCert, client, jsonRpc) {
             transportAgent.add_session(sessions[i]);
         }
 
+        transportAgent.start();
         numberOfReceivePreparedSessions = sessions.length;
 
         function prepareSession(session, mdesc) {

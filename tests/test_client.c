@@ -610,6 +610,7 @@ end_payload:
         g_object_set_data(G_OBJECT(transport_agent), "media-sessions", media_sessions);
         owr_transport_agent_add_session(transport_agent, OWR_SESSION(media_session));
     }
+    owr_transport_agent_start(transport_agent);
     json_reader_end_member(reader);
 }
 

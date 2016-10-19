@@ -281,6 +281,8 @@ static void got_sources(GList *sources, gpointer user_data)
 
         sources = sources->next;
     }
+    owr_transport_agent_start(recv_transport_agent);
+    owr_transport_agent_start(send_transport_agent);
 }
 
 void on_new_source(gpointer *unused, OwrMediaSource *source)
