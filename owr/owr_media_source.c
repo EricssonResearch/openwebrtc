@@ -335,9 +335,11 @@ static GstElement *owr_media_source_request_source_default(OwrMediaSource *media
             GstElement *glupload;
 
             CREATE_ELEMENT_WITH_ID(glupload, "glupload", "source-glupload", source_id);
+            CREATE_ELEMENT_WITH_ID(videoscale, "gleffects_identity", "source-glcolorscale", source_id);
             CREATE_ELEMENT_WITH_ID(videoconvert, "glcolorconvert", "source-glcolorconvert", source_id);
+
             gst_bin_add_many(GST_BIN(source_bin),
-                    queue_pre, glupload, videoconvert, capsfilter, queue_post, NULL);
+                queue_pre, glupload, videoconvert, videoscale, queue_post, NULL);
 
             if (videorate) {
                 LINK_ELEMENTS(queue_pre, videorate);
@@ -346,6 +348,8 @@ static GstElement *owr_media_source_request_source_default(OwrMediaSource *media
                 LINK_ELEMENTS(queue_pre, glupload);
             }
             LINK_ELEMENTS(glupload, videoconvert);
+            LINK_ELEMENTS(videoconvert, videoscale);
+            LINK_ELEMENTS(videoscale, queue_post);
         } else {
             GstElement *gldownload;
 
@@ -362,9 +366,9 @@ static GstElement *owr_media_source_request_source_default(OwrMediaSource *media
             }
             LINK_ELEMENTS(gldownload, videoscale);
             LINK_ELEMENTS(videoscale, videoconvert);
+            LINK_ELEMENTS(videoconvert, capsfilter);
+            LINK_ELEMENTS(capsfilter, queue_post);
         }
-        LINK_ELEMENTS(videoconvert, capsfilter);
-        LINK_ELEMENTS(capsfilter, queue_post);
 
         break;
         }
