@@ -43,6 +43,7 @@ GType owr_codec_type_get_type(void)
         {OWR_CODEC_TYPE_OPUS, "Opus", "opus"},
         {OWR_CODEC_TYPE_H264, "H264", "h264"},
         {OWR_CODEC_TYPE_VP8, "VP8", "vp8"},
+        {OWR_CODEC_TYPE_VP9, "VP9", "vp9"},
         {0, NULL, NULL}
     };
     static volatile GType id = 0;

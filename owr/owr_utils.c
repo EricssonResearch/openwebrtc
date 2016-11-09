@@ -54,6 +54,8 @@ OwrCodecType _owr_caps_to_codec_type(GstCaps *caps)
         return OWR_CODEC_TYPE_H264;
     if (gst_structure_has_name(structure, "video/x-vp8"))
         return OWR_CODEC_TYPE_VP8;
+    if (gst_structure_has_name(structure, "video/x-vp9"))
+        return OWR_CODEC_TYPE_VP9;
 
     GST_ERROR("Unknown caps: %" GST_PTR_FORMAT, (gpointer)caps);
     return OWR_CODEC_TYPE_NONE;

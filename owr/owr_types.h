@@ -42,7 +42,8 @@ typedef enum _OwrCodecType {
     OWR_CODEC_TYPE_PCMA,
     OWR_CODEC_TYPE_OPUS,
     OWR_CODEC_TYPE_H264,
-    OWR_CODEC_TYPE_VP8
+    OWR_CODEC_TYPE_VP8,
+    OWR_CODEC_TYPE_VP9
 } OwrCodecType;
 
 typedef enum _OwrMediaType {

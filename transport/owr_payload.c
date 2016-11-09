@@ -188,6 +188,8 @@ static GList *h264_decoders = NULL;
 static GList *h264_encoders = NULL;
 static GList *vp8_decoders = NULL;
 static GList *vp8_encoders = NULL;
+static GList *vp9_decoders = NULL;
+static GList *vp9_encoders = NULL;
 
 static gpointer owr_payload_detect_codecs(gpointer data)
 {
@@ -214,6 +216,11 @@ static gpointer owr_payload_detect_codecs(gpointer data)
     vp8_encoders = gst_element_factory_list_filter(encoder_factories, caps, GST_PAD_SRC, FALSE);
     gst_caps_unref(caps);
 
+    caps = gst_caps_new_empty_simple("video/x-vp9");
+    vp9_decoders = gst_element_factory_list_filter(decoder_factories, caps, GST_PAD_SINK, FALSE);
+    vp9_encoders = gst_element_factory_list_filter(encoder_factories, caps, GST_PAD_SRC, FALSE);
+    gst_caps_unref(caps);
+
     gst_plugin_feature_list_free(decoder_factories);
     gst_plugin_feature_list_free(encoder_factories);
 
@@ -221,6 +228,8 @@ static gpointer owr_payload_detect_codecs(gpointer data)
     h264_encoders = g_list_sort(h264_encoders, gst_plugin_feature_rank_compare_func);
     vp8_decoders = g_list_sort(vp8_decoders, gst_plugin_feature_rank_compare_func);
     vp8_encoders = g_list_sort(vp8_encoders, gst_plugin_feature_rank_compare_func);
+    vp9_decoders = g_list_sort(vp9_decoders, gst_plugin_feature_rank_compare_func);
+    vp9_encoders = g_list_sort(vp9_encoders, gst_plugin_feature_rank_compare_func);
 
     return NULL;
 }
@@ -300,11 +309,11 @@ static void owr_payload_init(OwrPayload *payload)
 /* Private methods */
 
 
-static const gchar *OwrCodecTypeEncoderElementName[] = {"none", "mulawenc", "alawenc", "opusenc", "openh264enc", "vp8enc"};
-static const gchar *OwrCodecTypeDecoderElementName[] = {"none", "mulawdec", "alawdec", "opusdec", "openh264dec", "vp8dec"};
-static const gchar *OwrCodecTypeParserElementName[] = {"none", "none", "none", "none", "h264parse", "none"};
-static const gchar *OwrCodecTypePayElementName[] = {"none", "rtppcmupay", "rtppcmapay", "rtpopuspay", "rtph264pay", "rtpvp8pay"};
-static const gchar *OwrCodecTypeDepayElementName[] = {"none", "rtppcmudepay", "rtppcmadepay", "rtpopusdepay", "rtph264depay", "rtpvp8depay"};
+static const gchar *OwrCodecTypeEncoderElementName[] = {"none", "mulawenc", "alawenc", "opusenc", "openh264enc", "vp8enc", "vp9enc"};
+static const gchar *OwrCodecTypeDecoderElementName[] = {"none", "mulawdec", "alawdec", "opusdec", "openh264dec", "vp8dec", "vp9dec"};
+static const gchar *OwrCodecTypeParserElementName[] = {"none", "none", "none", "none", "h264parse", "none", "none"};
+static const gchar *OwrCodecTypePayElementName[] = {"none", "rtppcmupay", "rtppcmapay", "rtpopuspay", "rtph264pay", "rtpvp8pay", "rtpvp9pay"};
+static const gchar *OwrCodecTypeDepayElementName[] = {"none", "rtppcmudepay", "rtppcmadepay", "rtpopusdepay", "rtph264depay", "rtpvp8depay", "rtpvp9depay"};
 
 static guint evaluate_bitrate_from_payload(OwrPayload *payload)
 {
@@ -450,6 +459,30 @@ GstElement * _owr_payload_create_encoder(OwrPayload *payload)
         g_object_bind_property(payload, "bitrate", encoder, "target-bitrate", G_BINDING_SYNC_CREATE);
         g_object_set(payload, "bitrate", evaluate_bitrate_from_payload(payload), NULL);
         break;
+    case OWR_CODEC_TYPE_VP9:
+        encoder = try_codecs(vp9_encoders, "encoder");
+        g_return_val_if_fail(encoder, NULL);
+        /* values are inspired by webrtc.org values in vp9_impl.cc */
+        g_object_set(encoder,
+            "end-usage", 1, /* VPX_CBR */
+            "deadline", G_GINT64_CONSTANT(1), /* VPX_DL_REALTIME */
+            "cpu-used", 3,
+            "min-quantizer", 2,
+            "max-quantizer", 52,
+            "buffer-initial-size", 500,
+            "buffer-optimal-size", 600,
+            "buffer-size", 1000,
+            "dropframe-threshold", 30,
+            "lag-in-frames", 0,
+            "timebase", 1, 90000,
+            "error-resilient", 1,
+            "resize-allowed", TRUE,
+            "keyframe-mode", 0, /* VPX_KF_DISABLED */
+            NULL);
+
+        g_object_bind_property(payload, "bitrate", encoder, "target-bitrate", G_BINDING_SYNC_CREATE);
+        g_object_set(payload, "bitrate", evaluate_bitrate_from_payload(payload), NULL);
+        break;
     default:
         element_name = g_strdup_printf("encoder_%s_%u", OwrCodecTypeEncoderElementName[payload->priv->codec_type], get_unique_id());
         encoder = gst_element_factory_make(OwrCodecTypeEncoderElementName[payload->priv->codec_type], element_name);
@@ -475,6 +508,10 @@ GstElement * _owr_payload_create_decoder(OwrPayload *payload)
         break;
     case OWR_CODEC_TYPE_VP8:
         decoder = try_codecs(vp8_decoders, "decoder");
+        g_return_val_if_fail(decoder, NULL);
+        break;
+    case OWR_CODEC_TYPE_VP9:
+        decoder = try_codecs(vp9_decoders, "decoder");
         g_return_val_if_fail(decoder, NULL);
         break;
     default:
@@ -607,6 +644,10 @@ GstCaps * _owr_payload_create_rtp_caps(OwrPayload *payload)
         encoding_name = "VP8-DRAFT-IETF-01";
         break;
 
+    case OWR_CODEC_TYPE_VP9:
+        encoding_name = "VP9-DRAFT-IETF-01";
+        break;
+
     default:
         g_return_val_if_reached(NULL);
     }
@@ -717,6 +758,9 @@ GstCaps * _owr_payload_create_encoded_caps(OwrPayload *payload)
         break;
     case OWR_CODEC_TYPE_VP8:
         caps = gst_caps_new_empty_simple("video/x-vp8");
+        break;
+    case OWR_CODEC_TYPE_VP9:
+        caps = gst_caps_new_empty_simple("video/x-vp9");
         break;
     default:
         caps = gst_caps_new_any();
