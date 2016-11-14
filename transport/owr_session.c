@@ -66,6 +66,7 @@ G_DEFINE_TYPE_WITH_CODE(OwrSession, owr_session, G_TYPE_OBJECT,
     G_IMPLEMENT_INTERFACE(OWR_TYPE_MESSAGE_ORIGIN, owr_message_origin_interface_init))
 
 struct _OwrSessionPrivate {
+    guint stream_id;
     gboolean dtls_client_mode;
     gchar *dtls_certificate;
     gchar *dtls_key;
@@ -332,6 +333,7 @@ static void owr_session_init(OwrSession *session)
     OwrSessionPrivate *priv;
 
     session->priv = priv = OWR_SESSION_GET_PRIVATE(session);
+    priv->stream_id = 0;
     priv->dtls_client_mode = DEFAULT_DTLS_CLIENT_MODE;
     priv->dtls_certificate = g_strdup(DEFAULT_DTLS_CERTIFICATE);
     priv->dtls_key = g_strdup(DEFAULT_DTLS_KEY);
@@ -775,4 +777,14 @@ void _owr_session_emit_ice_state_changed(OwrSession *session, guint session_id,
 
     session->priv->ice_state = new_state;
     g_object_notify_by_pspec(G_OBJECT(session), obj_properties[PROP_ICE_STATE]);
+}
+
+void _owr_session_set_stream_id(OwrSession *session, guint stream_id)
+{
+    session->priv->stream_id = stream_id;
+}
+
+guint _owr_session_get_stream_id(OwrSession *session)
+{
+    return session->priv->stream_id;
 }
