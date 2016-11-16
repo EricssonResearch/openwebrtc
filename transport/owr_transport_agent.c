@@ -761,6 +761,12 @@ static void update_helper_servers(OwrTransportAgent *transport_agent, guint stre
             nice_agent_set_relay_info(priv->nice_agent, stream_id, NICE_COMPONENT_TYPE_RTCP,
                 address, port, username, password, NICE_RELAY_TYPE_TURN_TCP);
             break;
+        case OWR_HELPER_SERVER_TYPE_TURN_TLS:
+            nice_agent_set_relay_info(priv->nice_agent, stream_id, NICE_COMPONENT_TYPE_RTP,
+                                      address, port, username, password, NICE_RELAY_TYPE_TURN_TLS);
+            nice_agent_set_relay_info(priv->nice_agent, stream_id, NICE_COMPONENT_TYPE_RTCP,
+                                      address, port, username, password, NICE_RELAY_TYPE_TURN_TLS);
+            break;
         }
     }
 }
