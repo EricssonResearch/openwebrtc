@@ -41,7 +41,8 @@ G_BEGIN_DECLS
 typedef enum _OwrHelperServerType {
     OWR_HELPER_SERVER_TYPE_STUN,
     OWR_HELPER_SERVER_TYPE_TURN_UDP,
-    OWR_HELPER_SERVER_TYPE_TURN_TCP
+    OWR_HELPER_SERVER_TYPE_TURN_TCP,
+    OWR_HELPER_SERVER_TYPE_TURN_TLS
 } OwrHelperServerType;
 
 #define OWR_TYPE_TRANSPORT_AGENT            (owr_transport_agent_get_type())
