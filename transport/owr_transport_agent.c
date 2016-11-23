@@ -1604,12 +1604,12 @@ static void link_rtpbin_to_send_output_bin(OwrTransportAgent *transport_agent, g
 static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_agent,
     guint session_id, guint stream_id, gboolean rtcp_mux, PendingSessionInfo *pending_session_info)
 {
-    GstElement *nice_element, *dtls_srtp_bin_rtp, *dtls_srtp_bin_rtcp = NULL;
+    GstElement *nice_element, *dtls_srtp_bin_rtp = NULL, *dtls_srtp_bin_rtcp = NULL;
     GstElement *scream_queue = NULL;
     gboolean linked_ok, synced_ok;
     GstElement *send_output_bin = NULL;
     SendBinInfo *send_bin_info;
-    gchar *bin_name, *dtls_srtp_pad_name, *queue_name;
+    gchar *bin_name, *dtls_srtp_pad_name = NULL, *queue_name;
     OwrMediaSession *media_session;
     AgentAndSessionIdPair *agent_and_session_id_pair;
 
@@ -1696,9 +1696,12 @@ static void prepare_transport_bin_send_elements(OwrTransportAgent *transport_age
             dtls_srtp_pad_name = g_strdup_printf("rtp_sink_%u", session_id);
         }
     }
-    linked_ok = gst_element_link_pads(scream_queue, "src", dtls_srtp_bin_rtp, dtls_srtp_pad_name);
-    g_warn_if_fail(linked_ok);
-    g_free(dtls_srtp_pad_name);
+
+    if (dtls_srtp_bin_rtp && dtls_srtp_pad_name) {
+      linked_ok = gst_element_link_pads(scream_queue, "src", dtls_srtp_bin_rtp, dtls_srtp_pad_name);
+      g_warn_if_fail(linked_ok);
+      g_free(dtls_srtp_pad_name);
+    }
 
     if (nice_element) {
         synced_ok = gst_element_sync_state_with_parent(nice_element);
