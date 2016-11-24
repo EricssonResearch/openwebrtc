@@ -58,6 +58,7 @@ enum {
     PROP_0,
     PROP_MEDIA_TYPE,
     PROP_DISABLED,
+    PROP_SOURCE,
     N_PROPERTIES
 };
 
@@ -115,10 +116,6 @@ static void owr_media_renderer_finalize(GObject *object)
     G_OBJECT_CLASS(owr_media_renderer_parent_class)->finalize(object);
 }
 
-static void owr_media_renderer_reconfigure_element_default(G_GNUC_UNUSED OwrMediaRenderer *renderer)
-{
-}
-
 static void owr_media_renderer_class_init(OwrMediaRendererClass *klass)
 {
     GObjectClass *gobject_class = G_OBJECT_CLASS(klass);
@@ -134,13 +131,15 @@ static void owr_media_renderer_class_init(OwrMediaRendererClass *klass)
         "Whether this renderer is disabled or not", DEFAULT_DISABLED,
         G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
+    obj_properties[PROP_SOURCE] = g_param_spec_object("source", "Source",
+                                                      "Current Media Source being rendered", OWR_TYPE_MEDIA_SOURCE,
+                                                      G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+
     gobject_class->set_property = owr_media_renderer_set_property;
     gobject_class->get_property = owr_media_renderer_get_property;
 
     gobject_class->finalize = owr_media_renderer_finalize;
     g_object_class_install_properties(gobject_class, N_PROPERTIES, obj_properties);
-
-    klass->reconfigure_element = owr_media_renderer_reconfigure_element_default;
 }
 
 static gpointer owr_media_renderer_get_bus_set(OwrMessageOrigin *origin)
@@ -269,6 +268,10 @@ static void owr_media_renderer_set_property(GObject *object, guint property_id,
         priv->disabled = g_value_get_boolean(value);
         break;
 
+    case PROP_SOURCE:
+        priv->source = g_value_get_object(value);
+        break;
+
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
         break;
@@ -290,6 +293,10 @@ static void owr_media_renderer_get_property(GObject *object, guint property_id,
 
     case PROP_DISABLED:
         g_value_set_boolean(value, priv->disabled);
+        break;
+
+    case PROP_SOURCE:
+        g_value_set_object(value, priv->source);
         break;
 
     default:
@@ -395,8 +402,8 @@ static gboolean set_source(GHashTable *args)
     }
 
     priv->source = g_object_ref(source);
+    g_object_notify_by_pspec(G_OBJECT(renderer), obj_properties[PROP_SOURCE]);
 
-    _owr_media_renderer_reconfigure_element(renderer);
     maybe_start_renderer(renderer);
 
     g_mutex_unlock(&priv->media_renderer_lock);
@@ -480,12 +487,6 @@ void _owr_media_renderer_set_sink(OwrMediaRenderer *renderer, gpointer sink_ptr)
 OwrMediaSource* _owr_media_renderer_get_source(OwrMediaRenderer *renderer)
 {
     return renderer->priv->source;
-}
-
-void _owr_media_renderer_reconfigure_element(OwrMediaRenderer *renderer)
-{
-    g_return_if_fail(OWR_IS_MEDIA_RENDERER(renderer));
-    OWR_MEDIA_RENDERER_GET_CLASS(renderer)->reconfigure_element(renderer);
 }
 
 gchar * owr_media_renderer_get_dot_data(OwrMediaRenderer *renderer)

@@ -93,6 +93,7 @@ static void owr_video_renderer_reconfigure_element(OwrMediaRenderer *renderer);
 static GstElement *owr_video_renderer_get_element_with_window_handle(OwrMediaRenderer *renderer, guintptr window_handle);
 static GstCaps *owr_video_renderer_get_caps(OwrMediaRenderer *renderer);
 static GstElement *owr_video_renderer_get_sink(OwrMediaRenderer *renderer);
+static void _owr_video_renderer_notify_source_changed(OwrMediaRenderer *renderer, GParamSpec *pspec, gpointer user_data);
 
 struct _OwrVideoRendererPrivate {
     guint width;
@@ -171,7 +172,7 @@ static void owr_video_renderer_class_init(OwrVideoRendererClass *klass)
 
     media_renderer_class->get_caps = (void *(*)(OwrMediaRenderer *))owr_video_renderer_get_caps;
     media_renderer_class->get_sink = (void *(*)(OwrMediaRenderer *))owr_video_renderer_get_sink;
-    media_renderer_class->reconfigure_element = (void (*)(OwrMediaRenderer *))owr_video_renderer_reconfigure_element;
+
 
     g_object_class_install_properties(gobject_class, N_PROPERTIES, obj_properties);
 }
@@ -190,6 +191,8 @@ static void owr_video_renderer_init(OwrVideoRenderer *renderer)
     g_mutex_init(&priv->closure_mutex);
     priv->request_context = NULL;
     priv->renderer_bin = NULL;
+
+    g_signal_connect(renderer, "notify::source", G_CALLBACK(_owr_video_renderer_notify_source_changed), NULL);
 }
 
 static void owr_video_renderer_set_property(GObject *object, guint property_id,
@@ -600,6 +603,13 @@ static GstElement *owr_video_renderer_get_sink(OwrMediaRenderer *renderer)
 {
     OWR_UNUSED(renderer);
     return gst_element_factory_make(VIDEO_SINK, "video-renderer-sink");
+}
+
+static void _owr_video_renderer_notify_source_changed(OwrMediaRenderer *renderer, GParamSpec *pspec, gpointer user_data)
+{
+    OWR_UNUSED(pspec);
+    OWR_UNUSED(user_data);
+    owr_video_renderer_reconfigure_element(renderer);
 }
 
 void _owr_video_renderer_notify_tag_changed(OwrVideoRenderer *video_renderer, const gchar *tag, gboolean have_handle, guintptr new_handle)
