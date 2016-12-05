@@ -627,6 +627,40 @@ GstCaps * _owr_payload_create_encoded_caps(OwrPayload *payload)
     return caps;
 }
 
+gboolean owr_payload_supported(OwrCodecType codec_type)
+{
+  gboolean supported = FALSE;
+  GstElement* encoder = NULL;
+  GstElement* decoder = _owr_create_decoder(codec_type);
+
+  switch (codec_type) {
+  case OWR_CODEC_TYPE_H264:
+      encoder = _owr_try_codecs(_owr_get_detected_h264_encoders(), NULL);
+      break;
+  case OWR_CODEC_TYPE_VP8:
+      encoder = _owr_try_codecs(_owr_get_detected_vp8_encoders(), NULL);
+      break;
+  case OWR_CODEC_TYPE_VP9:
+      encoder = _owr_try_codecs(_owr_get_detected_vp9_encoders(), NULL);
+      break;
+  default:
+      encoder = gst_element_factory_make(_owr_get_encoder_name(codec_type), NULL);
+  }
+
+  supported = encoder && decoder;
+
+  if (encoder) {
+      gst_element_set_state(encoder, GST_STATE_NULL);
+      gst_object_unref(encoder);
+  }
+
+  if (decoder) {
+      gst_element_set_state(decoder, GST_STATE_NULL);
+      gst_object_unref(decoder);
+  }
+
+  return supported;
+}
 
 
 /* local functions */
