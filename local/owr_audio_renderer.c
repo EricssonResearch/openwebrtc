@@ -123,7 +123,7 @@ OwrAudioRenderer *owr_audio_renderer_new(void)
 static void
 setup_sink_for_aec(GstElement *sink)
 {
-#if defined(__linux__) && !defined(__ANDROID__)
+#if defined(__linux__) && !defined(__ANDROID__) && !TARGET_RPI
     /* pulsesink */
     GstStructure *s;
 
@@ -136,7 +136,8 @@ setup_sink_for_aec(GstElement *sink)
 
 #elif defined(__APPLE__) && !TARGET_IPHONE_SIMULATOR
     /* osxaudiosink */
-
+#else
+    OWR_UNUSED(sink);
 #endif
 }
 
