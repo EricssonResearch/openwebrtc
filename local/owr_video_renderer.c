@@ -380,8 +380,8 @@ static void owr_video_renderer_reconfigure_element(OwrMediaRenderer *renderer)
 {
     OwrVideoRenderer *video_renderer;
     OwrVideoRendererPrivate *priv;
-    GstElement *parser;
-    GstElement *decoder;
+    GstElement *parser = NULL;
+    GstElement *decoder = NULL;
     GstElement *balance = NULL;
     GstElement *upload, *sink, *flip = NULL;
     GstPad *ghostpad, *sinkpad;
@@ -398,12 +398,14 @@ static void owr_video_renderer_reconfigure_element(OwrMediaRenderer *renderer)
     source = _owr_media_renderer_get_source(renderer);
     codec_type = _owr_media_source_get_codec(source);
 
-    parser = _owr_create_parser(codec_type);
-    decoder = _owr_create_decoder(codec_type);
-    if (parser)
-      gst_bin_add(GST_BIN(priv->renderer_bin), parser);
-    if (decoder)
-      gst_bin_add(GST_BIN(priv->renderer_bin), decoder);
+    if (!_owr_codec_type_is_raw(codec_type)) {
+        parser = _owr_create_parser(codec_type);
+        decoder = _owr_create_decoder(codec_type);
+        if (parser)
+            gst_bin_add(GST_BIN(priv->renderer_bin), parser);
+        if (decoder)
+            gst_bin_add(GST_BIN(priv->renderer_bin), decoder);
+    }
 
     upload = gst_element_factory_make("glupload", "video-renderer-upload");
     gst_bin_add(GST_BIN(priv->renderer_bin), upload);
@@ -434,7 +436,7 @@ static void owr_video_renderer_reconfigure_element(OwrMediaRenderer *renderer)
             _owr_update_flip_method(G_OBJECT(renderer), NULL, flip);
             gst_bin_add(GST_BIN(priv->renderer_bin), flip);
         } else
-            g_warning("no suitable flipping element");
+            g_warning("the glvideoflip element isn't available, video rotation support is now disabled");
     }
     g_signal_connect_object(renderer, "notify::rotation", G_CALLBACK(update_flip_method), flip, 0);
     g_signal_connect_object(renderer, "notify::mirror", G_CALLBACK(update_flip_method), flip, 0);
@@ -448,9 +450,6 @@ static void owr_video_renderer_reconfigure_element(OwrMediaRenderer *renderer)
     g_value_set_object(&value, gst_object_ref(sink));
     disable_last_sample_on_sink(&value, NULL);
     g_value_unset(&value);
-
-    // FIXME: huhhhhh really?
-    g_object_set(sink, "sync", FALSE, NULL);
 
     gst_bin_add(GST_BIN(priv->renderer_bin), sink);
 

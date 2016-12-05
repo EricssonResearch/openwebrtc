@@ -579,7 +579,7 @@ GstCaps * _owr_payload_create_raw_caps(OwrPayload *payload)
                 "framerate", &framerate,
                 NULL);
         }
-        caps = gst_caps_new_empty_simple(_owr_codec_type_to_caps_mime(media_type, priv->codec_type));
+        caps = gst_caps_new_empty_simple("video/x-raw");
 #ifdef __APPLE__
         if (priv->codec_type == OWR_CODEC_TYPE_H264)
           gst_caps_set_features(caps, 0, gst_caps_features_new_any());
