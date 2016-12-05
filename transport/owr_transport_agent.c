@@ -824,7 +824,7 @@ static gboolean link_source_to_transport_bin(GstPad *srcpad, GstElement *pipelin
     if (media_type == OWR_MEDIA_TYPE_VIDEO)
         g_snprintf(name, OWR_OBJECT_NAME_LENGTH_MAX, "video_sink_%u_%u", codec_type, stream_id);
     else if (media_type == OWR_MEDIA_TYPE_AUDIO)
-        g_snprintf(name, OWR_OBJECT_NAME_LENGTH_MAX, "audio_raw_sink_%u", stream_id);
+        g_snprintf(name, OWR_OBJECT_NAME_LENGTH_MAX, "audio_sink_%u_%u", codec_type, stream_id);
     sinkpad = gst_element_get_static_pad(transport_bin, name);
 
     ret = gst_pad_link(srcpad, sinkpad) == GST_PAD_LINK_OK;
@@ -987,7 +987,7 @@ static void remove_existing_send_source_and_payload(OwrTransportAgent *transport
     if (media_type == OWR_MEDIA_TYPE_VIDEO)
         pad_name = g_strdup_printf("video_sink_%u_%u", codec_type, stream_id);
     else
-        pad_name = g_strdup_printf("audio_raw_sink_%u", stream_id);
+        pad_name = g_strdup_printf("audio_sink_%u_%u", codec_type, stream_id);
     sinkpad = gst_element_get_static_pad(transport_agent->priv->transport_bin, pad_name);
     g_assert(sinkpad);
     g_free(pad_name);
