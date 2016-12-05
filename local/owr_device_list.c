@@ -387,6 +387,12 @@ static gboolean enumerate_video_source_devices(GClosure *callback)
         OWR_MEDIA_SOURCE_SUPPORTS_VIDEO_ORIENTATION | OWR_MEDIA_SOURCE_SUPPORTS_COLOR_BALANCE);
     _owr_media_source_set_codec(OWR_MEDIA_SOURCE(source), OWR_CODEC_TYPE_H264);
     sources = g_list_prepend(sources, source);
+
+    // Skip v4l2 devices.
+    _owr_utils_call_closure_with_list(callback, sources);
+    g_list_free_full(sources, g_object_unref);
+
+    return FALSE;
 #endif
 
     dev_dir = g_dir_open("/dev", 0, &error);
