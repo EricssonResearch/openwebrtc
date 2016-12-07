@@ -308,7 +308,8 @@ static void renderer_disabled(OwrMediaRenderer *renderer, G_GNUC_UNUSED GParamSp
 
     const GList* controls = gst_color_balance_list_channels(color_balance);
     gint index = 0;
-    for (const GList* item = controls; item != NULL; item = item->next, ++index) {
+    const GList* item;
+    for (item = controls; item != NULL; item = item->next, ++index) {
         GstColorBalanceChannel* channel = item->data;
         if (g_strcmp0(channel->label, "SATURATION") == 0 || g_strcmp0(channel->label, "BRIGHTNESS") == 0) {
             gint new_value = disabled ? channel->min_value : ((channel->min_value + channel->max_value) / 2);
