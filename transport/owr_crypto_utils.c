@@ -148,8 +148,22 @@ gpointer _create_crypto_worker_run(gpointer data)
 
     key_pair = EVP_PKEY_new();
 
+    // RSA_generate_key was deprecated in OpenSSL 0.9.8.
+#if OPENSSL_VERSION_NUMBER < 0x10100001L
     rsa = RSA_generate_key(2048, RSA_F4, NULL, NULL);
-
+#else
+    rsa = RSA_new ();
+    if (rsa != NULL) {
+        BIGNUM *e = BN_new ();
+        if (e == NULL || !BN_set_word(e, RSA_F4)
+            || !RSA_generate_key_ex(rsa, 2048, e, NULL)) {
+            RSA_free(rsa);
+            rsa = NULL;
+        }
+        if (e)
+            BN_free(e);
+    }
+#endif
     EVP_PKEY_assign_RSA(key_pair, rsa);
 
     X509_set_version(cert, 2);
