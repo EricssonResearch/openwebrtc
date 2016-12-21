@@ -583,8 +583,8 @@ end_payload:
                     g_object_unref(remote_candidate);
                 json_reader_end_element(reader);
             }
-            json_reader_end_member(reader); /* candidates */
         }
+        json_reader_end_member(reader); /* candidates */
         json_reader_end_member(reader); /* ice */
 
         json_reader_end_element(reader);
