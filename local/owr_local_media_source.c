@@ -78,6 +78,18 @@ static guint unique_bin_id = 0;
 #define OWR_LOCAL_MEDIA_SOURCE_GET_PRIVATE(obj) \
     (G_TYPE_INSTANCE_GET_PRIVATE((obj), OWR_TYPE_LOCAL_MEDIA_SOURCE, OwrLocalMediaSourcePrivate))
 
+#define LINK_ELEMENTS(a, b) do { \
+    if (!gst_element_link(a, b)) \
+        GST_ERROR("Failed to link " #a " -> " #b); \
+} while (0)
+
+#define CREATE_ELEMENT(elem, factory, name) do { \
+    elem = gst_element_factory_make(factory, name); \
+    if (!elem) \
+        GST_ERROR("Could not create " name " from factory " factory); \
+    g_assert(elem); \
+} while (0)
+
 static void owr_message_origin_interface_init(OwrMessageOriginInterface *interface);
 
 G_DEFINE_TYPE_WITH_CODE(OwrLocalMediaSource, owr_local_media_source, OWR_TYPE_MEDIA_SOURCE,
@@ -86,6 +98,10 @@ G_DEFINE_TYPE_WITH_CODE(OwrLocalMediaSource, owr_local_media_source, OWR_TYPE_ME
 struct _OwrLocalMediaSourcePrivate {
     gint device_index;
     OwrMessageOriginBusSet *message_origin_bus_set;
+
+    /* Volume control for audio sources; tmp_volume is for before source_volume gets created */
+    GstElement *source_volume;
+    double tmp_volume;
 };
 
 static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_source, GstCaps *caps);
@@ -98,6 +114,7 @@ static void owr_local_media_source_get_property(GObject *object, guint property_
 enum {
     PROP_0,
     PROP_DEVICE_INDEX,
+    PROP_VOLUME,
     N_PROPERTIES
 };
 
@@ -107,6 +124,8 @@ static void owr_local_media_source_finalize(GObject *object)
 
     owr_message_origin_bus_set_free(source->priv->message_origin_bus_set);
     source->priv->message_origin_bus_set = NULL;
+
+    g_clear_object(&source->priv->source_volume);
 }
 
 static void owr_local_media_source_class_init(OwrLocalMediaSourceClass *klass)
@@ -128,6 +147,12 @@ static void owr_local_media_source_class_init(OwrLocalMediaSourceClass *klass)
             "Index of the device to be used for this source (-1 => auto)",
             -1, G_MAXINT16, -1,
             G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+    g_object_class_install_property(gobject_class, PROP_VOLUME,
+        g_param_spec_double("volume", "Volume",
+            "Volume factor (only applicable to audio sources)",
+            0, 10, 1,
+            G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 }
 
 static gpointer owr_local_media_source_get_bus_set(OwrMessageOrigin *origin)
@@ -143,19 +168,34 @@ static void owr_message_origin_interface_init(OwrMessageOriginInterface *interfa
 static void owr_local_media_source_init(OwrLocalMediaSource *source)
 {
     OwrLocalMediaSourcePrivate *priv;
+
     source->priv = priv = OWR_LOCAL_MEDIA_SOURCE_GET_PRIVATE(source);
     priv->device_index = -1;
     priv->message_origin_bus_set = owr_message_origin_bus_set_new();
+    priv->source_volume = NULL;
+    priv->tmp_volume = 1;
 }
 
 static void owr_local_media_source_set_property(GObject *object, guint property_id,
     const GValue *value, GParamSpec *pspec)
 {
     OwrLocalMediaSource *source = OWR_LOCAL_MEDIA_SOURCE(object);
+    OwrMediaType media_type = OWR_MEDIA_TYPE_UNKNOWN;
 
     switch (property_id) {
     case PROP_DEVICE_INDEX:
         source->priv->device_index = g_value_get_int(value);
+        break;
+    case PROP_VOLUME:
+        g_object_get(source, "media-type", &media_type, NULL);
+        if (source->priv->source_volume)
+            g_object_set(source->priv->source_volume, "volume", g_value_get_double(value), NULL);
+        
+        if (media_type == OWR_MEDIA_TYPE_AUDIO)
+            /* Set this anyway in case the source gets shutdown and restarted */
+            source->priv->tmp_volume = g_value_get_double(value);
+        else
+            GST_WARNING_OBJECT(source, "Tried to set volume on non-audio source");
         break;
 
     default:
@@ -168,10 +208,21 @@ static void owr_local_media_source_get_property(GObject *object, guint property_
     GValue *value, GParamSpec *pspec)
 {
     OwrLocalMediaSource *source = OWR_LOCAL_MEDIA_SOURCE(object);
+    OwrMediaType media_type = OWR_MEDIA_TYPE_UNKNOWN;
 
     switch (property_id) {
     case PROP_DEVICE_INDEX:
         g_value_set_int(value, source->priv->device_index);
+        break;
+    case PROP_VOLUME:
+        g_object_get(source, "media-type", &media_type, NULL);
+        if (source->priv->source_volume)
+            g_object_get_property(G_OBJECT(source->priv->source_volume), "volume", value);
+        else if (media_type == OWR_MEDIA_TYPE_AUDIO)
+            g_value_set_double(value, source->priv->tmp_volume);
+        else
+            GST_WARNING_OBJECT(source, "Tried to get volume on non-audio source");
+
         break;
 
     default:
@@ -179,16 +230,6 @@ static void owr_local_media_source_get_property(GObject *object, guint property_
         break;
     }
 }
-
-#define LINK_ELEMENTS(a, b) \
-    if (!gst_element_link(a, b)) \
-        GST_ERROR("Failed to link " #a " -> " #b);
-
-#define CREATE_ELEMENT(elem, factory, name) \
-    elem = gst_element_factory_make(factory, name); \
-    if (!elem) \
-        GST_ERROR("Could not create " name " from factory " factory); \
-    g_assert(elem);
 
 /* FIXME: Copy from owr/orw.c without any error handling whatsoever */
 static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer user_data)
@@ -266,6 +307,7 @@ static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer user_data)
 static gboolean shutdown_media_source(GHashTable *args)
 {
     OwrMediaSource *media_source;
+    OwrLocalMediaSource *local_media_source;
     GstElement *source_pipeline, *source_tee;
     GHashTable *event_data;
     GValue *value;
@@ -276,6 +318,9 @@ static gboolean shutdown_media_source(GHashTable *args)
 
     media_source = g_hash_table_lookup(args, "media_source");
     g_assert(media_source);
+
+    local_media_source = OWR_LOCAL_MEDIA_SOURCE(media_source);
+    g_clear_object(&local_media_source->priv->source_volume);
 
     source_pipeline = _owr_media_source_get_source_bin(media_source);
     if (!source_pipeline) {
@@ -451,6 +496,8 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
     local_source = OWR_LOCAL_MEDIA_SOURCE(media_source);
     priv = local_source->priv;
 
+    GST_DEBUG_OBJECT(media_source, "source requested");
+
     /* only create the source bin for this media source once */
     if ((source_pipeline = _owr_media_source_get_source_bin(media_source)))
         GST_DEBUG_OBJECT(media_source, "Re-using existing source element/bin");
@@ -548,6 +595,11 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
                 goto done;
             }
 
+            CREATE_ELEMENT(priv->source_volume, "volume", "audio-source-volume");
+            g_object_set(priv->source_volume, "volume", priv->tmp_volume, NULL);
+            source_process = priv->source_volume;
+            gst_bin_add(GST_BIN(source_pipeline), source_process);
+
             break;
             }
         case OWR_MEDIA_TYPE_VIDEO:
@@ -631,6 +683,7 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
                     /* Accepting any format didn't work, we're going to hope that scaling fixes it */
                     CREATE_ELEMENT(source_process, "videoscale", "video-source-scale");
                     gst_bin_add(GST_BIN(source_pipeline), source_process);
+                    /* should be gst_object_unref(source_process); ? */
                 }
             }
 
