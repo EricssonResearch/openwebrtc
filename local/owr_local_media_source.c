@@ -840,6 +840,37 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
             gst_caps_set_simple(source_caps, "format", G_TYPE_STRING, "NV12", NULL);
 #endif
 
+#if defined(TARGET_RPI) && TARGET_RPI
+#define MAX_RPI_CAMERA_HEIGHT 720
+#define MAX_RPI_CAMERA_WIDTH 1440
+            /* The requested video source resolution can cause firmware mmal related errors.
+             * This happens for example with WebKit and AppRTC when the screen resolution is set to 1080p.
+             * We work-around this by capping the maximum allowed resolution to 720p.
+             * We try to keep the aspect ratio. */
+            gint width, height;
+            gdouble ratio;
+            const GstStructure *str;
+            str = gst_caps_get_structure (source_caps, 0);
+            if (gst_structure_get_int (str, "width", &width) &&
+                gst_structure_get_int (str, "height", &height)) {
+                GST_DEBUG_OBJECT(local_source, "RPiCam: Asked source video resolution of %dx%d\n", width, height);
+                if ((height > MAX_RPI_CAMERA_HEIGHT) ||
+                   (width > MAX_RPI_CAMERA_WIDTH)) {
+                    ratio = (gdouble) width / height;
+                    if (height > MAX_RPI_CAMERA_HEIGHT) {
+                        height = MAX_RPI_CAMERA_HEIGHT;
+                        width = height * ratio;
+                    }
+                    if (width > MAX_RPI_CAMERA_WIDTH) {
+                        width = MAX_RPI_CAMERA_WIDTH;
+                        height = width / ratio;
+                    }
+                    gst_caps_set_simple(source_caps, "height", G_TYPE_INT, height, NULL);
+                    gst_caps_set_simple(source_caps, "width", G_TYPE_INT, width, NULL);
+                    GST_WARNING_OBJECT(local_source, "RPiCam: The asked source video resolution was capped to %dx%d to avoid mmal firmware related errors\n", width, height);
+                }
+            }
+#endif //defined(TARGET_RPI) && TARGET_RPI
             CREATE_ELEMENT(capsfilter, "capsfilter", "video-source-capsfilter");
             g_object_set(capsfilter, "caps", source_caps, NULL);
             gst_caps_unref(source_caps);
