@@ -387,6 +387,16 @@ static GstElement *owr_video_renderer_get_element(OwrMediaRenderer *renderer, gu
 }
 
 /**
+ * OwrVideoRendererRequestContextCallback:
+ * @context_type: (transfer none): the context type
+ * @user_data: (allow-none): the data passed to owr_video_renderer_set_request_context_callback
+ *
+ * Prototype for the callback passed to owr_video_renderer_set_request_context_callback()
+ *
+ * Returns: (transfer none): the GstContext
+ */
+
+/**
  * owr_video_renderer_set_request_context_callback: Configure the GClosure to
  * invoke when a GL context is required by the GStreamer pipeline running the
  * renderer.
