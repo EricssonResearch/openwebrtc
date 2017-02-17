@@ -379,6 +379,19 @@ def gen_namespace(namespace):
 
     return {c.name: str(c) for c in all_classes}
 
+external_classes = {
+    'GstContext': str(J.Class(
+        name='GstContext',
+        extends='NativeInstance',
+        visibility='public',
+        package=config.PACKAGE_ROOT,
+        body=[
+            J.Method('public', [], 'GstContext', params=['long pointer'],
+                     body=[J.Call('super', 'new NativePointer(pointer)')],
+                     ),
+        ]
+    )),
+}
 
 standard_classes = {
     'NativeInstance': str(J.Class(

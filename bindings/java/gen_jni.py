@@ -38,7 +38,7 @@ from gir_parser import GirParser
 from type_registry import TypeRegistry
 from type_registry import TypeTransform
 from type_registry import GirMetaType
-from standard_types import standard_types
+from standard_types import standard_types, GObjectMetaType
 from standard_types import ObjectMetaType
 
  ######   #######  ##    ##  ######  ########
@@ -144,6 +144,10 @@ class GMainContextDummy(GirMetaType()):
         return TypeTransform()
 
 
+class GstContextDummy(GObjectMetaType(gir_type='GstContext', c_type='OwrGstContext', prefix=None)):
+    pass
+
+
 def remove_ignored_elements(xml_root):
     def remove_elem(path):
         parent = xml_root.find(path + '/..')
@@ -165,6 +169,7 @@ def main(argv = None):
     type_registry.register(standard_types)
     type_registry.register(WindowHandleType)
     type_registry.register(GMainContextDummy)
+    type_registry.register(GstContextDummy)
 
     xml_root = ET.parse(args.gir).getroot()
     remove_ignored_elements(xml_root)
@@ -176,6 +181,9 @@ def main(argv = None):
 
     java_base_dir = '/'.join([args.j_dir] + config.PACKAGE_ROOT.split('.'))
     for name, source in java_generator.standard_classes.items():
+        write_file(source, java_base_dir, name + '.java')
+
+    for name, source in java_generator.external_classes.items():
         write_file(source, java_base_dir, name + '.java')
 
     for namespace in namespaces:
