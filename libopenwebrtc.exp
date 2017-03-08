@@ -80,6 +80,7 @@ owr_video_payload_get_type
 owr_video_payload_new
 owr_video_renderer_get_type
 owr_video_renderer_new
+owr_video_renderer_set_request_context_callback
 owr_window_registry_get
 owr_window_registry_get_type
 owr_window_registry_register
