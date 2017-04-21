@@ -161,6 +161,12 @@ Owr_@OWR_API_VERSION_UNDERSCORE@_gir_FILES = \
     ../local/owr_window_registry.h \
     ../local/owr_window_registry.c
 
+if OWR_GST
+Owr_@OWR_API_VERSION_UNDERSCORE@_gir_FILES += \
+    ../local/owr_gst_local_media_source.h \
+    ../local/owr_gst_local_media_source.c
+endif
+
 INTROSPECTION_GIRS += Owr-@OWR_API_VERSION@.gir
 
 girdir = $(datadir)/gir-1.0

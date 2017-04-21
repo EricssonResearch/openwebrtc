@@ -60,6 +60,9 @@ struct _OwrLocalMediaSource {
 
 struct _OwrLocalMediaSourceClass {
     OwrMediaSourceClass parent_class;
+
+    /*< private >*/
+    void *(*request_source_element)(OwrLocalMediaSource *media_source);
 };
 
 GType owr_local_media_source_get_type(void) G_GNUC_CONST;

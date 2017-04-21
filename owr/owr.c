@@ -78,6 +78,7 @@ GST_DEBUG_CATEGORY(_owrimagerenderer_debug);
 GST_DEBUG_CATEGORY(_owrimageserver_debug);
 GST_DEBUG_CATEGORY(_owrlocal_debug);
 GST_DEBUG_CATEGORY(_owrlocalmediasource_debug);
+GST_DEBUG_CATEGORY(_owrgstlocalmediasource_debug);
 GST_DEBUG_CATEGORY(_owrmediarenderer_debug);
 GST_DEBUG_CATEGORY(_owrmediasession_debug);
 GST_DEBUG_CATEGORY(_owrmediasource_debug);
@@ -242,6 +243,8 @@ void owr_init(GMainContext *main_context)
         "OpenWebRTC Local");
     GST_DEBUG_CATEGORY_INIT(_owrlocalmediasource_debug, "owrlocalmediasource", 0,
         "OpenWebRTC Local Media Source");
+    GST_DEBUG_CATEGORY_INIT(_owrgstlocalmediasource_debug, "owrgstlocalmediasource", 0,
+        "OpenWebRTC Gstreamer Local Media Source");
     GST_DEBUG_CATEGORY_INIT(_owrmediarenderer_debug, "owrmediarenderer", 0,
         "OpenWebRTC Media Renderer");
     GST_DEBUG_CATEGORY_INIT(_owrmediasession_debug, "owrmediasession", 0,
