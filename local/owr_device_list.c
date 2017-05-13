@@ -513,7 +513,11 @@ static JavaVM *get_java_vm(void)
 
     while (android_runtime_libs[lib_index] && !handle) {
         dlerror();
+#if defined(__BIONIC__) && !defined(__LP64__)
+        handle = RTLD_DEFAULT;
+#else
         handle = dlopen(android_runtime_libs[lib_index], RTLD_LOCAL | RTLD_LAZY);
+#endif         
         error_string = dlerror();
 
         if (error_string)
