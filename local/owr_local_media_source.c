@@ -767,8 +767,14 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
 #endif
                 break;
             case OWR_SOURCE_TYPE_TEST: {
-                GstElement *src, *time;
+                GstElement *src, *time, *h264enc = NULL;
                 GstPad *srcpad;
+                gboolean useh264 = g_ascii_strcasecmp (g_getenv("OWR_USE_TEST_SOURCES"),"H264") == 0;
+
+                if (useh264)
+                    printf("video-source encoding: video/x-h264\n");
+                else
+                    printf("video-source encoding: video/x-raw\n");
 
                 source = gst_bin_new("video-source");
 
@@ -781,9 +787,24 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
                     g_object_set(time, "font-desc", "Sans 60", NULL);
                     gst_bin_add(GST_BIN(source), time);
                     gst_element_link(src, time);
-                    srcpad = gst_element_get_static_pad(time, "src");
-                } else
-                    srcpad = gst_element_get_static_pad(src, "src");
+                    if (!useh264)
+                        srcpad = gst_element_get_static_pad(time, "src");
+                } else if (!useh264)
+                        srcpad = gst_element_get_static_pad(src, "src");
+
+                if (useh264) {
+                    h264enc = gst_element_factory_make("openh264enc", "openh264enc");
+                    if (!h264enc) {
+                        GST_ERROR_OBJECT(source, "Failed to create openh264enc element!");
+                        printf("Failed to create openh264enc element!\n");
+                    }
+                    gst_bin_add(GST_BIN(source), h264enc);
+                    if (time)
+                        gst_element_link(time, h264enc);
+                    else
+                        gst_element_link(src, h264enc);
+                    srcpad = gst_element_get_static_pad(h264enc, "src");
+                }
 
                 gst_element_add_pad(source, gst_ghost_pad_new("src", srcpad));
                 gst_object_unref(srcpad);

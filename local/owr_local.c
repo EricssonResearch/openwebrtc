@@ -65,6 +65,7 @@ static GList *get_test_sources(OwrMediaType types)
     OwrMediaType media_type;
     GList *result_list = NULL;
     GList *elem;
+    gboolean useh264 = g_ascii_strcasecmp (g_getenv("OWR_USE_TEST_SOURCES"),"H264") == 0;
 
     if (g_once_init_enter(&cached_sources)) {
         GList *sources = NULL;
@@ -73,6 +74,8 @@ static GList *get_test_sources(OwrMediaType types)
         sources = g_list_append(sources, OWR_MEDIA_SOURCE(source));
 
         source = _owr_local_media_source_new_cached(-1, "Video test source", OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_TEST, OWR_MEDIA_SOURCE_SUPPORTS_NONE);
+        if (useh264)
+            _owr_media_source_set_codec(OWR_MEDIA_SOURCE(source), OWR_CODEC_TYPE_H264);
         sources = g_list_append(sources, OWR_MEDIA_SOURCE(source));
 
         g_once_init_leave(&cached_sources, sources);
