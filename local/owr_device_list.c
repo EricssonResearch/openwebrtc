@@ -413,9 +413,9 @@ typedef jint (*JNI_GetCreatedJavaVMs)(JavaVM **vmBuf, jsize bufLen, jsize *nVMs)
 static void cache_java_classes(JNIEnv *);
 
 static const char *const android_runtime_libs[] = {
+    NULL,
     ANDROID_RUNTIME_DALVIK_LIB,
-    ANDROID_RUNTIME_ART_LIB,
-    NULL
+    ANDROID_RUNTIME_ART_LIB
 };
 
 static pthread_key_t detach_key = 0;
@@ -508,44 +508,40 @@ static JavaVM *get_java_vm(void)
     static JavaVM *jvm = NULL;
     const gchar *error_string;
     jsize num_jvms = 0;
-    gint lib_index = 0;
+    guint lib_index;
     gint err;
 
-    while (android_runtime_libs[lib_index] && !handle) {
+    for (lib_index = 0; !jvm && lib_index < G_N_ELEMENTS(android_runtime_libs); lib_index++) {
         dlerror();
         handle = dlopen(android_runtime_libs[lib_index], RTLD_LOCAL | RTLD_LAZY);
-        error_string = dlerror();
 
-        if (error_string)
-            g_debug("failed to load %s: %s", android_runtime_libs[lib_index], error_string);
+        if (!handle) {
+            g_debug("failed to load %s: %s", android_runtime_libs[lib_index], dlerror());
+            continue;
+        }
 
-        if (handle)
-            g_debug("Android runtime loaded from %s", android_runtime_libs[lib_index]);
-        else
-            ++lib_index;
-    }
+        g_debug("Android runtime loaded from %s", android_runtime_libs[lib_index]);
 
-    if (handle) {
         dlerror();
         *(void **) (&get_created_java_vms) = dlsym(handle, "JNI_GetCreatedJavaVMs");
         error_string = dlerror();
 
-        if (error_string) {
+        if (!error_string) {
+            get_created_java_vms(&jvm, 1, &num_jvms);
+
+            if (num_jvms < 1)
+                g_debug("get_created_java_vms returned %d jvms", num_jvms);
+            else
+                g_debug("found existing jvm");
+        } else
             g_warning("dlsym(\"JNI_GetCreatedJavaVMs\") failed: %s", error_string);
-            return NULL;
-        }
-
-        get_created_java_vms(&jvm, 1, &num_jvms);
-
-        if (num_jvms < 1)
-            g_debug("get_created_java_vms returned %d jvms", num_jvms);
-        else
-            g_debug("found existing jvm");
 
         err = dlclose(handle);
         if (err)
             g_warning("dlclose() of android runtime handle failed");
-    } else
+    }
+
+    if (!jvm)
         g_error("Failed to get jvm");
 
     return jvm;
