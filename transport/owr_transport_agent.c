@@ -3814,6 +3814,7 @@ static void handle_data_channel_message(OwrTransportAgent *transport_agent, guin
     if (data_channel_info->state != OWR_DATA_CHANNEL_STATE_OPEN) {
         /* This should never happen */
         g_critical("Received message before datachannel was established.");
+        g_rw_lock_reader_unlock(&data_channel_info->rw_mutex);
         goto end;
     }
 
