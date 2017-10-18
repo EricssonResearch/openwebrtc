@@ -165,6 +165,7 @@ static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer user_data)
 
     case GST_MESSAGE_WARNING:
         is_warning = TRUE;
+        /* fallthru */
 
     case GST_MESSAGE_ERROR:
         if (is_warning) {
