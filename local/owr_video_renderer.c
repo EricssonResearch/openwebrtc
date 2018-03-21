@@ -505,7 +505,10 @@ static GstCaps *owr_video_renderer_get_caps(OwrMediaRenderer *renderer)
 static GstElement *owr_video_renderer_get_sink(OwrMediaRenderer *renderer)
 {
     OWR_UNUSED(renderer);
-    return gst_element_factory_make(VIDEO_SINK, "video-renderer-sink");
+    GstElement *result;
+    result = gst_element_factory_make(VIDEO_SINK, "video-renderer-sink");
+    g_object_set(result, "sync", FALSE, NULL);
+    return result;
 }
 
 void _owr_video_renderer_notify_tag_changed(OwrVideoRenderer *video_renderer, const gchar *tag, gboolean have_handle, guintptr new_handle)

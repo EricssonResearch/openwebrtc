@@ -46,6 +46,10 @@
 
 #include <string.h>
 
+typedef struct{
+  OwrTransportAgent *snd, *rcv;
+}TransportAgents;
+
 static OwrTransportAgent *recv_transport_agent = NULL;
 static OwrMediaSession *recv_session_audio = NULL;
 static OwrMediaSession *recv_session_video = NULL;
@@ -341,6 +345,15 @@ static gboolean dump_cb(gpointer *user_data)
     return G_SOURCE_REMOVE;
 }
 
+static gboolean add_subflow(gpointer *user_data)
+{
+    g_print("Add subflow to the pipeline!\n");
+    TransportAgents *agents = user_data;
+    owr_transport_agent_join_rcv_subflow(agents->rcv, 5720);
+    owr_transport_agent_join_snd_subflow(agents->snd, "127.0.0.1", 5720);
+    return G_SOURCE_REMOVE;
+}
+
 static const gchar *message_origin_name_func(gpointer origin)
 {
     if (!origin) {
@@ -378,11 +391,11 @@ static const gchar *message_origin_name_func(gpointer origin)
     }
 }
 
-
 int main(int argc, char **argv)
 {
     GOptionContext *options;
     GError *error = NULL;
+    TransportAgents agents;
 
     options = g_option_context_new(NULL);
     g_option_context_add_main_entries(options, entries, NULL);
@@ -412,7 +425,7 @@ int main(int argc, char **argv)
 
     owr_bus_add_message_origin(bus, OWR_MESSAGE_ORIGIN(owr_window_registry_get()));
 
-    recv_transport_agent = owr_transport_agent_new(FALSE);
+    agents.rcv = recv_transport_agent = owr_transport_agent_new(FALSE);
     g_assert(OWR_IS_TRANSPORT_AGENT(recv_transport_agent));
     owr_bus_add_message_origin(bus, OWR_MESSAGE_ORIGIN(recv_transport_agent));
 
@@ -423,7 +436,7 @@ int main(int argc, char **argv)
         owr_transport_agent_add_local_address(recv_transport_agent, local_addr);
 
     // SEND
-    send_transport_agent = owr_transport_agent_new(TRUE);
+    agents.snd = send_transport_agent = owr_transport_agent_new(TRUE);
     g_assert(OWR_IS_TRANSPORT_AGENT(send_transport_agent));
     owr_bus_add_message_origin(bus, OWR_MESSAGE_ORIGIN(send_transport_agent));
 
@@ -502,6 +515,10 @@ int main(int argc, char **argv)
     }
 
     g_timeout_add_seconds(10, (GSourceFunc)dump_cb, NULL);
+
+    //Todo: transport agent into one pointer.
+    g_timeout_add_seconds(10, (GSourceFunc)add_subflow, &agents);
+
 
     owr_run();
 
