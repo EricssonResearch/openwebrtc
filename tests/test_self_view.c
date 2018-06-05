@@ -49,7 +49,12 @@ static OwrMediaRenderer *audio_renderer = NULL, *video_renderer = NULL;
 
 gboolean dump_pipeline(gpointer user_data)
 {
-    g_print("Dumping pipelines\n");
+    if (!g_getenv("OWR_DEBUG_DUMP_DOT_DIR")) {
+        g_print("Not dumping pipelines because OWR_DEBUG_DUMP_DOT_DIR environment variable is empty.\n");
+        return FALSE;
+    }
+
+    g_print("Dumping pipelines...");
 
     if (audio_source)
         write_dot_file("test_self_view-audio_source", owr_media_source_get_dot_data(audio_source), FALSE);
@@ -60,6 +65,8 @@ gboolean dump_pipeline(gpointer user_data)
         write_dot_file("test_self_view-video_source", owr_media_source_get_dot_data(video_source), FALSE);
     if (video_renderer)
         write_dot_file("test_self_view-video_renderer", owr_media_renderer_get_dot_data(video_renderer), FALSE);
+
+    g_print(" done.\n");
 
     return FALSE;
 }

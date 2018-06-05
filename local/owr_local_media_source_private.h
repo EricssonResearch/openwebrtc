@@ -33,6 +33,7 @@
 #define __OWR_LOCAL_MEDIA_SOURCE_PRIVATE_H__
 
 #include "owr_local_media_source.h"
+#include "owr_media_source_private.h"
 
 #include "owr_types.h"
 
@@ -43,7 +44,8 @@
 G_BEGIN_DECLS
 
 OwrLocalMediaSource *_owr_local_media_source_new_cached(gint device_index,
-    const gchar *name, OwrMediaType media_type, OwrSourceType source_type);
+    const gchar *name, OwrMediaType media_type, OwrSourceType source_type,
+    OwrMediaSourceSupportedInterfaces interfaces);
 void _owr_local_media_source_set_capture_device_index(OwrLocalMediaSource *source, guint index);
 
 G_END_DECLS

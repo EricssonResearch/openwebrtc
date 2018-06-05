@@ -289,7 +289,7 @@ def handle_offer(message):
                 session.set_send_source(source)
         ALL_SESSIONS.append((session, session_data))
         TRANSPORT_AGENT.add_session(session)
-
+    TRANSPORT_AGENT.start()
 
 def handle_remote_candidate(message):
     print("Handling remote candidate")

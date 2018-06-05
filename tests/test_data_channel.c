@@ -223,14 +223,14 @@ static gboolean setup_transport_agents()
 {
     g_print("Setting up transport agents\n");
     // LEFT
-    left_transport_agent = owr_transport_agent_new(FALSE);
+    left_transport_agent = owr_transport_agent_new(FALSE, OWR_BUNDLE_POLICY_TYPE_BALANCED);
     g_assert(OWR_IS_TRANSPORT_AGENT(left_transport_agent));
 
     owr_transport_agent_set_local_port_range(left_transport_agent, 5000, 5999);
     owr_transport_agent_add_local_address(left_transport_agent, "127.0.0.1");
 
     // RIGHT
-    right_transport_agent = owr_transport_agent_new(TRUE);
+    right_transport_agent = owr_transport_agent_new(TRUE, OWR_BUNDLE_POLICY_TYPE_BALANCED);
     g_assert(OWR_IS_TRANSPORT_AGENT(right_transport_agent));
 
     owr_transport_agent_set_local_port_range(right_transport_agent, 5000, 5999);
@@ -247,7 +247,9 @@ static gboolean setup_transport_agents()
 
     owr_transport_agent_add_session(left_transport_agent, OWR_SESSION(left_session));
     owr_transport_agent_add_session(right_transport_agent, OWR_SESSION(right_session));
-
+    owr_transport_agent_start(left_transport_agent);
+    owr_transport_agent_start(right_transport_agent);
+    
     if (wait_for_dtls) {
         gboolean peer_certificate_received;
         GAsyncQueue *msg_queue = g_async_queue_new();

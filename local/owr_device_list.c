@@ -262,7 +262,8 @@ static void source_info_iterator(pa_context *pa_context, const pa_source_info *i
         }
 
         source = _owr_local_media_source_new_cached(info->index, info->description,
-            OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_CAPTURE);
+            OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_CAPTURE,
+            OWR_MEDIA_SOURCE_SUPPORTS_NONE);
 
         context->list = g_list_prepend(context->list, source);
     } else {
@@ -283,7 +284,8 @@ static gboolean enumerate_audio_source_devices(GClosure *callback)
     GList *sources = NULL;
 
     source = _owr_local_media_source_new_cached(-1,
-        "Default audio input", OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_CAPTURE);
+        "Default audio input", OWR_MEDIA_TYPE_AUDIO, OWR_SOURCE_TYPE_CAPTURE,
+        OWR_MEDIA_SOURCE_SUPPORTS_NONE);
     sources = g_list_prepend(sources, source);
     _owr_utils_call_closure_with_list(callback, sources);
     g_list_free_full(sources, g_object_unref);
@@ -358,7 +360,8 @@ static OwrLocalMediaSource *maybe_create_source_from_filename(const gchar *name)
             return NULL;
 
         source = _owr_local_media_source_new_cached(index, device_name,
-            OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE);
+            OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE,
+            OWR_MEDIA_SOURCE_SUPPORTS_NONE);
 
         g_debug("v4l: filename match: %s", device_name);
 
@@ -377,6 +380,20 @@ static gboolean enumerate_video_source_devices(GClosure *callback)
     GError *error = NULL;
     GDir *dev_dir;
     const gchar *filename;
+
+#if TARGET_RPI
+    source = _owr_local_media_source_new_cached(-1, "RPiCam",
+        OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE,
+        OWR_MEDIA_SOURCE_SUPPORTS_VIDEO_ORIENTATION | OWR_MEDIA_SOURCE_SUPPORTS_COLOR_BALANCE);
+    _owr_media_source_set_codec(OWR_MEDIA_SOURCE(source), OWR_CODEC_TYPE_H264);
+    sources = g_list_prepend(sources, source);
+
+    // Skip v4l2 devices.
+    _owr_utils_call_closure_with_list(callback, sources);
+    g_list_free_full(sources, g_object_unref);
+
+    return FALSE;
+#endif
 
     dev_dir = g_dir_open("/dev", 0, &error);
 
@@ -677,11 +694,13 @@ static gboolean enumerate_video_source_devices(GClosure *callback)
 
         if (facing == CameraInfo.CAMERA_FACING_FRONT) {
             source = _owr_local_media_source_new_cached(i, "Front facing Camera",
-                OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE);
+                OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE,
+                OWR_MEDIA_SOURCE_SUPPORTS_NONE);
             sources = g_list_prepend(sources, source);
         } else if (facing == CameraInfo.CAMERA_FACING_BACK) {
             source = _owr_local_media_source_new_cached(i, "Back facing Camera",
-                OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE);
+                OWR_MEDIA_TYPE_VIDEO, OWR_SOURCE_TYPE_CAPTURE,
+                OWR_MEDIA_SOURCE_SUPPORTS_NONE);
             sources = g_list_append(sources, source);
         }
 

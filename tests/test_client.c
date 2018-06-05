@@ -610,6 +610,7 @@ end_payload:
         g_object_set_data(G_OBJECT(transport_agent), "media-sessions", media_sessions);
         owr_transport_agent_add_session(transport_agent, OWR_SESSION(media_session));
     }
+    owr_transport_agent_start(transport_agent);
     json_reader_end_member(reader);
 }
 
@@ -771,7 +772,7 @@ static void send_eventsource_request(const gchar *url)
 static void got_local_sources(GList *sources, gchar *url)
 {
     local_sources = g_list_copy(sources);
-    transport_agent = owr_transport_agent_new(FALSE);
+    transport_agent = owr_transport_agent_new(FALSE, OWR_BUNDLE_POLICY_TYPE_BALANCED);
     owr_transport_agent_add_helper_server(transport_agent, OWR_HELPER_SERVER_TYPE_STUN,
         "stun.services.mozilla.com", 3478, NULL, NULL);
     if (url) {

@@ -65,6 +65,8 @@ struct _OwrPayloadClass {
 
 GType owr_payload_get_type(void) G_GNUC_CONST;
 
+gboolean owr_payload_supported(OwrCodecType codec_type);
+
 G_END_DECLS
 
 #endif /* __OWR_PAYLOAD_H__ */

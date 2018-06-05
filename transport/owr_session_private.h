@@ -50,6 +50,9 @@ void _owr_session_set_dtls_peer_certificate(OwrSession *, const gchar *certifica
 void _owr_session_emit_ice_state_changed(OwrSession *session, guint session_id,
 	OwrComponentType component_type, OwrIceState state);
 
+void _owr_session_set_stream_id(OwrSession *session, guint session_id);
+guint _owr_session_get_stream_id(OwrSession *session);
+
 G_END_DECLS
 
 #endif /* __GTK_DOC_IGNORE__ */

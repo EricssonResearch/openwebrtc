@@ -79,7 +79,9 @@ static void on_caps(GstElement *source, GParamSpec *pspec, OwrMediaSource *media
     if (GST_IS_CAPS(caps)) {
         GST_INFO_OBJECT(source, "%s - configured with caps: %" GST_PTR_FORMAT,
             media_source_name, caps);
+        gst_caps_unref(caps);
     }
+    g_free(media_source_name);
 }
 
 #define LINK_ELEMENTS(a, b) \
@@ -87,7 +89,7 @@ static void on_caps(GstElement *source, GParamSpec *pspec, OwrMediaSource *media
         GST_ERROR("Failed to link " #a " -> " #b);
 
 OwrMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
-    guint stream_id, OwrCodecType codec_type, gpointer transport_bin_ptr)
+    guint session_id, guint stream_id, OwrCodecType codec_type, gpointer transport_bin_ptr)
 {
     GstElement *transport_bin = GST_ELEMENT(transport_bin_ptr);
     OwrRemoteMediaSource *source;
@@ -119,10 +121,10 @@ OwrMediaSource *_owr_remote_media_source_new(OwrMediaType media_type,
     /* create source tee and everything */
     if (media_type == OWR_MEDIA_TYPE_VIDEO) {
         bin_name = g_strdup_printf("video-src-%u-%u", codec_type, stream_id);
-        pad_name = g_strdup_printf("video_src_%u_%u", codec_type, stream_id);
+        pad_name = g_strdup_printf("video_src_%u_%u_%u", codec_type, session_id, stream_id);
     } else if (media_type == OWR_MEDIA_TYPE_AUDIO) {
         bin_name = g_strdup_printf("audio-src-%u-%u", codec_type, stream_id);
-        pad_name = g_strdup_printf("audio_raw_src_%u", stream_id);
+        pad_name = g_strdup_printf("audio_raw_src_%u_%u", session_id, stream_id);
     } else
         g_assert_not_reached();
 

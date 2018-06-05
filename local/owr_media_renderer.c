@@ -58,6 +58,7 @@ enum {
     PROP_0,
     PROP_MEDIA_TYPE,
     PROP_DISABLED,
+    PROP_SOURCE,
     N_PROPERTIES
 };
 
@@ -129,6 +130,10 @@ static void owr_media_renderer_class_init(OwrMediaRendererClass *klass)
     obj_properties[PROP_DISABLED] = g_param_spec_boolean("disabled", "Disabled",
         "Whether this renderer is disabled or not", DEFAULT_DISABLED,
         G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+
+    obj_properties[PROP_SOURCE] = g_param_spec_object("source", "Source",
+                                                      "Current Media Source being rendered", OWR_TYPE_MEDIA_SOURCE,
+                                                      G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
     gobject_class->set_property = owr_media_renderer_set_property;
     gobject_class->get_property = owr_media_renderer_get_property;
@@ -263,6 +268,10 @@ static void owr_media_renderer_set_property(GObject *object, guint property_id,
         priv->disabled = g_value_get_boolean(value);
         break;
 
+    case PROP_SOURCE:
+        priv->source = g_value_get_object(value);
+        break;
+
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
         break;
@@ -286,6 +295,10 @@ static void owr_media_renderer_get_property(GObject *object, guint property_id,
         g_value_set_boolean(value, priv->disabled);
         break;
 
+    case PROP_SOURCE:
+        g_value_set_object(value, priv->source);
+        break;
+
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
         break;
@@ -305,6 +318,7 @@ static void on_caps(GstElement *sink, GParamSpec *pspec, OwrMediaRenderer *media
             media_renderer->priv->media_type == OWR_MEDIA_TYPE_AUDIO ? "Audio" :
             media_renderer->priv->media_type == OWR_MEDIA_TYPE_VIDEO ? "Video" :
             "Unknown", caps);
+        gst_caps_unref(caps);
     }
 }
 
@@ -388,6 +402,7 @@ static gboolean set_source(GHashTable *args)
     }
 
     priv->source = g_object_ref(source);
+    g_object_notify_by_pspec(G_OBJECT(renderer), obj_properties[PROP_SOURCE]);
 
     maybe_start_renderer(renderer);
 
@@ -467,6 +482,11 @@ void _owr_media_renderer_set_sink(OwrMediaRenderer *renderer, gpointer sink_ptr)
     maybe_start_renderer(renderer);
 
     g_mutex_unlock(&priv->media_renderer_lock);
+}
+
+OwrMediaSource* _owr_media_renderer_get_source(OwrMediaRenderer *renderer)
+{
+    return renderer->priv->source;
 }
 
 gchar * owr_media_renderer_get_dot_data(OwrMediaRenderer *renderer)

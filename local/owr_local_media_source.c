@@ -66,9 +66,14 @@ GST_DEBUG_CATEGORY_EXTERN(_owrlocalmediasource_debug);
 #define VIDEO_SRC "androidvideosource"
 
 #elif defined(__linux__)
-#define AUDIO_SRC  "pulsesrc"
-#define VIDEO_SRC  "v4l2src"
+#include <pulse/pulseaudio.h>
 
+#define AUDIO_SRC  "pulsesrc"
+#if TARGET_RPI
+#define VIDEO_SRC  "rpicamsrc"
+#else
+#define VIDEO_SRC  "v4l2src"
+#endif /* TARGET_RPI */
 #else
 #define AUDIO_SRC  "audiotestsrc"
 #define VIDEO_SRC  "videotestsrc"
@@ -562,7 +567,29 @@ static void on_caps(GstElement *source, GParamSpec *pspec, OwrMediaSource *media
     if (GST_IS_CAPS(caps)) {
         GST_INFO_OBJECT(source, "%s - configured with caps: %" GST_PTR_FORMAT,
             media_source_name, caps);
+        gst_caps_unref(caps);
     }
+    g_free(media_source_name);
+}
+
+static void
+setup_source_for_aec(GstElement *src)
+{
+#if defined(__linux__) && !defined(__ANDROID__)
+    /* pulsesrc */
+    GstStructure *s;
+
+    s = gst_structure_new("props", PA_PROP_FILTER_WANT, G_TYPE_STRING, "echo-cancel", NULL);
+    g_object_set(G_OBJECT(src), "stream-properties", s, NULL);
+    gst_structure_free(s);
+
+#elif defined(__ANDROID__)
+    /* openslessrc */
+
+#elif defined(__APPLE__) && !TARGET_IPHONE_SIMULATOR
+    /* osxaudiosrc */
+
+#endif
 }
 
 /*
@@ -695,6 +722,7 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
 #endif
                 }
 #endif
+                setup_source_for_aec(source);
                 break;
             case OWR_SOURCE_TYPE_TEST:
                 CREATE_ELEMENT(source, "audiotestsrc", "audio-source");
@@ -723,6 +751,7 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
             switch (source_type) {
             case OWR_SOURCE_TYPE_CAPTURE:
                 CREATE_ELEMENT(source, VIDEO_SRC, "video-source");
+#if !defined(TARGET_RPI) || !TARGET_RPI
                 if (priv->device_index > -1) {
 #if defined(__APPLE__) && !TARGET_IPHONE_SIMULATOR
                     g_object_set(source, "device-index", priv->device_index, NULL);
@@ -734,10 +763,19 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
                     g_free(tmp);
 #endif
                 }
+#else
+                g_object_set(source, "preview", FALSE, "fullscreen", FALSE, "inline-headers", TRUE, NULL);
+#endif
                 break;
             case OWR_SOURCE_TYPE_TEST: {
-                GstElement *src, *time;
+                GstElement *src, *time, *h264enc = NULL;
                 GstPad *srcpad;
+                gboolean useh264 = g_ascii_strcasecmp (g_getenv("OWR_USE_TEST_SOURCES"),"H264") == 0;
+
+                if (useh264)
+                    printf("video-source encoding: video/x-h264\n");
+                else
+                    printf("video-source encoding: video/x-raw\n");
 
                 source = gst_bin_new("video-source");
 
@@ -750,9 +788,24 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
                     g_object_set(time, "font-desc", "Sans 60", NULL);
                     gst_bin_add(GST_BIN(source), time);
                     gst_element_link(src, time);
-                    srcpad = gst_element_get_static_pad(time, "src");
-                } else
-                    srcpad = gst_element_get_static_pad(src, "src");
+                    if (!useh264)
+                        srcpad = gst_element_get_static_pad(time, "src");
+                } else if (!useh264)
+                        srcpad = gst_element_get_static_pad(src, "src");
+
+                if (useh264) {
+                    h264enc = gst_element_factory_make("openh264enc", "openh264enc");
+                    if (!h264enc) {
+                        GST_ERROR_OBJECT(source, "Failed to create openh264enc element!");
+                        printf("Failed to create openh264enc element!\n");
+                    }
+                    gst_bin_add(GST_BIN(source), h264enc);
+                    if (time)
+                        gst_element_link(time, h264enc);
+                    else
+                        gst_element_link(src, h264enc);
+                    srcpad = gst_element_get_static_pad(h264enc, "src");
+                }
 
                 gst_element_add_pad(source, gst_ghost_pad_new("src", srcpad));
                 gst_object_unref(srcpad);
@@ -809,6 +862,37 @@ static GstElement *owr_local_media_source_request_source(OwrMediaSource *media_s
             gst_caps_set_simple(source_caps, "format", G_TYPE_STRING, "NV12", NULL);
 #endif
 
+#if defined(TARGET_RPI) && TARGET_RPI
+#define MAX_RPI_CAMERA_HEIGHT 720
+#define MAX_RPI_CAMERA_WIDTH 1440
+            /* The requested video source resolution can cause firmware mmal related errors.
+             * This happens for example with WebKit and AppRTC when the screen resolution is set to 1080p.
+             * We work-around this by capping the maximum allowed resolution to 720p.
+             * We try to keep the aspect ratio. */
+            gint width, height;
+            gdouble ratio;
+            const GstStructure *str;
+            str = gst_caps_get_structure (source_caps, 0);
+            if (gst_structure_get_int (str, "width", &width) &&
+                gst_structure_get_int (str, "height", &height)) {
+                GST_DEBUG_OBJECT(local_source, "RPiCam: Asked source video resolution of %dx%d\n", width, height);
+                if ((height > MAX_RPI_CAMERA_HEIGHT) ||
+                   (width > MAX_RPI_CAMERA_WIDTH)) {
+                    ratio = (gdouble) width / height;
+                    if (height > MAX_RPI_CAMERA_HEIGHT) {
+                        height = MAX_RPI_CAMERA_HEIGHT;
+                        width = height * ratio;
+                    }
+                    if (width > MAX_RPI_CAMERA_WIDTH) {
+                        width = MAX_RPI_CAMERA_WIDTH;
+                        height = width / ratio;
+                    }
+                    gst_caps_set_simple(source_caps, "height", G_TYPE_INT, height, NULL);
+                    gst_caps_set_simple(source_caps, "width", G_TYPE_INT, width, NULL);
+                    GST_WARNING_OBJECT(local_source, "RPiCam: The asked source video resolution was capped to %dx%d to avoid mmal firmware related errors\n", width, height);
+                }
+            }
+#endif //defined(TARGET_RPI) && TARGET_RPI
             CREATE_ELEMENT(capsfilter, "capsfilter", "video-source-capsfilter");
             g_object_set(capsfilter, "caps", source_caps, NULL);
             gst_caps_unref(source_caps);
@@ -887,7 +971,8 @@ done:
 }
 
 static OwrLocalMediaSource *_owr_local_media_source_new(gint device_index, const gchar *name,
-    OwrMediaType media_type, OwrSourceType source_type)
+    OwrMediaType media_type, OwrSourceType source_type,
+    OwrMediaSourceSupportedInterfaces interfaces)
 {
     OwrLocalMediaSource *source;
 
@@ -898,12 +983,14 @@ static OwrLocalMediaSource *_owr_local_media_source_new(gint device_index, const
         NULL);
 
     _owr_media_source_set_type(OWR_MEDIA_SOURCE(source), source_type);
+    _owr_media_source_set_supported_interfaces(OWR_MEDIA_SOURCE(source), interfaces);
 
     return source;
 }
 
 OwrLocalMediaSource *_owr_local_media_source_new_cached(gint device_index, const gchar *name,
-    OwrMediaType media_type, OwrSourceType source_type)
+    OwrMediaType media_type, OwrSourceType source_type,
+    OwrMediaSourceSupportedInterfaces interfaces)
 {
     static OwrLocalMediaSource *test_sources[2] = { NULL, };
     static GHashTable *sources[2] = { NULL, };
@@ -924,7 +1011,7 @@ OwrLocalMediaSource *_owr_local_media_source_new_cached(gint device_index, const
 
     if (source_type == OWR_SOURCE_TYPE_TEST) {
         if (!test_sources[i])
-            test_sources[i] = _owr_local_media_source_new(device_index, name, media_type, source_type);
+            test_sources[i] = _owr_local_media_source_new(device_index, name, media_type, source_type, interfaces);
 
         ret = test_sources[i];
 
@@ -944,7 +1031,7 @@ OwrLocalMediaSource *_owr_local_media_source_new_cached(gint device_index, const
         }
 
         if (!ret) {
-            ret = _owr_local_media_source_new(device_index, name, media_type, source_type);
+            ret = _owr_local_media_source_new(device_index, name, media_type, source_type, interfaces);
             g_hash_table_insert(sources[i], GINT_TO_POINTER(device_index), ret);
         }
 
